@@ -2,7 +2,7 @@
 %define mod_path ibus-0.1
 Name:       ibus
 Version:    0.1.0.20080810
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -21,6 +21,7 @@ BuildRequires:  dbus-glib-devel
 
 Requires:   pygtk2
 Requires:   dbus-python >= 0.83.0
+Requires:   gnome-python2-gconf
 Requires:   pyxdg
 
 %description
@@ -120,5 +121,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/qt4/plugins/inputmethods/libibus.so
 
 %changelog
+* Mon Aug 11 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.0.20080810-2
+- Add gnome-python2-gconf in Requires.
+
 * Thu Aug 07 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.0.20080810-1
 - The first version.
