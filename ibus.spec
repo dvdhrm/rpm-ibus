@@ -1,7 +1,7 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 %define mod_path ibus-0.1
 Name:       ibus
-Version:    0.1.1.20080815
+Version:    0.1.1.20080823
 Release:    1%{?dist}
 Summary:    Input Bus for Linux OS
 License:    LGPLv2+
@@ -120,6 +120,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/qt4/plugins/inputmethods/libibus.so
 
 %changelog
+* Sat Aug 23 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20080823-1
+- Update to 0.1.1.20080823.
+
 * Fri Aug 15 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20080815-1
 - Update to 0.1.1.20080815.
 
