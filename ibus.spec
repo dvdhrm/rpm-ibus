@@ -1,9 +1,9 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 %define mod_path ibus-0.1
 Name:       ibus
-Version:    0.1.1.20080901
+Version:    0.1.1.20080908
 Release:    1%{?dist}
-Summary:    Input Bus for Linux OS
+Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
 URL:        http://code.google.com/p/ibus/
@@ -25,12 +25,12 @@ Requires:   gnome-python2-gconf
 Requires:   pyxdg
 
 %description
-IBus means the Input Bus. It is a new input framework for Linux OS. It provides
+IBus means Intelligent Input Bus. It is a new input framework for Linux OS. It provides
 full featured and user friendly input method user interface. It also may help
 developers to develop input method easily.
 
 %package gtk
-Summary:    IBus im module for gtk2
+Summary:    iBus im module for gtk2
 Group:      System Environment/Libraries
 Requires:   %{name} = %{version}-%{release}
 
@@ -38,7 +38,7 @@ Requires:   %{name} = %{version}-%{release}
 This package contains ibus im module for gtk2
 
 %package qt
-Summary:    IBus im module for qt4
+Summary:    iBus im module for qt4
 Group:      System Environment/Libraries
 Requires:   %{name} = %{version}-%{release}
 
@@ -120,6 +120,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/qt4/plugins/inputmethods/libibus.so
 
 %changelog
+* Mon Sep 08 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20080908-1
+- Update to 0.1.1.20080908.
+
 * Mon Sep 01 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20080901-1
 - Update to 0.1.1.20080901.
 
