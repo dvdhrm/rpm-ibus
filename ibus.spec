@@ -23,6 +23,7 @@ Requires:   pygtk2
 Requires:   dbus-python >= 0.83.0
 Requires:   gnome-python2-gconf
 Requires:   pyxdg
+Requires:   iso-codes
 
 %description
 IBus means Intelligent Input Bus. It is a new input framework for Linux OS. It provides
