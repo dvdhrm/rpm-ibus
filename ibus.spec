@@ -1,7 +1,8 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
+%{!?gtk_binary_version: %define gtk_binary_version %(pkg-config  --variable=gtk_binary_version gtk+-2.0)}
 %define mod_path ibus-0.1
 Name:       ibus
-Version:    0.1.1.20080923
+Version:    0.1.1.20080930
 Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
@@ -62,7 +63,7 @@ rm -rf $RPM_BUILD_ROOT
 make DESTDIR=${RPM_BUILD_ROOT} install
 rm -f $RPM_BUILD_ROOT%{_libdir}/libibus-gtk.la
 rm -f $RPM_BUILD_ROOT%{_libdir}/libibus-gtk.so
-rm -f $RPM_BUILD_ROOT%{_libdir}/gtk-2.0/immodules/im-ibus.la
+rm -f $RPM_BUILD_ROOT%{_libdir}/gtk-2.0/%{gtk_binary_version}/immodules/im-ibus.la
 
 # install xinput config file
 mkdir -pm 755 ${RPM_BUILD_ROOT}/%{_sysconfdir}/X11/xinit/xinput.d
@@ -114,7 +115,7 @@ rm -rf $RPM_BUILD_ROOT
 %files gtk
 %defattr(-,root,root,-)
 %doc
-%{_libdir}/gtk-2.0/immodules/im-ibus.so
+%{_libdir}/gtk-2.0/%{gtk_binary_version}/immodules/im-ibus.so
 
 %files qt
 %defattr(-,root,root,-)
@@ -122,6 +123,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/qt4/plugins/inputmethods/libibus.so
 
 %changelog
+* Tue Sep 30 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20080930-1
+- Update to 0.1.1.20080930.
+
 * Tue Sep 23 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20080923-1
 - Update to 0.1.1.20080923.
 
