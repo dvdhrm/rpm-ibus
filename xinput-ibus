@@ -1,5 +1,6 @@
 XIM=ibus
 XIM_PROGRAM="/usr/bin/ibus"
+ICON="/usr/share/ibus/icons/ibus.svg"
 # XIM_ARGS="0xffffffff"
 PREFERENCE_PROGRAM=/usr/bin/ibus-setup
 SHORT_DESC="iBus"
