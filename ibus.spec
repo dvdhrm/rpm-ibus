@@ -2,7 +2,7 @@
 %{!?gtk_binary_version: %define gtk_binary_version %(pkg-config  --variable=gtk_binary_version gtk+-2.0)}
 %define mod_path ibus-0.1
 Name:       ibus
-Version:    0.1.1.20081005
+Version:    0.1.1.20081006
 Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
@@ -92,7 +92,7 @@ rm -rf $RPM_BUILD_ROOT
 %dir %{_datadir}/ibus/
 %dir %{_datadir}/ibus/daemon/
 %dir %{_datadir}/ibus/gconf/
-%dir %{_datadir}/ibus/panel/
+%dir %{_datadir}/ibus/ui/
 %dir %{_datadir}/ibus/setup/
 %dir %{_datadir}/ibus/engine/
 %dir %{_datadir}/ibus/icons/
@@ -101,14 +101,14 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/libibus-gtk.so*
 %{_datadir}/ibus/daemon/*
 %{_datadir}/ibus/gconf/*
-%{_datadir}/ibus/panel/*
+%{_datadir}/ibus/ui/*
 %{_datadir}/ibus/setup/*
 %{_datadir}/ibus/icons/*
 %{_datadir}/applications/*
 %{_datadir}/pixmaps/*
 %{_bindir}/ibus-daemon
 %{_bindir}/ibus-gconf
-%{_bindir}/ibus-panel
+%{_bindir}/ibus-ui-gtk
 %{_bindir}/ibus-x11
 %config %{_xinputconf}
 
@@ -123,6 +123,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/qt4/plugins/inputmethods/libibus.so
 
 %changelog
+* Mon Oct 06 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20081006-1
+- Update to 0.1.1.20081006.
+
 * Sun Oct 05 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20081005-1
 - Update to 0.1.1.20081005.
 
