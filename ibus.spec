@@ -3,7 +3,7 @@
 %define mod_path ibus-0.1
 Name:       ibus
 Version:    0.1.1.20081006
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -25,6 +25,8 @@ Requires:   dbus-python >= 0.83.0
 Requires:   gnome-python2-gconf
 Requires:   pyxdg
 Requires:   iso-codes
+Requires(post): %{_sbindir}/alternatives
+Requires(postun): %{_sbindir}/alternatives
 
 %description
 IBus means Intelligent Input Bus. It is a new input framework for Linux OS. It provides
@@ -74,7 +76,9 @@ install -pm 644 %{SOURCE1} ${RPM_BUILD_ROOT}/%{_xinputconf}
 %clean
 rm -rf $RPM_BUILD_ROOT
 
-%post -p /sbin/ldconfig
+%post
+/sbin/ldconfig
+%{_sbindir}/alternatives --install %{_sysconfdir}/X11/xinit/xinputrc xinputrc %{_xinputconf} 83 || :
 
 %post gtk
 %{_bindir}/update-gtk-immodules %{_host} || :
@@ -82,7 +86,13 @@ rm -rf $RPM_BUILD_ROOT
 %postun gtk
 %{_bindir}/update-gtk-immodules %{_host} || :
 
-%postun -p /sbin/ldconfig
+%postun
+/sbin/ldconfig
+if [ "$1" = "0" ]; then
+   %{_sbindir}/alternatives --remove xinputrc %{_xinputconf} || :
+   # if alternative was set to manual, reset to auto
+   [ -L %{_sysconfdir}/alternatives/xinputrc -a "`readlink %{_sysconfdir}/alternatives/xinputrc`" = "%{_xinputconf}" ] && %{_sbindir}/alternatives --auto xinputrc || :
+fi
 
 %files -f %{name}.lang
 %defattr(-,root,root,-)
@@ -123,6 +133,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/qt4/plugins/inputmethods/libibus.so
 
 %changelog
+* Tue Oct  7 2008 Jens Petersen <petersen@redhat.com> - 0.1.1.20081006-2
+- add xinputrc alternative when installing or uninstalling
+
 * Mon Oct 06 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20081006-1
 - Update to 0.1.1.20081006.
 
