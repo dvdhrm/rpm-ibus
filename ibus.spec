@@ -3,7 +3,7 @@
 %define mod_path ibus-0.1
 Name:       ibus
 Version:    0.1.1.20081006
-Release:    2%{?dist}
+Release:    3%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -131,6 +131,9 @@ fi
 %{_libdir}/qt4/plugins/inputmethods/libibus.so
 
 %changelog
+* Tue Oct  7 2008 Jens Petersen <petersen@redhat.com> - 0.1.1.20081006-3
+- remove the empty %%doc file entries
+
 * Tue Oct  7 2008 Jens Petersen <petersen@redhat.com> - 0.1.1.20081006-2
 - add xinputrc alternative when installing or uninstalling
 
