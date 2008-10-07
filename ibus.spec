@@ -124,12 +124,10 @@ fi
 
 %files gtk
 %defattr(-,root,root,-)
-%doc
 %{_libdir}/gtk-2.0/%{gtk_binary_version}/immodules/im-ibus.so
 
 %files qt
 %defattr(-,root,root,-)
-%doc
 %{_libdir}/qt4/plugins/inputmethods/libibus.so
 
 %changelog
