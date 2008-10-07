@@ -19,14 +19,18 @@ BuildRequires:  python
 BuildRequires:  gtk2-devel
 BuildRequires:  qt-devel
 BuildRequires:  dbus-glib-devel
+BuildRequires:  desktop-file-utils
+
+Requires(post):  desktop-file-utils
+Requires(post):  %{_sbindir}/alternatives
+Requires(postun):  desktop-file-utils
+Requires(postun):  %{_sbindir}/alternatives
 
 Requires:   pygtk2
 Requires:   dbus-python >= 0.83.0
-Requires:   gnome-python2-gconf
 Requires:   pyxdg
+Requires:   gnome-python2-gconf
 Requires:   iso-codes
-Requires(post): %{_sbindir}/alternatives
-Requires(postun): %{_sbindir}/alternatives
 
 %description
 IBus means Intelligent Input Bus. It is a new input framework for Linux OS. It provides
@@ -34,7 +38,7 @@ full featured and user friendly input method user interface. It also may help
 developers to develop input method easily.
 
 %package gtk
-Summary:    iBus im module for gtk2
+Summary:    IBus im module for gtk2
 Group:      System Environment/Libraries
 Requires:   %{name} = %{version}-%{release}
 
@@ -42,10 +46,10 @@ Requires:   %{name} = %{version}-%{release}
 This package contains ibus im module for gtk2
 
 %package qt
-Summary:    iBus im module for qt4
+Summary:    IBus im module for qt4
 Group:      System Environment/Libraries
 Requires:   %{name} = %{version}-%{release}
-Requires:   qt >= 4.4.1
+Requires:   qt >= 4.4.2
 
 %description qt
 This package contains ibus im module for qt4
@@ -71,6 +75,11 @@ rm -f $RPM_BUILD_ROOT%{_libdir}/gtk-2.0/%{gtk_binary_version}/immodules/im-ibus.
 mkdir -pm 755 ${RPM_BUILD_ROOT}/%{_sysconfdir}/X11/xinit/xinput.d
 install -pm 644 %{SOURCE1} ${RPM_BUILD_ROOT}/%{_xinputconf}
 
+# install .desktop files
+desktop-file-install --delete-original          \
+  --dir $RPM_BUILD_ROOT%{_datadir}/applications \
+  $RPM_BUILD_ROOT%{_datadir}/applications/*
+
 %find_lang %{name}
 
 %clean
@@ -78,21 +87,23 @@ rm -rf $RPM_BUILD_ROOT
 
 %post
 /sbin/ldconfig
+update-desktop-database -q
 %{_sbindir}/alternatives --install %{_sysconfdir}/X11/xinit/xinputrc xinputrc %{_xinputconf} 83 || :
 
 %post gtk
 %{_bindir}/update-gtk-immodules %{_host} || :
 
-%postun gtk
-%{_bindir}/update-gtk-immodules %{_host} || :
-
 %postun
 /sbin/ldconfig
+update-desktop-database -q
 if [ "$1" = "0" ]; then
-   %{_sbindir}/alternatives --remove xinputrc %{_xinputconf} || :
-   # if alternative was set to manual, reset to auto
-   [ -L %{_sysconfdir}/alternatives/xinputrc -a "`readlink %{_sysconfdir}/alternatives/xinputrc`" = "%{_xinputconf}" ] && %{_sbindir}/alternatives --auto xinputrc || :
+  %{_sbindir}/alternatives --remove xinputrc %{_xinputconf} || :
+  # if alternative was set to manual, reset to auto
+  [ -L %{_sysconfdir}/alternatives/xinputrc -a "`readlink %{_sysconfdir}/alternatives/xinputrc`" = "%{_xinputconf}" ] && %{_sbindir}/alternatives --auto xinputrc || :
 fi
+
+%postun gtk
+%{_bindir}/update-gtk-immodules %{_host} || :
 
 %files -f %{name}.lang
 %defattr(-,root,root,-)
