@@ -30,6 +30,8 @@ Requires:   pygtk2
 Requires:   dbus-python >= 0.83.0
 Requires:   gnome-python2-gconf
 Requires:   notification-daemon
+Requires:   imsettings
+Requires:   im-chooser
 Requires:   pyxdg
 Requires:   iso-codes
 
