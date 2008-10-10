@@ -82,6 +82,7 @@ install -pm 644 %{SOURCE1} ${RPM_BUILD_ROOT}/%{_xinputconf}
 desktop-file-install --delete-original          \
   --dir $RPM_BUILD_ROOT%{_datadir}/applications \
   $RPM_BUILD_ROOT%{_datadir}/applications/*
+rm -rf $RPM_BUILD_ROOT%{_datadir}/applications/*
 
 %find_lang %{name}
 
@@ -128,7 +129,7 @@ fi
 %{_datadir}/ibus/ui/*
 %{_datadir}/ibus/setup/*
 %{_datadir}/ibus/icons/*
-%{_datadir}/applications/*
+# %{_datadir}/applications/*
 %{_datadir}/pixmaps/*
 %{_bindir}/ibus-daemon
 %{_bindir}/ibus-gconf
