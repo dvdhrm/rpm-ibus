@@ -2,7 +2,7 @@
 %{!?gtk_binary_version: %define gtk_binary_version %(pkg-config  --variable=gtk_binary_version gtk+-2.0)}
 %define mod_path ibus-0.1
 Name:       ibus
-Version:    0.1.1.20081016
+Version:    0.1.1.20081023
 Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
@@ -147,6 +147,9 @@ fi
 %{_libdir}/qt4/plugins/inputmethods/libibus.so
 
 %changelog
+* Thu Oct 23 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20081023-1
+- Update to 0.1.1.20081023.
+
 * Thu Oct 16 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20081016-1
 - Update to 0.1.1.20081016.
 
