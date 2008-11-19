@@ -3,7 +3,7 @@
 %define mod_path ibus-0.1
 Name:       ibus
 Version:    0.1.1.20081023
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -91,15 +91,14 @@ desktop-file-install --delete-original          \
 rm -rf $RPM_BUILD_ROOT
 
 %post
-/sbin/ldconfig
 update-desktop-database -q
 %{_sbindir}/alternatives --install %{_sysconfdir}/X11/xinit/xinputrc xinputrc %{_xinputconf} 83 || :
 
 %post gtk
+/sbin/ldconfig
 %{_bindir}/update-gtk-immodules %{_host} || :
 
 %postun
-/sbin/ldconfig
 update-desktop-database -q
 if [ "$1" = "0" ]; then
   %{_sbindir}/alternatives --remove xinputrc %{_xinputconf} || :
@@ -108,6 +107,7 @@ if [ "$1" = "0" ]; then
 fi
 
 %postun gtk
+/sbin/ldconfig
 %{_bindir}/update-gtk-immodules %{_host} || :
 
 %files -f %{name}.lang
@@ -124,7 +124,6 @@ fi
 %dir %{_datadir}/ibus/icons/
 %{_bindir}/ibus
 %{_bindir}/ibus-setup
-%{_libdir}/libibus-gtk.so*
 %{_datadir}/ibus/daemon/*
 %{_datadir}/ibus/gconf/*
 %{_datadir}/ibus/ui/*
@@ -132,14 +131,15 @@ fi
 %{_datadir}/ibus/icons/*
 %{_datadir}/applications/*
 %{_datadir}/pixmaps/*
+%{_bindir}/ibus-x11
 %{_bindir}/ibus-daemon
 %{_bindir}/ibus-gconf
 %{_bindir}/ibus-ui-gtk
-%{_bindir}/ibus-x11
 %config %{_xinputconf}
 
 %files gtk
 %defattr(-,root,root,-)
+%{_libdir}/libibus-gtk.so*
 %{_libdir}/gtk-2.0/%{gtk_binary_version}/immodules/im-ibus.so
 
 %files qt
@@ -147,6 +147,9 @@ fi
 %{_libdir}/qt4/plugins/inputmethods/libibus.so
 
 %changelog
+* Wed Nov 19 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20081023-2
+- Move libibus-gtk.so from ibus.rpm to ibus-gtk.rpm to fix bug 472146.
+
 * Thu Oct 23 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20081023-1
 - Update to 0.1.1.20081023.
 
