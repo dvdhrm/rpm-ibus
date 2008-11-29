@@ -3,7 +3,7 @@
 %define mod_path ibus-0.1
 Name:       ibus
 Version:    0.1.1.20081023
-Release:    2%{?dist}
+Release:    3%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -147,6 +147,9 @@ fi
 %{_libdir}/qt4/plugins/inputmethods/libibus.so
 
 %changelog
+* Sat Nov 29 2008 Ignacio Vazquez-Abrams <ivazqueznet+rpm@gmail.com> - 0.1.1.20081023-3
+- Rebuild for Python 2.6
+
 * Wed Nov 19 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20081023-2
 - Move libibus-gtk.so from ibus.rpm to ibus-gtk.rpm to fix bug 472146.
 
