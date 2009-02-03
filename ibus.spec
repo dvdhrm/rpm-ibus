@@ -2,8 +2,8 @@
 %{!?gtk_binary_version: %define gtk_binary_version %(pkg-config  --variable=gtk_binary_version gtk+-2.0)}
 %define mod_path ibus-0.1
 Name:       ibus
-Version:    0.1.1.20081023
-Release:    3%{?dist}
+Version:    0.1.1.20090203
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -12,6 +12,8 @@ Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
+
+%define glib_ver %([ -a %{_libdir}/pkgconfig/glib-2.0.pc ] && pkg-config --modversion glib-2.0 | cut -d. -f 1,2 || echo -n "999")
 
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
@@ -26,6 +28,7 @@ Requires(post):  %{_sbindir}/alternatives
 Requires(postun):  desktop-file-utils
 Requires(postun):  %{_sbindir}/alternatives
 
+Requires:   glib2 >= %{glib_ver}
 Requires:   pygtk2
 Requires:   dbus-python >= 0.83.0
 Requires:   gnome-python2-gconf
@@ -147,6 +150,9 @@ fi
 %{_libdir}/qt4/plugins/inputmethods/libibus.so
 
 %changelog
+* Tue Feb 03 2009 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20090203-1
+- Update to 0.1.1.20090203.
+
 * Sat Nov 29 2008 Ignacio Vazquez-Abrams <ivazqueznet+rpm@gmail.com> - 0.1.1.20081023-3
 - Rebuild for Python 2.6
 
