@@ -2,8 +2,8 @@
 %{!?gtk_binary_version: %define gtk_binary_version %(pkg-config  --variable=gtk_binary_version gtk+-2.0)}
 %define mod_path ibus-1.1
 Name:       ibus
-Version:    1.1.0.20090205
-Release:    2%{?dist}
+Version:    1.1.0.20090211
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -179,10 +179,11 @@ fi
 %{_libdir}/pkgconfig/*
 
 %changelog
-* Wed Feb 11 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090205-2
+* Wed Feb 11 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090211-1
 - Add --xim argument in xinput-ibus
 - Add Obsoletes:  ibus-qt <= 1.1.0
 - Move libibus.so.* to ibus-libs to make ibus multilib.
+- Update to 1.1.0.20090211.
 
 * Thu Feb 05 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090205-1
 - Update to 1.1.0.20090205.
