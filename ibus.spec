@@ -3,7 +3,7 @@
 %define mod_path ibus-1.1
 Name:       ibus
 Version:    1.1.0.20090205
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -27,6 +27,8 @@ BuildRequires:  gtk-doc
 BuildRequires:  GConf2-devel
 BuildRequires:  pygobject2-devel
 
+Requires:   %{name}-libs = %{version}-%{release}
+
 Requires(post):  desktop-file-utils
 Requires(post):  %{_sbindir}/alternatives
 Requires(postun):  desktop-file-utils
@@ -40,7 +42,12 @@ Requires:   notification-daemon
 Requires:   pyxdg
 Requires:   iso-codes
 
-Obsoletes: 	ibus-anthy <= 1.1.0, ibus-pinyin <= 1.1.0, ibus-m17n <= 1.1.0, ibus-hangul <= 1.1.0, ibus-chewing <= 1.1.0
+Obsoletes:  ibus-qt <= 1.1.0
+Obsoletes: 	ibus-anthy <= 1.1.0
+Obsoletes:  ibus-pinyin <= 1.1.0
+Obsoletes:  ibus-m17n <= 1.1.0
+Obsoletes:  ibus-hangul <= 1.1.0
+Obsoletes:  ibus-chewing <= 1.1.0
 
 %define _xinputconf %{_sysconfdir}/X11/xinit/xinput.d/ibus.conf
 
@@ -48,6 +55,13 @@ Obsoletes: 	ibus-anthy <= 1.1.0, ibus-pinyin <= 1.1.0, ibus-m17n <= 1.1.0, ibus-
 IBus means Intelligent Input Bus. It is a new input framework for Linux OS. It provides
 full featured and user friendly input method user interface. It also may help
 developers to develop input method easily.
+
+%package libs
+Summary:    IBus libraries
+Group:      System Environment/Libraries
+
+%description libs
+This package contains the libraries for IBus
 
 %package gtk
 Summary:    IBus im module for gtk2
@@ -109,7 +123,7 @@ desktop-file-install --delete-original          \
 %clean
 rm -rf $RPM_BUILD_ROOT
 
-%post
+%post libs
 /sbin/ldconfig
 update-desktop-database -q
 %{_sbindir}/alternatives --install %{_sysconfdir}/X11/xinit/xinputrc xinputrc %{_xinputconf} 83 || :
@@ -117,7 +131,7 @@ update-desktop-database -q
 %post gtk
 %{_bindir}/update-gtk-immodules %{_host} || :
 
-%postun
+%postun libs
 /sbin/ldconfig
 update-desktop-database -q
 if [ "$1" = "0" ]; then
@@ -137,7 +151,6 @@ fi
 %dir %{_datadir}/ibus/
 %{_bindir}/ibus-daemon
 %{_bindir}/ibus-setup
-%{_libdir}/libibus.so*
 %{_datadir}/ibus/*
 %{_datadir}/applications/*
 %{_datadir}/pixmaps/*
@@ -145,6 +158,10 @@ fi
 %{_libexecdir}/ibus-ui-gtk
 %{_libexecdir}/ibus-x11
 %config %{_xinputconf}
+
+%files libs
+%defattr(-,root,root,-)
+%{_libdir}/libibus.so*
 
 %files gtk
 %defattr(-,root,root,-)
@@ -162,6 +179,11 @@ fi
 %{_libdir}/pkgconfig/*
 
 %changelog
+* Wed Feb 11 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090205-2
+- Add --xim argument in xinput-ibus
+- Add Obsoletes:  ibus-qt <= 1.1.0
+- Move libibus.so.* to ibus-libs to make ibus multilib.
+
 * Thu Feb 05 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090205-1
 - Update to 1.1.0.20090205.
 
