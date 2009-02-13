@@ -347,6 +347,32 @@ index eec1df0..71c8dbe 100644
      server = bus_server_get_default ();
      bus_server_listen (server);
  
+diff --git a/src/ibusbus.c b/src/ibusbus.c
+index 9965761..a567359 100644
+--- a/src/ibusbus.c
++++ b/src/ibusbus.c
+@@ -639,15 +639,20 @@ ibus_bus_exit (IBusBus *bus,
+ {
+     g_assert (IBUS_IS_BUS (bus));
+ 
++    IBusBusPrivate *priv;
++    priv = IBUS_BUS_GET_PRIVATE (bus);
++    
+     gboolean result;
+     result = ibus_bus_call (bus,
+                             IBUS_SERVICE_IBUS,
+                             IBUS_PATH_IBUS,
+                             IBUS_INTERFACE_IBUS,
+-                            "Kill",
++                            "Exit",
+                             G_TYPE_BOOLEAN, &restart,
+                             G_TYPE_INVALID,
+                             G_TYPE_INVALID);
++    ibus_connection_flush (priv->connection);
++    
+     return result;
+ }
+ 
 diff --git a/src/ibuscomponent.c b/src/ibuscomponent.c
 index 9ca487d..59690b8 100644
 --- a/src/ibuscomponent.c

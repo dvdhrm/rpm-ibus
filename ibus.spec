@@ -3,7 +3,7 @@
 %define mod_path ibus-1.1
 Name:       ibus
 Version:    1.1.0.20090211
-Release:    2%{?dist}
+Release:    3%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -181,6 +181,9 @@ fi
 %{_libdir}/pkgconfig/*
 
 %changelog
+* Fri Feb 13 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090211-3
+- Update ibus-HEAD.patch, to fix bug 484652.
+
 * Fri Feb 13 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090211-2
 - Add patch ibus-HEAD.patch, to update ibus to HEAD version.
 
