@@ -3,13 +3,14 @@
 %define mod_path ibus-1.1
 Name:       ibus
 Version:    1.1.0.20090211
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
 URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
+Patch0:     ibus-HEAD.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -20,12 +21,12 @@ BuildRequires:  libtool
 BuildRequires:  python
 BuildRequires:  gtk2-devel
 BuildRequires:  dbus-devel
-BuildRequires:  qt-devel
 BuildRequires:  dbus-glib-devel
 BuildRequires:  desktop-file-utils
 BuildRequires:  gtk-doc
 BuildRequires:  GConf2-devel
 BuildRequires:  pygobject2-devel
+# BuildRequires:  qt-devel
 
 Requires:   %{name}-libs = %{version}-%{release}
 
@@ -94,6 +95,7 @@ docs for ibus.
 
 %prep
 %setup -q
+%patch0 -p1
 
 %build
 %configure --disable-static \
@@ -179,6 +181,9 @@ fi
 %{_libdir}/pkgconfig/*
 
 %changelog
+* Fri Feb 13 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090211-2
+- Add patch ibus-HEAD.patch, to update ibus to HEAD version.
+
 * Wed Feb 11 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090211-1
 - Add --xim argument in xinput-ibus
 - Add Obsoletes:  ibus-qt <= 1.1.0
