@@ -3,7 +3,7 @@
 %define mod_path ibus-1.1
 Name:       ibus
 Version:    1.1.0.20090211
-Release:    3%{?dist}
+Release:    4%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -38,7 +38,6 @@ Requires(postun):  %{_sbindir}/alternatives
 Requires:   glib2 >= %{glib_ver}
 Requires:   pygtk2
 Requires:   dbus-python >= 0.83.0
-Requires:   gnome-python2-gconf
 Requires:   notification-daemon
 Requires:   pyxdg
 Requires:   iso-codes
@@ -181,6 +180,9 @@ fi
 %{_libdir}/pkgconfig/*
 
 %changelog
+* Sun Feb 15 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090211-4
+- Remove gnome-python2-gconf from requires.
+
 * Fri Feb 13 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090211-3
 - Update ibus-HEAD.patch, to fix bug 484652.
 
