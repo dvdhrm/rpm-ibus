@@ -1,5 +1,18 @@
+diff --git a/bus/engineproxy.c b/bus/engineproxy.c
+index 6fc111f..647845b 100644
+--- a/bus/engineproxy.c
++++ b/bus/engineproxy.c
+@@ -636,7 +636,7 @@ bus_engine_proxy_set_capabilities (BusEngineProxy *engine,
+     g_assert (BUS_IS_ENGINE_PROXY (engine));
+ 
+     ibus_proxy_call ((IBusProxy *) engine,
+-                     "SetCapabilites",
++                     "SetCapabilities",
+                      G_TYPE_UINT, &caps,
+                      G_TYPE_INVALID);
+ 
 diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
-index e92b373..3af090d 100644
+index e92b373..7f51130 100644
 --- a/bus/ibusimpl.c
 +++ b/bus/ibusimpl.c
 @@ -21,6 +21,7 @@
@@ -18,15 +31,15 @@ index e92b373..3af090d 100644
 +    glong timeout;
 +    gint status;
 +    gboolean flag;
-+        
++
 +    bus_registry_stop_all_components (ibus->registry);
 +
 +    pid = 0;
 +    timeout = 0;
 +    flag = FALSE;
 +    while (1) {
-+        while ((pid = waitpid (0, &status, WNOHANG)) > 0);        
-+        
++        while ((pid = waitpid (0, &status, WNOHANG)) > 0);
++
 +        if (pid == -1) { /* all children finished */
 +            break;
 +        }
@@ -61,7 +74,16 @@ index e92b373..3af090d 100644
      IBUS_OBJECT_CLASS(parent_class)->destroy (IBUS_OBJECT (ibus));
  }
  
-@@ -832,7 +868,6 @@ _ibus_list_active_engines (BusIBusImpl   *ibus,
+@@ -662,6 +698,8 @@ _ibus_create_input_context (BusIBusImpl     *ibus,
+     context = bus_input_context_new (connection, client);
+     ibus->contexts = g_list_append (ibus->contexts, context);
+ 
++    _context_request_engine_cb (context, NULL, ibus);
++
+     static const struct {
+         gchar *name;
+         GCallback callback;
+@@ -832,7 +870,6 @@ _ibus_list_active_engines (BusIBusImpl   *ibus,
      return reply;
  }
  
@@ -69,7 +91,16 @@ index e92b373..3af090d 100644
  
  static IBusMessage *
  _ibus_exit (BusIBusImpl     *ibus,
-@@ -859,32 +894,28 @@ _ibus_exit (BusIBusImpl     *ibus,
+@@ -842,7 +879,7 @@ _ibus_exit (BusIBusImpl     *ibus,
+     IBusMessage *reply;
+     IBusError *error;
+     gboolean restart;
+-    
++
+     if (!ibus_message_get_args (message,
+                                 &error,
+                                 G_TYPE_BOOLEAN, &restart,
+@@ -859,32 +896,28 @@ _ibus_exit (BusIBusImpl     *ibus,
      ibus_connection_flush ((IBusConnection *) connection);
      ibus_message_unref (reply);
  
@@ -108,7 +139,8 @@ index e92b373..3af090d 100644
          g_warning ("execv %s failed!", g_argv[0]);
          exit (-1);
      }
-     
+-    
++
 +    /* should not reach here */
 +    g_assert_not_reached ();
 +
@@ -116,7 +148,7 @@ index e92b373..3af090d 100644
  }
  
 diff --git a/bus/inputcontext.c b/bus/inputcontext.c
-index be45bbe..e8fc1da 100644
+index be45bbe..bdc7d75 100644
 --- a/bus/inputcontext.c
 +++ b/bus/inputcontext.c
 @@ -100,6 +100,8 @@ static gboolean bus_input_context_send_signal   (BusInputContext        *context
@@ -150,6 +182,62 @@ index be45bbe..e8fc1da 100644
      BusInputContextPrivate *priv;
      priv = BUS_INPUT_CONTEXT_GET_PRIVATE (call_data->context);
  
+@@ -596,8 +594,6 @@ _ic_process_key_event (BusInputContext *context,
+     BusInputContextPrivate *priv;
+     priv = BUS_INPUT_CONTEXT_GET_PRIVATE (context);
+ 
+-
+-    error = ibus_error_new ();
+     retval = ibus_message_get_args (message,
+                 &error,
+                 G_TYPE_UINT, &keyval,
+@@ -612,8 +608,6 @@ _ic_process_key_event (BusInputContext *context,
+         return reply;
+     }
+ 
+-    ibus_error_free (error);
+-
+     retval = bus_input_context_filter_keyboard_shortcuts (context, keyval, modifiers);
+ 
+     if (retval) {
+@@ -623,12 +617,16 @@ _ic_process_key_event (BusInputContext *context,
+                                   G_TYPE_INVALID);
+     }
+     else if (priv->enabled && priv->engine) {
+-        CallData *call_data = g_slice_new (CallData);
+-        call_data->context = context;
+-        call_data->message = message;
++        CallData *call_data;
++
++        call_data = g_slice_new (CallData);
++
+         g_object_ref (context);
+         ibus_message_ref (message);
+ 
++        call_data->context = context;
++        call_data->message = message;
++
+         bus_engine_proxy_process_key_event (priv->engine,
+                                             keyval,
+                                             modifiers,
+@@ -1012,7 +1010,7 @@ bus_input_context_focus_in (BusInputContext *context)
+ 
+     priv->has_focus = TRUE;
+ 
+-    if (priv->engine) {
++    if (priv->engine && priv->enabled) {
+         bus_engine_proxy_focus_in (priv->engine);
+     }
+ 
+@@ -1034,7 +1032,7 @@ bus_input_context_focus_out (BusInputContext *context)
+ 
+     priv->has_focus = FALSE;
+ 
+-    if (priv->engine) {
++    if (priv->engine && priv->enabled) {
+         bus_engine_proxy_focus_out (priv->engine);
+     }
+ 
 @@ -1122,7 +1120,7 @@ _engine_destroy_cb (BusEngineProxy  *engine,
  
      g_assert (priv->engine == engine);
@@ -159,8 +247,20 @@ index be45bbe..e8fc1da 100644
  }
  
  static void
-@@ -1408,6 +1406,48 @@ bus_input_context_disable (BusInputContext *context)
+@@ -1391,7 +1389,6 @@ bus_input_context_disable (BusInputContext *context)
+     BusInputContextPrivate *priv;
+     priv = BUS_INPUT_CONTEXT_GET_PRIVATE (context);
+ 
+-    priv->enabled = FALSE;
+ 
+     if (priv->engine) {
+         if (priv->has_focus) {
+@@ -1406,8 +1403,52 @@ bus_input_context_disable (BusInputContext *context)
+     g_signal_emit (context,
+                    context_signals[DISABLED],
                     0);
++
++    priv->enabled = FALSE;
  }
  
 +const static struct {
@@ -208,7 +308,7 @@ index be45bbe..e8fc1da 100644
  
  void
  bus_input_context_set_engine (BusInputContext *context,
-@@ -1420,56 +1460,25 @@ bus_input_context_set_engine (BusInputContext *context,
+@@ -1420,56 +1461,25 @@ bus_input_context_set_engine (BusInputContext *context,
      priv = BUS_INPUT_CONTEXT_GET_PRIVATE (context);
  
      if (priv->engine != NULL) {
@@ -279,7 +379,7 @@ index be45bbe..e8fc1da 100644
                     context_signals[ENGINE_CHANGED],
                     0);
 diff --git a/bus/main.c b/bus/main.c
-index eec1df0..71c8dbe 100644
+index eec1df0..8757af5 100644
 --- a/bus/main.c
 +++ b/bus/main.c
 @@ -29,6 +29,7 @@ gchar **g_argv = NULL;
@@ -324,7 +424,7 @@ index eec1df0..71c8dbe 100644
  
 +    /* create a new process group */
 +    setpgrp ();
-+    
++
      g_type_init ();
  
 +    /* check if ibus-daemon is running in this session */
@@ -342,13 +442,225 @@ index eec1df0..71c8dbe 100644
 +    }
 +    g_object_unref (bus);
 +    bus = NULL;
-+    
++
 +    /* create ibus server */
      server = bus_server_get_default ();
      bus_server_listen (server);
  
+diff --git a/client/gtk2/ibusim.c b/client/gtk2/ibusim.c
+index 56f593a..75b02a5 100644
+--- a/client/gtk2/ibusim.c
++++ b/client/gtk2/ibusim.c
+@@ -33,13 +33,11 @@ static const GtkIMContextInfo ibus_im_info = {
+     "ja:ko:zh"
+ };
+ 
+-static const GtkIMContextInfo * info_list[] = {
++static const GtkIMContextInfo *info_list[] = {
+     &ibus_im_info
+ };
+ 
+-
+-G_MODULE_EXPORT const gchar* g_module_check_init (GModule *module);
+-const gchar*
++G_MODULE_EXPORT const gchar*
+ g_module_check_init (GModule *module)
+ {
+     return glib_check_version (GLIB_MAJOR_VERSION,
+@@ -47,7 +45,7 @@ g_module_check_init (GModule *module)
+                                GLIB_MICRO_VERSION);
+ }
+ 
+-void
++G_MODULE_EXPORT void
+ im_module_init (GTypeModule *type_module)
+ {
+     /* make module resident */
+@@ -56,25 +54,25 @@ im_module_init (GTypeModule *type_module)
+     ibus_im_context_register_type (type_module);
+ }
+ 
+-void
++G_MODULE_EXPORT void
+ im_module_exit (void)
+ {
+ }
+ 
+-GtkIMContext *
++G_MODULE_EXPORT GtkIMContext *
+ im_module_create (const gchar *context_id)
+ {
+     if (g_strcmp0 (context_id, "ibus") == 0) {
+         IBusIMContext *context;
+         context = ibus_im_context_new ();
+-        return GTK_IM_CONTEXT(context);
++        return (GtkIMContext *) context;
+     }
+     return NULL;
+ }
+ 
+-void
++G_MODULE_EXPORT void
+ im_module_list (const GtkIMContextInfo ***contexts,
+-                int                      *n_contexts)
++                gint                     *n_contexts)
+ {
+     *contexts = info_list;
+     *n_contexts = G_N_ELEMENTS (info_list);
+diff --git a/configure.ac b/configure.ac
+index 7481739..4437fd2 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -177,7 +177,7 @@ AC_ARG_ENABLE(qt4-immodule,
+ if test x"$IBUS_HAS_QT4" != x"yes"; then
+     enable_qt4=no
+ fi
+-enable_qt=no
++enable_qt4=no
+ AM_CONDITIONAL(IBUS_BUILD_QT4, [test x"$enable_qt4" = x"yes" ])
+ 
+ PKG_CHECK_MODULES(GCONF,
+diff --git a/ibus.spec.in b/ibus.spec.in
+index 65dfced..d9d5dba 100644
+--- a/ibus.spec.in
++++ b/ibus.spec.in
+@@ -20,7 +20,7 @@ BuildRequires:  libtool
+ BuildRequires:  python
+ BuildRequires:  gtk2-devel
+ BuildRequires:  dbus-devel
+-BuildRequires:  qt-devel
++# BuildRequires:  qt-devel
+ BuildRequires:  dbus-glib-devel
+ BuildRequires:  desktop-file-utils
+ 
+@@ -29,10 +29,10 @@ Requires(post):  %{_sbindir}/alternatives
+ Requires(postun):  desktop-file-utils
+ Requires(postun):  %{_sbindir}/alternatives
+ 
++Requires:   %{name}-libs = %{version}-%{release}
+ Requires:   glib2 >= %{glib_ver}
+ Requires:   pygtk2
+ Requires:   dbus-python >= 0.83.0
+-Requires:   gnome-python2-gconf
+ Requires:   notification-daemon
+ Requires:   pyxdg
+ Requires:   iso-codes
+@@ -44,6 +44,14 @@ IBus means Intelligent Input Bus. It is a new input framework for Linux OS. It p
+ full featured and user friendly input method user interface. It also may help
+ developers to develop input method easily.
+ 
++%package libs
++Summary:    IBus libraries
++Group:      System Environment/Libraries
++
++%description libs
++This package contains ibus libraries.
++
++
+ %package gtk
+ Summary:    IBus im module for gtk2
+ Group:      System Environment/Libraries
+@@ -52,14 +60,14 @@ Requires:   %{name} = %{version}-%{release}
+ %description gtk
+ This package contains ibus im module for gtk2
+ 
+-%package qt
+-Summary:    IBus im module for qt4
+-Group:      System Environment/Libraries
+-Requires:   %{name} = %{version}-%{release}
+-Requires:   qt >= 4.4.2
+-
+-%description qt
+-This package contains ibus im module for qt4
++# %package qt
++# Summary:    IBus im module for qt4
++# Group:      System Environment/Libraries
++# Requires:   %{name} = %{version}-%{release}
++# Requires:   qt >= 4.4.2
++# 
++# %description qt
++# This package contains ibus im module for qt4
+ 
+ %package devel
+ Summary:    Development tools for ibus
+@@ -123,13 +131,10 @@ fi
+ %files -f %{name}.lang
+ %defattr(-,root,root,-)
+ %doc AUTHORS COPYING README
+-%dir %{python_sitelib}/ibus
+-%{python_sitelib}/ibus/*
+-%dir %{_datadir}/ibus/
++%{python_sitelib}/ibus
+ %{_bindir}/ibus-daemon
+ %{_bindir}/ibus-setup
+-%{_libdir}/libibus.so*
+-%{_datadir}/ibus/*
++%{_datadir}/ibus
+ %{_datadir}/applications/*
+ %{_datadir}/pixmaps/*
+ %{_libexecdir}/ibus-gconf
+@@ -137,13 +142,18 @@ fi
+ %{_libexecdir}/ibus-x11
+ %config %{_xinputconf}
+ 
++
++%files libs
++%defattr(-,root,root,-)
++%{_libdir}/libibus.so*
++
+ %files gtk
+ %defattr(-,root,root,-)
+ %{_libdir}/gtk-2.0/%{gtk_binary_version}/immodules/im-ibus.so
+ 
+-%files qt
+-%defattr(-,root,root,-)
+-%{_libdir}/qt4/plugins/inputmethods/libibus.so
++# %files qt
++# %defattr(-,root,root,-)
++# %{_libdir}/qt4/plugins/inputmethods/libibus.so
+ 
+ %files devel
+ %defattr(-,root,root,-)
+diff --git a/ibus/engine.py b/ibus/engine.py
+index d52c97e..f8c0447 100644
+--- a/ibus/engine.py
++++ b/ibus/engine.py
+@@ -44,6 +44,9 @@ class EngineBase(object.Object):
+     def set_cursor_location(self, x, y, w, h):
+         pass
+ 
++    def set_capabilities(self, cap):
++        pass
++
+     def reset(self):
+         pass
+ 
+@@ -158,6 +161,9 @@ class EngineProxy(interface.IEngine):
+     def SetCursorLocation(self, x, y, w, h):
+         return self.__engine.set_cursor_location(x, y, w, h)
+ 
++    def SetCapabilities(self, caps):
++        return self.__engine.set_capabilities(caps)
++
+     def Reset(self):
+         return self.__engine.reset()
+ 
+diff --git a/ibus/interface/iengine.py b/ibus/interface/iengine.py
+index 32ba998..63d6c0e 100644
+--- a/ibus/interface/iengine.py
++++ b/ibus/interface/iengine.py
+@@ -49,6 +49,9 @@ class IEngine(dbus.service.Object):
+     @method(in_signature="iiii")
+     def SetCursorLocation(self, x, y, w, h): pass
+ 
++    @method(in_signature="u")
++    def SetCapabilities(self, cap): pass
++
+     @method()
+     def FocusIn(self): pass
+ 
 diff --git a/src/ibusbus.c b/src/ibusbus.c
-index 9965761..a567359 100644
+index 9965761..0ebdf66 100644
 --- a/src/ibusbus.c
 +++ b/src/ibusbus.c
 @@ -639,15 +639,20 @@ ibus_bus_exit (IBusBus *bus,
@@ -357,7 +669,7 @@ index 9965761..a567359 100644
  
 +    IBusBusPrivate *priv;
 +    priv = IBUS_BUS_GET_PRIVATE (bus);
-+    
++
      gboolean result;
      result = ibus_bus_call (bus,
                              IBUS_SERVICE_IBUS,
@@ -369,23 +681,283 @@ index 9965761..a567359 100644
                              G_TYPE_INVALID,
                              G_TYPE_INVALID);
 +    ibus_connection_flush (priv->connection);
-+    
++
      return result;
  }
  
-diff --git a/src/ibuscomponent.c b/src/ibuscomponent.c
-index 9ca487d..59690b8 100644
---- a/src/ibuscomponent.c
-+++ b/src/ibuscomponent.c
-@@ -679,7 +679,7 @@ ibus_component_start (IBusComponent *component)
+diff --git a/src/ibuslookuptable.c b/src/ibuslookuptable.c
+index e2935b8..37342c5 100644
+--- a/src/ibuslookuptable.c
++++ b/src/ibuslookuptable.c
+@@ -121,7 +121,7 @@ ibus_lookup_table_serialize (IBusLookupTable *table,
  
-     error = NULL;
-     retval = g_spawn_async (NULL, argv, NULL,
--                            G_SPAWN_DO_NOT_REAP_CHILD | G_SPAWN_STDOUT_TO_DEV_NULL | G_SPAWN_STDERR_TO_DEV_NULL,
-+                            G_SPAWN_DO_NOT_REAP_CHILD /* | G_SPAWN_STDOUT_TO_DEV_NULL | G_SPAWN_STDERR_TO_DEV_NULL */,
-                             NULL, NULL,
-                             &(component->pid), &error);
-     g_strfreev (argv)
+     retval = ibus_message_iter_append (iter, G_TYPE_BOOLEAN, &table->cursor_visible);
+     g_return_val_if_fail (retval, FALSE);
+-    
++
+     retval = ibus_message_iter_append (iter, G_TYPE_BOOLEAN, &table->round);
+     g_return_val_if_fail (retval, FALSE);
+ 
+@@ -168,7 +168,7 @@ ibus_lookup_table_deserialize (IBusLookupTable *table,
+ 
+     retval = ibus_message_iter_get (iter, G_TYPE_BOOLEAN, &table->cursor_visible);
+     g_return_val_if_fail (retval, FALSE);
+-    
++
+     retval = ibus_message_iter_get (iter, G_TYPE_BOOLEAN, &table->round);
+     g_return_val_if_fail (retval, FALSE);
+ 
+@@ -223,6 +223,8 @@ ibus_lookup_table_new (guint page_size,
+                        gboolean cursor_visible,
+                        gboolean round)
+ {
++    g_assert (page_size > 0);
++
+     IBusLookupTable *table;
+ 
+     table= g_object_new (IBUS_TYPE_LOOKUP_TABLE, NULL);
+@@ -278,15 +280,150 @@ ibus_lookup_table_set_cursor_pos (IBusLookupTable *table,
+                                   guint            cursor_pos)
+ {
+     g_assert (IBUS_IS_LOOKUP_TABLE (table));
++    g_assert (cursor_pos < table->candidates->len);
+ 
+     table->cursor_pos = cursor_pos;
+ }
++
++guint
++ibus_lookup_table_get_cursor_pos (IBusLookupTable *table)
++{
++    g_assert (IBUS_IS_LOOKUP_TABLE (table));
++
++    return table->cursor_pos;
++}
++
++guint
++ibus_lookup_table_get_cursor_in_page (IBusLookupTable *table)
++{
++    g_assert (IBUS_IS_LOOKUP_TABLE (table));
++
++    return table->cursor_pos % table->page_size;
++}
++
++void
++ibus_lookup_table_set_cursor_visible (IBusLookupTable *table,
++                                      gboolean         visible)
++{
++    g_assert (IBUS_IS_LOOKUP_TABLE (table));
++
++    table->cursor_visible = visible;
++}
++
++gboolean
++ibus_lookup_table_is_cursor_visible (IBusLookupTable *table)
++{
++    g_assert (IBUS_IS_LOOKUP_TABLE (table));
++
++    return table->cursor_visible;
++}
++
+ void
+ ibus_lookup_table_set_page_size  (IBusLookupTable *table,
+                                   guint            page_size)
+ {
+     g_assert (IBUS_IS_LOOKUP_TABLE (table));
++    g_assert (page_size > 0);
+ 
+     table->page_size = page_size;
+ }
+ 
++guint
++ibus_lookup_table_get_page_size (IBusLookupTable *table)
++{
++    g_assert (IBUS_IS_LOOKUP_TABLE (table));
++
++    return table->page_size;
++}
++
++gboolean
++ibus_lookup_table_page_up (IBusLookupTable *table)
++{
++    g_assert (IBUS_IS_LOOKUP_TABLE (table));
++
++    if (table->cursor_pos < table->page_size) {
++        gint i;
++        gint page_nr;
++
++        if (!table->round) {
++            return FALSE;
++        }
++
++        /* cursor index in page */
++        i = table->cursor_pos % table->page_size;
++        page_nr = (table->candidates->len + table->page_size - 1) / table->page_size;
++
++        table->cursor_pos = page_nr * table->page_size + i;
++        if (table->cursor_pos >= table->candidates->len) {
++            table->cursor_pos = table->candidates->len - 1;
++        }
++        return TRUE;
++    }
++
++    table->cursor_pos -= table->page_size;
++    return TRUE;
++}
++
++gboolean
++ibus_lookup_table_page_down (IBusLookupTable *table)
++{
++    g_assert (IBUS_IS_LOOKUP_TABLE (table));
++
++    gint i;
++    gint page;
++    gint page_nr;
++
++    /* cursor index in page */
++    i = table->cursor_pos % table->page_size;
++    page = table->cursor_pos  / table->page_size;
++    page_nr = (table->candidates->len + table->page_size - 1) / table->page_size;
++
++    if (page == page_nr - 1) {
++        if (!table->round)
++            return FALSE;
++
++        table->cursor_pos = i;
++        return TRUE;
++    }
++
++    table->cursor_pos += table->page_size;
++    if (table->cursor_pos > table->candidates->len - 1) {
++        table->cursor_pos = table->candidates->len - 1;
++    }
++    return TRUE;
++}
++
++gboolean
++ibus_lookup_table_cursor_up (IBusLookupTable *table)
++{
++    g_assert (IBUS_IS_LOOKUP_TABLE (table));
++
++    if (table->cursor_pos == 0) {
++        if (!table->round)
++            return FALSE;
++
++        table->cursor_pos = table->candidates->len - 1;
++        return TRUE;
++    }
++
++    table->cursor_pos --;
++
++    return TRUE;
++}
++
++gboolean
++ibus_lookup_table_cursor_down (IBusLookupTable *table)
++{
++    g_assert (IBUS_IS_LOOKUP_TABLE (table));
++
++    if (table->cursor_pos == table->candidates->len - 1) {
++        if (!table->round)
++            return FALSE;
++
++        table->cursor_pos = 0;
++        return TRUE;
++    }
++
++    table->cursor_pos ++;
++    return TRUE;
++}
+diff --git a/src/ibuslookuptable.h b/src/ibuslookuptable.h
+index 62ca7d8..ede02b1 100644
+--- a/src/ibuslookuptable.h
++++ b/src/ibuslookuptable.h
+@@ -76,10 +76,26 @@ IBusText            *ibus_lookup_table_get_candidate
+ void                 ibus_lookup_table_set_cursor_pos
+                                                 (IBusLookupTable    *table,
+                                                  guint               cursor_pos);
++guint                ibus_lookup_table_get_cursor_pos
++                                                (IBusLookupTable    *table);
++void                 ibus_lookup_table_set_cursor_visible
++                                                (IBusLookupTable    *table,
++                                                 gboolean            visible);
++gboolean             ibus_lookup_table_is_cursor_visible
++                                                (IBusLookupTable    *table);
++guint                ibus_lookup_table_get_cursor_in_page
++                                                (IBusLookupTable    *table);
+ void                 ibus_lookup_table_set_page_size
+                                                 (IBusLookupTable    *table,
+                                                  guint               page_size);
++guint                ibus_lookup_table_get_page_size
++                                                (IBusLookupTable    *table);
+ void                 ibus_lookup_table_clear    (IBusLookupTable    *table);
++gboolean             ibus_lookup_table_page_up  (IBusLookupTable    *table);
++gboolean             ibus_lookup_table_page_down(IBusLookupTable    *table);
++gboolean             ibus_lookup_table_cursor_up(IBusLookupTable    *table);
++gboolean             ibus_lookup_table_cursor_down
++                                                (IBusLookupTable    *table);
+ G_END_DECLS
+ #endif
+ 
+diff --git a/ui/gtk/languagebar.py b/ui/gtk/languagebar.py
+index 3546ef7..2a10a43 100644
+--- a/ui/gtk/languagebar.py
++++ b/ui/gtk/languagebar.py
+@@ -65,11 +65,11 @@ class LanguageBar(gtk.Toolbar):
+ 
+         root = gdk.get_default_root_window()
+         try:
+-            workarea = root.property_get("_NET_WORKAREA")[2]
+-            right, bottom = workarea[0] + workarea[2], workarea[1] + workarea[3]
++            self.__work_area = root.property_get("_NET_WORKAREA")[2]
+         except:
+-            right, bottom = root.get_size()
+-        self.__position = right - 20, bottom - 20
++            w, h = root.get_size()
++            self.__work_area = 0, 0, w, h
++        self.__position = self.__work_area[0] + self.__work_area[2] - 20, self.__work_area[1] + self.__work_area[3] - 20
+         self.__toplevel.move(*self.__position)
+ 
+     def __create_ui(self):
+@@ -106,13 +106,19 @@ class LanguageBar(gtk.Toolbar):
+ 
+     def __toplevel_size_allocate_cb(self, toplevel, allocation):
+         x, y = self.__position
+-        self.__toplevel.move(x - allocation.width, y - allocation.height)
++        if x - self.__work_area[0] >= self.__work_area[2] - 80:
++            self.__toplevel.move(x - allocation.width, y - allocation.height)
+ 
+     def __remove_properties(self):
+         # reset all properties
+         map(lambda i: i.destroy(), self.__properties)
+         self.__properties = []
+ 
++    def __set_opacity(self, opacity):
++        if self.__toplevel.window == None:
++            self.__toplevel.realize()
++        self.__toplevel.window.set_opacity(opacity)
++
+     def do_show(self):
+         gtk.Toolbar.do_show(self)
+ 
+@@ -128,10 +134,14 @@ class LanguageBar(gtk.Toolbar):
+ 
+     def set_enabled(self, enabled):
+         self.__enabled = enabled
+-        if self.__enabled and self.__has_focus:
+-            self.show_all()
+-        if not self.__enabled and self.__auto_hide:
+-            self.hide_all()
++        if self.__enabled:
++            self.__set_opacity(1.0)
++            if self.__has_focus:
++                self.show_all()
++        else:
++            self.__set_opacity(0.5)
++            if self.__auto_hide:
++                self.hide_all()
+ 
+     def is_enabled(self):
+         return self.__enabled
 diff --git a/ui/gtk/menu.py b/ui/gtk/menu.py
 index 9a3b30a..6f6c7d1 100644
 --- a/ui/gtk/menu.py
@@ -409,7 +981,7 @@ index 9a3b30a..6f6c7d1 100644
  
          self.set_active (self._prop._state == ibus.PROP_STATE_CHECKED)
 diff --git a/ui/gtk/panel.py b/ui/gtk/panel.py
-index e7850e6..d3cd249 100644
+index e7850e6..d968393 100644
 --- a/ui/gtk/panel.py
 +++ b/ui/gtk/panel.py
 @@ -74,9 +74,7 @@ class Panel(ibus.PanelBase):
@@ -423,6 +995,14 @@ index e7850e6..d3cd249 100644
  
          self.__language_bar = LanguageBar()
          self.__language_bar.connect("property-activate",
+@@ -193,6 +191,7 @@ class Panel(ibus.PanelBase):
+     def focus_out(self, ic):
+         self.reset()
+         self.__focus_ic = None
++        self.__language_bar.set_enabled(False)
+         self.__language_bar.focus_out()
+         self.__set_im_icon(self.__ibus_icon)
+ 
 diff --git a/ui/gtk/toolitem.py b/ui/gtk/toolitem.py
 index 0e4e4ad..09ad686 100644
 --- a/ui/gtk/toolitem.py

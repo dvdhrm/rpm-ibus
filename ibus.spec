@@ -3,7 +3,7 @@
 %define mod_path ibus-1.1
 Name:       ibus
 Version:    1.1.0.20090211
-Release:    4%{?dist}
+Release:    5%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -180,6 +180,9 @@ fi
 %{_libdir}/pkgconfig/*
 
 %changelog
+* Sun Feb 15 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090211-5
+- Recreate the ibus-HEAD.patch from upstream git source tree.
+
 * Sun Feb 15 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090211-4
 - Remove gnome-python2-gconf from requires.
 
