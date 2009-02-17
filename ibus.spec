@@ -3,7 +3,7 @@
 %define mod_path ibus-1.1
 Name:       ibus
 Version:    1.1.0.20090211
-Release:    8%{?dist}
+Release:    9%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -41,6 +41,7 @@ Requires:   dbus-python >= 0.83.0
 Requires:   notification-daemon
 Requires:   pyxdg
 Requires:   iso-codes
+Requires:   im-chooser >= 1.2.5
 
 Obsoletes:  ibus-qt <= 1.1.0
 Obsoletes: 	ibus-anthy <= 1.1.0
@@ -180,6 +181,9 @@ fi
 %{_libdir}/pkgconfig/*
 
 %changelog
+* Tue Feb 17 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090211-9
+- Add requires im-chooser >= 1.2.5.
+
 * Tue Feb 17 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090211-8
 - Recreate the ibus-HEAD.patch from upstream git source tree.
 - Fix ibus-hangul segfault (#485438).
