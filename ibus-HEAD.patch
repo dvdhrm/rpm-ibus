@@ -161,7 +161,7 @@ index e92b373..7f51130 100644
  }
  
 diff --git a/bus/inputcontext.c b/bus/inputcontext.c
-index be45bbe..979c710 100644
+index be45bbe..7f4de65 100644
 --- a/bus/inputcontext.c
 +++ b/bus/inputcontext.c
 @@ -100,6 +100,8 @@ static gboolean bus_input_context_send_signal   (BusInputContext        *context
@@ -186,7 +186,17 @@ index be45bbe..979c710 100644
      }
  
      if (priv->connection) {
-@@ -562,7 +560,7 @@ _ic_process_key_event_reply_cb (gpointer data,
+@@ -516,8 +514,7 @@ _ibus_introspect (BusInputContext   *context,
+                   BusConnection     *connection)
+ {
+     static const gchar *introspect =
+-        "<!DOCTYPE node PUBLIC \"-//freedesktop//DTD D-BUS Object Introspection 1.0//EN\"\n"
+-        "\"http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd\">\n"
++        DBUS_INTROSPECT_1_0_XML_DOCTYPE_DECL_NODE
+         "<node>\n"
+         "  <interface name=\"org.freedesktop.DBus.Introspectable\">\n"
+         "    <method name=\"Introspect\">\n"
+@@ -562,7 +559,7 @@ _ic_process_key_event_reply_cb (gpointer data,
  
      retval = (gboolean) GPOINTER_TO_INT (data);
      call_data = (CallData *) user_data;
@@ -195,7 +205,7 @@ index be45bbe..979c710 100644
      BusInputContextPrivate *priv;
      priv = BUS_INPUT_CONTEXT_GET_PRIVATE (call_data->context);
  
-@@ -596,8 +594,6 @@ _ic_process_key_event (BusInputContext *context,
+@@ -596,8 +593,6 @@ _ic_process_key_event (BusInputContext *context,
      BusInputContextPrivate *priv;
      priv = BUS_INPUT_CONTEXT_GET_PRIVATE (context);
  
@@ -204,7 +214,7 @@ index be45bbe..979c710 100644
      retval = ibus_message_get_args (message,
                  &error,
                  G_TYPE_UINT, &keyval,
-@@ -612,8 +608,6 @@ _ic_process_key_event (BusInputContext *context,
+@@ -612,8 +607,6 @@ _ic_process_key_event (BusInputContext *context,
          return reply;
      }
  
@@ -213,7 +223,7 @@ index be45bbe..979c710 100644
      retval = bus_input_context_filter_keyboard_shortcuts (context, keyval, modifiers);
  
      if (retval) {
-@@ -623,12 +617,16 @@ _ic_process_key_event (BusInputContext *context,
+@@ -623,12 +616,16 @@ _ic_process_key_event (BusInputContext *context,
                                    G_TYPE_INVALID);
      }
      else if (priv->enabled && priv->engine) {
@@ -233,7 +243,7 @@ index be45bbe..979c710 100644
          bus_engine_proxy_process_key_event (priv->engine,
                                              keyval,
                                              modifiers,
-@@ -1012,7 +1010,7 @@ bus_input_context_focus_in (BusInputContext *context)
+@@ -1012,7 +1009,7 @@ bus_input_context_focus_in (BusInputContext *context)
  
      priv->has_focus = TRUE;
  
@@ -242,7 +252,7 @@ index be45bbe..979c710 100644
          bus_engine_proxy_focus_in (priv->engine);
      }
  
-@@ -1034,7 +1032,7 @@ bus_input_context_focus_out (BusInputContext *context)
+@@ -1034,7 +1031,7 @@ bus_input_context_focus_out (BusInputContext *context)
  
      priv->has_focus = FALSE;
  
@@ -251,7 +261,7 @@ index be45bbe..979c710 100644
          bus_engine_proxy_focus_out (priv->engine);
      }
  
-@@ -1122,7 +1120,8 @@ _engine_destroy_cb (BusEngineProxy  *engine,
+@@ -1122,7 +1119,8 @@ _engine_destroy_cb (BusEngineProxy  *engine,
  
      g_assert (priv->engine == engine);
  
@@ -261,7 +271,7 @@ index be45bbe..979c710 100644
  }
  
  static void
-@@ -1391,7 +1390,6 @@ bus_input_context_disable (BusInputContext *context)
+@@ -1391,7 +1389,6 @@ bus_input_context_disable (BusInputContext *context)
      BusInputContextPrivate *priv;
      priv = BUS_INPUT_CONTEXT_GET_PRIVATE (context);
  
@@ -269,7 +279,7 @@ index be45bbe..979c710 100644
  
      if (priv->engine) {
          if (priv->has_focus) {
-@@ -1406,8 +1404,52 @@ bus_input_context_disable (BusInputContext *context)
+@@ -1406,8 +1403,52 @@ bus_input_context_disable (BusInputContext *context)
      g_signal_emit (context,
                     context_signals[DISABLED],
                     0);
@@ -322,7 +332,7 @@ index be45bbe..979c710 100644
  
  void
  bus_input_context_set_engine (BusInputContext *context,
-@@ -1420,56 +1462,25 @@ bus_input_context_set_engine (BusInputContext *context,
+@@ -1420,56 +1461,25 @@ bus_input_context_set_engine (BusInputContext *context,
      priv = BUS_INPUT_CONTEXT_GET_PRIVATE (context);
  
      if (priv->engine != NULL) {
@@ -812,6 +822,348 @@ index 32ba998..63d6c0e 100644
      @method()
      def FocusIn(self): pass
  
+diff --git a/po/POTFILES.in b/po/POTFILES.in
+index 444ed03..6b30bdf 100644
+--- a/po/POTFILES.in
++++ b/po/POTFILES.in
+@@ -33,4 +33,5 @@
+ ./ui/gtk/languagebar.py
+ ./setup/main.py
+ ./setup/keyboardshortcut.py
++./setup/enginecombobox.py
+ ./setup/setup.glade
+diff --git a/po/fr.po b/po/fr.po
+index 92d7c4b..cb88f6e 100644
+--- a/po/fr.po
++++ b/po/fr.po
+@@ -8,7 +8,7 @@ msgid ""
+ msgstr ""
+ "Project-Id-Version: ibus VERSION\n"
+ "Report-Msgid-Bugs-To: http://code.google.com/p/ibus/issues/entry\n"
+-"POT-Creation-Date: 2009-02-11 14:27+0800\n"
++"POT-Creation-Date: 2009-02-17 16:05+0800\n"
+ "PO-Revision-Date: 2009-02-06 01:55+0100\n"
+ "Last-Translator: Julroy67 <julroy67@gmail.com>\n"
+ "Language-Team: French <julroy67@gmail.com>\n"
+@@ -18,25 +18,25 @@ msgstr ""
+ "X-Poedit-Language: French\n"
+ "X-Poedit-Country: FRANCE\n"
+ 
+-#: ibus/lang.py:40 ui/gtk/panel.py:311 ui/gtk/panel.py:312 ui/gtk/panel.py:313
+-#: ui/gtk/panel.py:314
++#: ibus/lang.py:40 ui/gtk/panel.py:310 ui/gtk/panel.py:311 ui/gtk/panel.py:312
++#: ui/gtk/panel.py:313
+ msgid "Other"
+ msgstr "Autre"
+ 
+-#: ui/gtk/panel.py:99
++#: ui/gtk/panel.py:97
+ #, fuzzy
+ msgid "IBus - Running"
+ msgstr "IBus - Démarré"
+ 
+-#: ui/gtk/panel.py:281
++#: ui/gtk/panel.py:280
+ msgid "Restart"
+ msgstr ""
+ 
+-#: ui/gtk/panel.py:374
++#: ui/gtk/panel.py:379
+ msgid "IBus is an intelligent input bus for Linux/Unix."
+ msgstr "IBus est un IME intelligent pour Linux/Unix"
+ 
+-#: ui/gtk/panel.py:378
++#: ui/gtk/panel.py:383
+ msgid "translator-credits"
+ msgstr "HUMBERT Julien <julroy67@gmail.com>"
+ 
+@@ -105,6 +105,10 @@ msgstr ""
+ msgid "Please press a key (or a key combination)"
+ msgstr "Veuillez presser une touche (ou une combinaison de touches)"
+ 
++#: setup/enginecombobox.py:94
++msgid "Select an input method"
++msgstr ""
++
+ #: setup/setup.glade:7
+ msgid "IBus - Setup"
+ msgstr "IBus - Configuration"
+diff --git a/po/ja.po b/po/ja.po
+index 011fa9d..0b2d558 100644
+--- a/po/ja.po
++++ b/po/ja.po
+@@ -8,7 +8,7 @@ msgid ""
+ msgstr ""
+ "Project-Id-Version: ibus VERSION\n"
+ "Report-Msgid-Bugs-To: http://code.google.com/p/ibus/issues/entry\n"
+-"POT-Creation-Date: 2009-02-11 14:27+0800\n"
++"POT-Creation-Date: 2009-02-17 16:05+0800\n"
+ "PO-Revision-Date: 2008-08-28 17:31+0900\n"
+ "Last-Translator: UTUMI Hirosi <utuhiro78@yahoo.co.jp>\n"
+ "Language-Team: Japanese <gnome-translation@gnome.gr.jp>\n"
+@@ -16,24 +16,24 @@ msgstr ""
+ "Content-Type: text/plain; charset=UTF-8\n"
+ "Content-Transfer-Encoding: 8bit\n"
+ 
+-#: ibus/lang.py:40 ui/gtk/panel.py:311 ui/gtk/panel.py:312 ui/gtk/panel.py:313
+-#: ui/gtk/panel.py:314
++#: ibus/lang.py:40 ui/gtk/panel.py:310 ui/gtk/panel.py:311 ui/gtk/panel.py:312
++#: ui/gtk/panel.py:313
+ msgid "Other"
+ msgstr ""
+ 
+-#: ui/gtk/panel.py:99
++#: ui/gtk/panel.py:97
+ msgid "IBus - Running"
+ msgstr "IBus - 実行中"
+ 
+-#: ui/gtk/panel.py:281
++#: ui/gtk/panel.py:280
+ msgid "Restart"
+ msgstr ""
+ 
+-#: ui/gtk/panel.py:374
++#: ui/gtk/panel.py:379
+ msgid "IBus is an intelligent input bus for Linux/Unix."
+ msgstr ""
+ 
+-#: ui/gtk/panel.py:378
++#: ui/gtk/panel.py:383
+ msgid "translator-credits"
+ msgstr "UTUMI Hirosi <utuhiro78@yahoo.co.jp>"
+ 
+@@ -100,6 +100,10 @@ msgstr ""
+ msgid "Please press a key (or a key combination)"
+ msgstr "キーもしくはキーの組み合わせを入力してください"
+ 
++#: setup/enginecombobox.py:94
++msgid "Select an input method"
++msgstr ""
++
+ #: setup/setup.glade:7
+ msgid "IBus - Setup"
+ msgstr "IBus - セットアップ"
+diff --git a/po/pa.po b/po/pa.po
+index 4bf8549..109fba8 100644
+--- a/po/pa.po
++++ b/po/pa.po
+@@ -6,7 +6,7 @@ msgid ""
+ msgstr ""
+ "Project-Id-Version: ibus\n"
+ "Report-Msgid-Bugs-To: http://code.google.com/p/ibus/issues/entry\n"
+-"POT-Creation-Date: 2009-02-11 14:27+0800\n"
++"POT-Creation-Date: 2009-02-17 16:05+0800\n"
+ "PO-Revision-Date: 2008-10-17 14:15+0530\n"
+ "Last-Translator: Amanpreet Singh <aalam@users.sf.net>\n"
+ "Language-Team: Punjabi/Panjabi <punjabi-l10n@lists.sf.net>\n"
+@@ -16,24 +16,24 @@ msgstr ""
+ "X-Generator: Lokalize 0.2\n"
+ "Plural-Forms: nplurals=2; plural=n != 1;\n"
+ 
+-#: ibus/lang.py:40 ui/gtk/panel.py:311 ui/gtk/panel.py:312 ui/gtk/panel.py:313
+-#: ui/gtk/panel.py:314
++#: ibus/lang.py:40 ui/gtk/panel.py:310 ui/gtk/panel.py:311 ui/gtk/panel.py:312
++#: ui/gtk/panel.py:313
+ msgid "Other"
+ msgstr "ਹੋਰ"
+ 
+-#: ui/gtk/panel.py:99
++#: ui/gtk/panel.py:97
+ msgid "IBus - Running"
+ msgstr "IBus -  ਚੱਲ ਰਿਹਾ ਹੈ"
+ 
+-#: ui/gtk/panel.py:281
++#: ui/gtk/panel.py:280
+ msgid "Restart"
+ msgstr ""
+ 
+-#: ui/gtk/panel.py:374
++#: ui/gtk/panel.py:379
+ msgid "IBus is an intelligent input bus for Linux/Unix."
+ msgstr "IBus ਲੀਨਕਸ/ਯੂਨੈਕਸ ਲਈ ਮਾਹਰ ਇੰਪੁੱਟ ਬੱਸ ਹੈ।"
+ 
+-#: ui/gtk/panel.py:378
++#: ui/gtk/panel.py:383
+ msgid "translator-credits"
+ msgstr "ਅਮਨਪਰੀਤ ਸਿੰਘ ਆਲਮ"
+ 
+@@ -99,6 +99,10 @@ msgstr ""
+ msgid "Please press a key (or a key combination)"
+ msgstr "ਕੋਈ ਵੀ ਸਵਿੱਚ ਦੱਬੋ (ਜਾਂ ਸਵਿੱਚ ਜੋੜ)"
+ 
++#: setup/enginecombobox.py:94
++msgid "Select an input method"
++msgstr ""
++
+ #: setup/setup.glade:7
+ msgid "IBus - Setup"
+ msgstr "IBus - ਸੈੱਟਅੱਪ"
+diff --git a/po/zh_CN.po b/po/zh_CN.po
+index c56b4c6..59aea5e 100644
+--- a/po/zh_CN.po
++++ b/po/zh_CN.po
+@@ -7,7 +7,7 @@ msgid ""
+ msgstr ""
+ "Project-Id-Version: 0.1.1.20080813\n"
+ "Report-Msgid-Bugs-To: http://code.google.com/p/ibus/issues/entry\n"
+-"POT-Creation-Date: 2009-02-11 14:27+0800\n"
++"POT-Creation-Date: 2009-02-17 16:05+0800\n"
+ "PO-Revision-Date: 2008-08-13 21:59+0800\n"
+ "Last-Translator: Huang Peng <shawn.p.huang@gmail.com>\n"
+ "Language-Team: Huang Peng <shawn.p.huang@gmail.com>\n"
+@@ -16,24 +16,24 @@ msgstr ""
+ "Content-Transfer-Encoding: 8bit\n"
+ "Plural-Forms: nplurals=1; plural=0;\n"
+ 
+-#: ibus/lang.py:40 ui/gtk/panel.py:311 ui/gtk/panel.py:312 ui/gtk/panel.py:313
+-#: ui/gtk/panel.py:314
++#: ibus/lang.py:40 ui/gtk/panel.py:310 ui/gtk/panel.py:311 ui/gtk/panel.py:312
++#: ui/gtk/panel.py:313
+ msgid "Other"
+ msgstr "其他"
+ 
+-#: ui/gtk/panel.py:99
++#: ui/gtk/panel.py:97
+ msgid "IBus - Running"
+ msgstr "IBus - 运行"
+ 
+-#: ui/gtk/panel.py:281
++#: ui/gtk/panel.py:280
+ msgid "Restart"
+ msgstr ""
+ 
+-#: ui/gtk/panel.py:374
++#: ui/gtk/panel.py:379
+ msgid "IBus is an intelligent input bus for Linux/Unix."
+ msgstr ""
+ 
+-#: ui/gtk/panel.py:378
++#: ui/gtk/panel.py:383
+ msgid "translator-credits"
+ msgstr "Huang Peng <shawn.p.huang@gmail.com>"
+ 
+@@ -99,6 +99,10 @@ msgstr ""
+ msgid "Please press a key (or a key combination)"
+ msgstr "请按一个键盘按键（或者一个组合按键）"
+ 
++#: setup/enginecombobox.py:94
++msgid "Select an input method"
++msgstr "选择输入法"
++
+ #: setup/setup.glade:7
+ msgid "IBus - Setup"
+ msgstr "IBus - 设置"
+@@ -192,26 +196,3 @@ msgstr "关于"
+ #: setup/setup.glade:524
+ msgid "gtk-close"
+ msgstr ""
+-
+-#~ msgid "Started"
+-#~ msgstr "启动"
+-
+-#~ msgid "Preload"
+-#~ msgstr "预加载"
+-
+-#~ msgid "Cannot enable input engine"
+-#~ msgstr "不能启动输入引擎"
+-
+-#~ msgid ""
+-#~ "IBus can not enable input engine, because IBus does not load any input "
+-#~ "engines!\n"
+-#~ "Please use ibus-setup program to load some input engines."
+-#~ msgstr ""
+-#~ "IBus不能启动输入引擎，因为IBus没有加载任何输入引擎！\n"
+-#~ "请运行ibus-setup程序，启动需要的输入法引擎。"
+-
+-#~ msgid "Setup"
+-#~ msgstr "设置"
+-
+-#~ msgid "Don't show this again"
+-#~ msgstr "不再显示该信息"
+diff --git a/setup/enginecombobox.py b/setup/enginecombobox.py
+index c8eaa15..6db543a 100644
+--- a/setup/enginecombobox.py
++++ b/setup/enginecombobox.py
+@@ -22,15 +22,19 @@
+ import gtk
+ import gobject
+ import ibus
+-
++import gettext
+ from icon import load_icon
+ 
++_  = lambda a : gettext.dgettext("ibus", a)
++
+ class EngineComboBox(gtk.ComboBox):
+     def __init__(self, engines):
+         super(EngineComboBox, self).__init__()
+ 
+         self.__model = gtk.TreeStore(gobject.TYPE_PYOBJECT)
+ 
++        iter1 = self.__model.append(None)
++        self.__model.set(iter1, 0, 0)
+         lang = {}
+         for e in engines:
+             l = ibus.get_language_name(e.language)
+@@ -57,11 +61,16 @@ class EngineComboBox(gtk.ComboBox):
+         self.pack_start(renderer, True)
+         self.set_cell_data_func(renderer, self.__name_cell_data_cb)
+ 
++        self.set_active(0)
++
+     def __icon_cell_data_cb(self, celllayout, renderer, model, iter):
+         engine = self.__model.get_value(iter, 0)
+ 
+         icon_size = gtk.icon_size_lookup(gtk.ICON_SIZE_LARGE_TOOLBAR)[0]
+-        if isinstance (engine, str) or isinstance (engine, unicode):
++        if isinstance(engine, str) or isinstance (engine, unicode):
++            renderer.set_property("visible", False)
++            renderer.set_property("sensitive", False)
++        elif isinstance(engine, int):
+             renderer.set_property("visible", False)
+             renderer.set_property("sensitive", False)
+         else:
+@@ -69,7 +78,7 @@ class EngineComboBox(gtk.ComboBox):
+             renderer.set_property("sensitive", True)
+             pixbuf = load_icon(engine.icon, gtk.ICON_SIZE_LARGE_TOOLBAR)
+             if pixbuf == None:
+-                pixbuf = load_icon("default-engine", gtk.ICON_SIZE_LARGE_TOOLBAR)
++                pixbuf = load_icon("engine-default", gtk.ICON_SIZE_LARGE_TOOLBAR)
+             if pixbuf == None:
+                 pixbuf = load_icon("gtk-missing-image", gtk.ICON_SIZE_LARGE_TOOLBAR)
+             renderer.set_property("pixbuf", pixbuf)
+@@ -80,13 +89,17 @@ class EngineComboBox(gtk.ComboBox):
+         if isinstance (engine, str) or isinstance (engine, unicode):
+             renderer.set_property("sensitive", False)
+             renderer.set_property("text", engine)
++        elif isinstance(engine, int):
++            renderer.set_property("sensitive", True)
++            renderer.set_property("text", _("Select an input method"))
+         else:
+             renderer.set_property("sensitive", True)
+             renderer.set_property("text", engine.longname)
+ 
+     def get_active_engine(self):
++        i = self.get_active()
+         iter = self.get_active_iter()
+-        if iter == None:
++        if i == 0 or i == -1:
+             return None
+         return self.get_model()[iter][0]
+ 
+diff --git a/setup/enginetreeview.py b/setup/enginetreeview.py
+index 4e4c131..70130a2 100644
+--- a/setup/enginetreeview.py
++++ b/setup/enginetreeview.py
+@@ -65,7 +65,7 @@ class EngineTreeView(gtk.TreeView):
+         pixbuf = load_icon(engine.icon, gtk.ICON_SIZE_LARGE_TOOLBAR)
+ 
+         if pixbuf == None:
+-            pixbuf = load_icon("default-engine", gtk.ICON_SIZE_LARGE_TOOLBAR)
++            pixbuf = load_icon("engine-default", gtk.ICON_SIZE_LARGE_TOOLBAR)
+         if pixbuf == None:
+             pixbuf = load_icon("gtk-missing-image", gtk.ICON_SIZE_LARGE_TOOLBAR)
+ 
 diff --git a/src/ibusattribute.c b/src/ibusattribute.c
 index 7b41ab2..e52e984 100644
 --- a/src/ibusattribute.c
@@ -866,7 +1218,7 @@ index 9965761..52631e8 100644
                              G_TYPE_INVALID,
                              G_TYPE_INVALID);
 diff --git a/src/ibusengine.c b/src/ibusengine.c
-index 0c36dd4..27fc71e 100644
+index 0c36dd4..d924e25 100644
 --- a/src/ibusengine.c
 +++ b/src/ibusengine.c
 @@ -101,7 +101,7 @@ static void     ibus_engine_cursor_down     (IBusEngine         *engine);
@@ -993,15 +1345,17 @@ index 0c36dd4..27fc71e 100644
  
      engine_signals[PROPERTY_ACTIVATE] =
          g_signal_new (I_("property-activate"),
-@@ -328,7 +342,10 @@ ibus_engine_class_init (IBusEngineClass *klass)
+@@ -327,8 +341,11 @@ ibus_engine_class_init (IBusEngineClass *klass)
+             G_SIGNAL_RUN_LAST,
              G_STRUCT_OFFSET (IBusEngineClass, property_activate),
              NULL, NULL,
-             ibus_marshal_VOID__STRING_INT,
+-            ibus_marshal_VOID__STRING_INT,
 -            G_TYPE_NONE, 0);
++            ibus_marshal_VOID__STRING_UINT,
 +            G_TYPE_NONE,
 +            2,
 +            G_TYPE_STRING,
-+            G_TYPE_INT);
++            G_TYPE_UINT);
  
      engine_signals[PROPERTY_SHOW] =
          g_signal_new (I_("property-show"),
@@ -1043,7 +1397,15 @@ index 0c36dd4..27fc71e 100644
                          "%s.%s: Can not match signature (ubu) of method",
                          IBUS_INTERFACE_ENGINE, "ProcessKeyEvent");
          ibus_connection_send (connection, error_message);
-@@ -527,7 +550,7 @@ ibus_engine_ibus_message (IBusEngine     *engine,
+@@ -520,14 +543,14 @@ ibus_engine_ibus_message (IBusEngine     *engine,
+     }
+     else if (ibus_message_is_method_call (message, IBUS_INTERFACE_ENGINE, "PropertyActivate")) {
+         gchar *name;
+-        gint state;
++        guint state;
+         gboolean retval;
+         IBusError *error = NULL;
+ 
          retval = ibus_message_get_args (message,
                                          &error,
                                          G_TYPE_STRING, &name,
@@ -1374,6 +1736,18 @@ index 62ca7d8..ede02b1 100644
  G_END_DECLS
  #endif
  
+diff --git a/src/ibusmarshalers.list b/src/ibusmarshalers.list
+index 14def28..7ef0c76 100644
+--- a/src/ibusmarshalers.list
++++ b/src/ibusmarshalers.list
+@@ -3,6 +3,7 @@ VOID:OBJECT
+ VOID:POINTER
+ VOID:STRING
+ VOID:STRING,INT
++VOID:STRING,UINT
+ BOOL:POINTER
+ BOOL:POINTER,POINTER
+ BOOL:UINT,UINT
 diff --git a/src/ibusproperty.c b/src/ibusproperty.c
 index 712bf1f..0976363 100644
 --- a/src/ibusproperty.c
@@ -1458,6 +1832,15 @@ index 9b87701..1725dda 100644
  
      text->text = (gchar *)g_malloc (12);
      len = g_unichar_to_utf8 (c, text->text);
+diff --git a/ui/gtk/icon.py b/ui/gtk/icon.py
+index 077848d..b8f6ac7 100644
+--- a/ui/gtk/icon.py
++++ b/ui/gtk/icon.py
+@@ -45,4 +45,3 @@ class IconWidget(gtk.Image):
+ 
+         self.set_from_pixbuf(pixbuf)
+         self.show()
+-
 diff --git a/ui/gtk/languagebar.py b/ui/gtk/languagebar.py
 index 3546ef7..2a10a43 100644
 --- a/ui/gtk/languagebar.py
@@ -1541,7 +1924,7 @@ index 9a3b30a..6f6c7d1 100644
  
          self.set_active (self._prop._state == ibus.PROP_STATE_CHECKED)
 diff --git a/ui/gtk/panel.py b/ui/gtk/panel.py
-index e7850e6..d968393 100644
+index e7850e6..6325df0 100644
 --- a/ui/gtk/panel.py
 +++ b/ui/gtk/panel.py
 @@ -74,9 +74,7 @@ class Panel(ibus.PanelBase):
@@ -1562,6 +1945,30 @@ index e7850e6..d968393 100644
 +        self.__language_bar.set_enabled(False)
          self.__language_bar.focus_out()
          self.__set_im_icon(self.__ibus_icon)
+ 
+@@ -318,7 +317,10 @@ class Panel(ibus.PanelBase):
+                     engine = tmp[lang][0]
+                     item = gtk.ImageMenuItem("%s - %s" % (lang, engine.longname))
+                     size = gtk.icon_size_lookup(gtk.ICON_SIZE_MENU)
+-                    item.set_image (_icon.IconWidget(engine.icon, size[0]))
++                    if engine.icon:
++                        item.set_image (_icon.IconWidget(engine.icon, size[0]))
++                    else:
++                        item.set_image (_icon.IconWidget("engine-default", size[0]))
+                     item.connect("activate", self.__im_menu_item_activate_cb, engine)
+                     menu.add(item)
+                 else:
+@@ -329,7 +331,10 @@ class Panel(ibus.PanelBase):
+                     for engine in tmp[lang]:
+                         item = gtk.ImageMenuItem(engine.longname)
+                         size = gtk.icon_size_lookup(gtk.ICON_SIZE_MENU)
+-                        item.set_image (_icon.IconWidget(engine.icon, size[0]))
++                        if engine.icon:
++                            item.set_image (_icon.IconWidget(engine.icon, size[0]))
++                        else:
++                            item.set_image (_icon.IconWidget("engine-default", size[0]))
+                         item.connect("activate", self.__im_menu_item_activate_cb, engine)
+                         submenu.add(item)
  
 diff --git a/ui/gtk/toolitem.py b/ui/gtk/toolitem.py
 index 0e4e4ad..09ad686 100644

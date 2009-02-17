@@ -3,7 +3,7 @@
 %define mod_path ibus-1.1
 Name:       ibus
 Version:    1.1.0.20090211
-Release:    9%{?dist}
+Release:    10%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -181,6 +181,10 @@ fi
 %{_libdir}/pkgconfig/*
 
 %changelog
+* Tue Feb 17 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090211-10
+- Recreate the ibus-HEAD.patch from upstream git source tree.
+- Put 'Select an input method' in engine select combobox (#485861).
+
 * Tue Feb 17 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090211-9
 - Add requires im-chooser >= 1.2.5.
 
