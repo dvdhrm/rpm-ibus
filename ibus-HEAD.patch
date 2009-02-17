@@ -812,6 +812,28 @@ index 32ba998..63d6c0e 100644
      @method()
      def FocusIn(self): pass
  
+diff --git a/src/ibusattribute.c b/src/ibusattribute.c
+index 7b41ab2..e52e984 100644
+--- a/src/ibusattribute.c
++++ b/src/ibusattribute.c
+@@ -181,7 +181,7 @@ ibus_attribute_new (guint type,
+         type == IBUS_ATTR_TYPE_FOREGROUND ||
+         type == IBUS_ATTR_TYPE_BACKGROUND, NULL);
+ 
+-    IBusAttribute *attr = IBUS_ATTRIBUTE (g_object_new (IBUS_TYPE_ATTRIBUTE, 0));
++    IBusAttribute *attr = IBUS_ATTRIBUTE (g_object_new (IBUS_TYPE_ATTRIBUTE, NULL));
+ 
+     attr->type = type;
+     attr->value = value;
+@@ -402,7 +402,7 @@ IBusAttrList *
+ ibus_attr_list_new ()
+ {
+     IBusAttrList *attr_list;
+-    attr_list = g_object_new (IBUS_TYPE_ATTR_LIST, 0);
++    attr_list = g_object_new (IBUS_TYPE_ATTR_LIST, NULL);
+     return attr_list;
+ }
+ 
 diff --git a/src/ibusbus.c b/src/ibusbus.c
 index 9965761..52631e8 100644
 --- a/src/ibusbus.c
@@ -1095,6 +1117,50 @@ index 0a827af..1a35c06 100644
      void        (* property_show)   (IBusEngine     *engine,
                                       const gchar    *prop_name);
      void        (* property_hide)   (IBusEngine     *engine,
+diff --git a/src/ibusfactory.c b/src/ibusfactory.c
+index af9d887..af26b57 100644
+--- a/src/ibusfactory.c
++++ b/src/ibusfactory.c
+@@ -99,7 +99,7 @@ ibus_factory_new (IBusConnection *connection)
+ 
+     factory = (IBusFactory *) g_object_new (IBUS_TYPE_FACTORY,
+                                             "path", IBUS_PATH_FACTORY,
+-                                            0);
++                                            NULL);
+     priv = IBUS_FACTORY_GET_PRIVATE (factory);
+ 
+     priv->connection = g_object_ref (connection);
+@@ -238,7 +238,7 @@ ibus_factory_ibus_message (IBusFactory    *factory,
+                                "name", engine_name,
+                                "path", path,
+                                "connection", priv->connection,
+-                               0);
++                               NULL);
+ 
+         priv->engine_list = g_list_append (priv->engine_list, engine);
+         g_signal_connect (engine,
+@@ -468,7 +468,7 @@ ibus_factory_info_new (const gchar *path,
+ 
+     IBusFactoryInfo *info;
+ 
+-    info = (IBusFactoryInfo *)g_object_new (IBUS_TYPE_FACTORY_INFO, 0);
++    info = (IBusFactoryInfo *) g_object_new (IBUS_TYPE_FACTORY_INFO, NULL);
+ 
+     info->path = g_strdup (path);
+     info->name = g_strdup (name);
+diff --git a/src/ibushotkey.c b/src/ibushotkey.c
+index eca7666..81e506c 100644
+--- a/src/ibushotkey.c
++++ b/src/ibushotkey.c
+@@ -315,7 +315,7 @@ ibus_hotkey_profile_copy (IBusHotkeyProfile       *dest,
+ IBusHotkeyProfile *
+ ibus_hotkey_profile_new (void)
+ {
+-    IBusHotkeyProfile *profile = g_object_new (IBUS_TYPE_HOTKEY_PROFILE, 0);
++    IBusHotkeyProfile *profile = g_object_new (IBUS_TYPE_HOTKEY_PROFILE, NULL);
+ 
+     return profile;
+ }
 diff --git a/src/ibuslookuptable.c b/src/ibuslookuptable.c
 index e2935b8..37342c5 100644
 --- a/src/ibuslookuptable.c
@@ -1308,6 +1374,90 @@ index 62ca7d8..ede02b1 100644
  G_END_DECLS
  #endif
  
+diff --git a/src/ibusproperty.c b/src/ibusproperty.c
+index 712bf1f..0976363 100644
+--- a/src/ibusproperty.c
++++ b/src/ibusproperty.c
+@@ -263,7 +263,7 @@ ibus_property_new (const gchar   *key,
+ 
+     IBusProperty *prop;
+ 
+-    prop = (IBusProperty *)g_object_new (IBUS_TYPE_PROPERTY, 0);
++    prop = (IBusProperty *)g_object_new (IBUS_TYPE_PROPERTY, NULL);
+ 
+     prop->key = g_strdup (key);
+     prop->icon = g_strdup (icon != NULL ? icon : "");
+diff --git a/src/ibusserializable.c b/src/ibusserializable.c
+index 82a49bc..348be43 100644
+--- a/src/ibusserializable.c
++++ b/src/ibusserializable.c
+@@ -473,7 +473,7 @@ ibus_serializable_copy (IBusSerializable *object)
+ 
+     type = G_OBJECT_TYPE (object);
+ 
+-    new_object = g_object_new (type, 0);
++    new_object = g_object_new (type, NULL);
+     g_return_val_if_fail (new_object != NULL, NULL);
+ 
+     if (IBUS_SERIALIZABLE_GET_CLASS (new_object)->copy (new_object, object)) {
+@@ -566,7 +566,7 @@ ibus_serializable_deserialize (IBusMessageIter *iter)
+ 
+     g_return_val_if_fail (g_type_is_a (type, IBUS_TYPE_SERIALIZABLE), NULL);
+ 
+-    object = g_object_new (type, 0);
++    object = g_object_new (type, NULL);
+ 
+     retval = IBUS_SERIALIZABLE_GET_CLASS (object)->deserialize (object, &sub_iter);
+     if (retval)
+diff --git a/src/ibustext.c b/src/ibustext.c
+index 9b87701..1725dda 100644
+--- a/src/ibustext.c
++++ b/src/ibustext.c
+@@ -176,7 +176,7 @@ ibus_text_new_from_string (const gchar *str)
+ 
+     IBusText *text;
+ 
+-    text= g_object_new (IBUS_TYPE_TEXT, 0);
++    text= g_object_new (IBUS_TYPE_TEXT, NULL);
+ 
+     text->is_static = FALSE;
+     text->text = g_strdup (str);
+@@ -191,7 +191,7 @@ ibus_text_new_from_ucs4 (const gunichar *str)
+ 
+     IBusText *text;
+ 
+-    text= g_object_new (IBUS_TYPE_TEXT, 0);
++    text= g_object_new (IBUS_TYPE_TEXT, NULL);
+ 
+     text->is_static = FALSE;
+     text->text = g_ucs4_to_utf8 (str, -1, NULL, NULL, NULL);
+@@ -206,7 +206,7 @@ ibus_text_new_from_static_string (const gchar *str)
+ 
+     IBusText *text;
+ 
+-    text= g_object_new (IBUS_TYPE_TEXT, 0);
++    text= g_object_new (IBUS_TYPE_TEXT, NULL);
+ 
+     text->is_static = TRUE;
+     text->text = (gchar *)str;
+@@ -231,7 +231,7 @@ ibus_text_new_from_printf (const gchar *format,
+     if (str == NULL)
+         return NULL;
+ 
+-    text= g_object_new (IBUS_TYPE_TEXT, 0);
++    text= g_object_new (IBUS_TYPE_TEXT, NULL);
+ 
+     text->text = (gchar *)str;
+ 
+@@ -244,7 +244,7 @@ ibus_text_new_from_unichar (gunichar c)
+     IBusText *text;
+     gint len;
+ 
+-    text= g_object_new (IBUS_TYPE_TEXT, 0);
++    text= g_object_new (IBUS_TYPE_TEXT, NULL);
+ 
+     text->text = (gchar *)g_malloc (12);
+     len = g_unichar_to_utf8 (c, text->text);
 diff --git a/ui/gtk/languagebar.py b/ui/gtk/languagebar.py
 index 3546ef7..2a10a43 100644
 --- a/ui/gtk/languagebar.py
