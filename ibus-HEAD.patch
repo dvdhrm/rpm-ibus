@@ -161,7 +161,7 @@ index e92b373..7f51130 100644
  }
  
 diff --git a/bus/inputcontext.c b/bus/inputcontext.c
-index be45bbe..bdc7d75 100644
+index be45bbe..979c710 100644
 --- a/bus/inputcontext.c
 +++ b/bus/inputcontext.c
 @@ -100,6 +100,8 @@ static gboolean bus_input_context_send_signal   (BusInputContext        *context
@@ -251,16 +251,17 @@ index be45bbe..bdc7d75 100644
          bus_engine_proxy_focus_out (priv->engine);
      }
  
-@@ -1122,7 +1120,7 @@ _engine_destroy_cb (BusEngineProxy  *engine,
+@@ -1122,7 +1120,8 @@ _engine_destroy_cb (BusEngineProxy  *engine,
  
      g_assert (priv->engine == engine);
  
 -    bus_input_context_set_engine (context, NULL);
 +    bus_input_context_unset_engine (context);
++    bus_input_context_disable (context);
  }
  
  static void
-@@ -1391,7 +1389,6 @@ bus_input_context_disable (BusInputContext *context)
+@@ -1391,7 +1390,6 @@ bus_input_context_disable (BusInputContext *context)
      BusInputContextPrivate *priv;
      priv = BUS_INPUT_CONTEXT_GET_PRIVATE (context);
  
@@ -268,7 +269,7 @@ index be45bbe..bdc7d75 100644
  
      if (priv->engine) {
          if (priv->has_focus) {
-@@ -1406,8 +1403,52 @@ bus_input_context_disable (BusInputContext *context)
+@@ -1406,8 +1404,52 @@ bus_input_context_disable (BusInputContext *context)
      g_signal_emit (context,
                     context_signals[DISABLED],
                     0);
@@ -321,7 +322,7 @@ index be45bbe..bdc7d75 100644
  
  void
  bus_input_context_set_engine (BusInputContext *context,
-@@ -1420,56 +1461,25 @@ bus_input_context_set_engine (BusInputContext *context,
+@@ -1420,56 +1462,25 @@ bus_input_context_set_engine (BusInputContext *context,
      priv = BUS_INPUT_CONTEXT_GET_PRIVATE (context);
  
      if (priv->engine != NULL) {
@@ -842,6 +843,258 @@ index 9965761..52631e8 100644
                              G_TYPE_BOOLEAN, &restart,
                              G_TYPE_INVALID,
                              G_TYPE_INVALID);
+diff --git a/src/ibusengine.c b/src/ibusengine.c
+index 0c36dd4..27fc71e 100644
+--- a/src/ibusengine.c
++++ b/src/ibusengine.c
+@@ -101,7 +101,7 @@ static void     ibus_engine_cursor_down     (IBusEngine         *engine);
+ static void     ibus_engine_property_activate
+                                             (IBusEngine         *engine,
+                                              const gchar        *prop_name,
+-                                             gint                prop_state);
++                                             guint               prop_state);
+ static void     ibus_engine_property_show   (IBusEngine         *engine,
+                                              const gchar        *prop_name);
+ static void     ibus_engine_property_hide   (IBusEngine         *engine,
+@@ -227,7 +227,8 @@ ibus_engine_class_init (IBusEngineClass *klass)
+             G_STRUCT_OFFSET (IBusEngineClass, focus_in),
+             NULL, NULL,
+             ibus_marshal_VOID__VOID,
+-            G_TYPE_NONE, 0);
++            G_TYPE_NONE,
++            0);
+ 
+     engine_signals[FOCUS_OUT] =
+         g_signal_new (I_("focus-out"),
+@@ -236,7 +237,8 @@ ibus_engine_class_init (IBusEngineClass *klass)
+             G_STRUCT_OFFSET (IBusEngineClass, focus_out),
+             NULL, NULL,
+             ibus_marshal_VOID__VOID,
+-            G_TYPE_NONE, 0);
++            G_TYPE_NONE,
++            0);
+ 
+     engine_signals[RESET] =
+         g_signal_new (I_("reset"),
+@@ -245,7 +247,8 @@ ibus_engine_class_init (IBusEngineClass *klass)
+             G_STRUCT_OFFSET (IBusEngineClass, reset),
+             NULL, NULL,
+             ibus_marshal_VOID__VOID,
+-            G_TYPE_NONE, 0);
++            G_TYPE_NONE,
++            0);
+ 
+     engine_signals[ENABLE] =
+         g_signal_new (I_("enable"),
+@@ -254,7 +257,8 @@ ibus_engine_class_init (IBusEngineClass *klass)
+             G_STRUCT_OFFSET (IBusEngineClass, enable),
+             NULL, NULL,
+             ibus_marshal_VOID__VOID,
+-            G_TYPE_NONE, 0);
++            G_TYPE_NONE,
++            0);
+ 
+     engine_signals[DISABLE] =
+         g_signal_new (I_("disable"),
+@@ -263,7 +267,8 @@ ibus_engine_class_init (IBusEngineClass *klass)
+             G_STRUCT_OFFSET (IBusEngineClass, disable),
+             NULL, NULL,
+             ibus_marshal_VOID__VOID,
+-            G_TYPE_NONE, 0);
++            G_TYPE_NONE,
++            0);
+ 
+     engine_signals[SET_CURSOR_LOCATION] =
+         g_signal_new (I_("set-cursor-location"),
+@@ -272,8 +277,12 @@ ibus_engine_class_init (IBusEngineClass *klass)
+             G_STRUCT_OFFSET (IBusEngineClass, set_cursor_location),
+             NULL, NULL,
+             ibus_marshal_VOID__INT_INT_INT_INT,
+-            G_TYPE_NONE, 4,
+-            G_TYPE_INT, G_TYPE_INT, G_TYPE_INT, G_TYPE_INT);
++            G_TYPE_NONE,
++            4,
++            G_TYPE_INT,
++            G_TYPE_INT,
++            G_TYPE_INT,
++            G_TYPE_INT);
+ 
+     engine_signals[SET_CAPABILITIES] =
+         g_signal_new (I_("set-capabilities"),
+@@ -282,7 +291,8 @@ ibus_engine_class_init (IBusEngineClass *klass)
+             G_STRUCT_OFFSET (IBusEngineClass, set_capabilities),
+             NULL, NULL,
+             ibus_marshal_VOID__UINT,
+-            G_TYPE_NONE, 1,
++            G_TYPE_NONE,
++            1,
+             G_TYPE_UINT);
+ 
+     engine_signals[PAGE_UP] =
+@@ -292,7 +302,8 @@ ibus_engine_class_init (IBusEngineClass *klass)
+             G_STRUCT_OFFSET (IBusEngineClass, page_up),
+             NULL, NULL,
+             ibus_marshal_VOID__VOID,
+-            G_TYPE_NONE, 0);
++            G_TYPE_NONE,
++            0);
+ 
+     engine_signals[PAGE_DOWN] =
+         g_signal_new (I_("page-down"),
+@@ -301,7 +312,8 @@ ibus_engine_class_init (IBusEngineClass *klass)
+             G_STRUCT_OFFSET (IBusEngineClass, page_down),
+             NULL, NULL,
+             ibus_marshal_VOID__VOID,
+-            G_TYPE_NONE, 0);
++            G_TYPE_NONE,
++            0);
+ 
+     engine_signals[CURSOR_UP] =
+         g_signal_new (I_("cursor-up"),
+@@ -310,7 +322,8 @@ ibus_engine_class_init (IBusEngineClass *klass)
+             G_STRUCT_OFFSET (IBusEngineClass, cursor_up),
+             NULL, NULL,
+             ibus_marshal_VOID__VOID,
+-            G_TYPE_NONE, 0);
++            G_TYPE_NONE,
++            0);
+ 
+     engine_signals[CURSOR_DOWN] =
+         g_signal_new (I_("cursor-down"),
+@@ -319,7 +332,8 @@ ibus_engine_class_init (IBusEngineClass *klass)
+             G_STRUCT_OFFSET (IBusEngineClass, cursor_down),
+             NULL, NULL,
+             ibus_marshal_VOID__VOID,
+-            G_TYPE_NONE, 0);
++            G_TYPE_NONE,
++            0);
+ 
+     engine_signals[PROPERTY_ACTIVATE] =
+         g_signal_new (I_("property-activate"),
+@@ -328,7 +342,10 @@ ibus_engine_class_init (IBusEngineClass *klass)
+             G_STRUCT_OFFSET (IBusEngineClass, property_activate),
+             NULL, NULL,
+             ibus_marshal_VOID__STRING_INT,
+-            G_TYPE_NONE, 0);
++            G_TYPE_NONE,
++            2,
++            G_TYPE_STRING,
++            G_TYPE_INT);
+ 
+     engine_signals[PROPERTY_SHOW] =
+         g_signal_new (I_("property-show"),
+@@ -337,7 +354,9 @@ ibus_engine_class_init (IBusEngineClass *klass)
+             G_STRUCT_OFFSET (IBusEngineClass, property_show),
+             NULL, NULL,
+             ibus_marshal_VOID__STRING,
+-            G_TYPE_NONE, 0);
++            G_TYPE_NONE,
++            1,
++            G_TYPE_STRING);
+ 
+     engine_signals[PROPERTY_HIDE] =
+         g_signal_new (I_("property-hide"),
+@@ -346,7 +365,9 @@ ibus_engine_class_init (IBusEngineClass *klass)
+             G_STRUCT_OFFSET (IBusEngineClass, property_hide),
+             NULL, NULL,
+             ibus_marshal_VOID__STRING,
+-            G_TYPE_NONE, 0);
++            G_TYPE_NONE,
++            1,
++            G_TYPE_STRING);
+ 
+ }
+ 
+@@ -465,6 +486,7 @@ ibus_engine_ibus_message (IBusEngine     *engine,
+         ibus_message_iter_init (message, &iter);
+         if (ibus_message_iter_has_next (&iter)) {
+             error_message = ibus_message_new_error_printf (message,
++                                DBUS_ERROR_INVALID_ARGS,
+                                 "%s.%s: Method does not have arguments",
+                                 IBUS_INTERFACE_ENGINE, no_arg_methods[i].member);
+             ibus_connection_send (connection, error_message);
+@@ -512,6 +534,7 @@ ibus_engine_ibus_message (IBusEngine     *engine,
+ 
+     _keypress_fail:
+         error_message = ibus_message_new_error_printf (message,
++                        DBUS_ERROR_INVALID_ARGS,
+                         "%s.%s: Can not match signature (ubu) of method",
+                         IBUS_INTERFACE_ENGINE, "ProcessKeyEvent");
+         ibus_connection_send (connection, error_message);
+@@ -527,7 +550,7 @@ ibus_engine_ibus_message (IBusEngine     *engine,
+         retval = ibus_message_get_args (message,
+                                         &error,
+                                         G_TYPE_STRING, &name,
+-                                        G_TYPE_INT, &state,
++                                        G_TYPE_UINT, &state,
+                                         G_TYPE_INVALID);
+ 
+         if (!retval)
+@@ -546,6 +569,7 @@ ibus_engine_ibus_message (IBusEngine     *engine,
+ 
+     _property_activate_fail:
+         error_message = ibus_message_new_error_printf (message,
++                        DBUS_ERROR_INVALID_ARGS,
+                         "%s.%s: Can not match signature (si) of method",
+                         IBUS_INTERFACE_ENGINE,
+                         "PropertyActivate");
+@@ -579,6 +603,7 @@ ibus_engine_ibus_message (IBusEngine     *engine,
+ 
+     _property_show_fail:
+         error_message = ibus_message_new_error_printf (message,
++                        DBUS_ERROR_INVALID_ARGS,
+                         "%s.%s: Can not match signature (s) of method",
+                         IBUS_INTERFACE_ENGINE,
+                         "PropertyShow");
+@@ -607,6 +632,7 @@ ibus_engine_ibus_message (IBusEngine     *engine,
+ 
+     _property_hide_fail:
+         error_message = ibus_message_new_error_printf (message,
++                        DBUS_ERROR_INVALID_ARGS,
+                         "%s.%s: Can not match signature (s) of method",
+                         IBUS_INTERFACE_ENGINE, "PropertyHide");
+         ibus_connection_send (connection, error_message);
+@@ -645,6 +671,7 @@ ibus_engine_ibus_message (IBusEngine     *engine,
+ 
+     _set_cursor_location_fail:
+         error_message = ibus_message_new_error_printf (message,
++                        DBUS_ERROR_INVALID_ARGS,
+                         "%s.%s: Can not match signature (iiii) of method",
+                         IBUS_INTERFACE_ENGINE,
+                         "SetCursorLocation");
+@@ -676,6 +703,7 @@ ibus_engine_ibus_message (IBusEngine     *engine,
+ 
+     _set_capabilities_fail:
+         error_message = ibus_message_new_error_printf (message,
++                        DBUS_ERROR_INVALID_ARGS,
+                         "%s.%s: Can not match signature (u) of method",
+                         IBUS_INTERFACE_ENGINE, "SetCapabilities");
+         ibus_connection_send (connection, error_message);
+@@ -775,8 +803,9 @@ ibus_engine_cursor_down (IBusEngine *engine)
+ }
+ 
+ static void
+-ibus_engine_property_activate (IBusEngine *engine,
+-    const gchar *prop_name, gint prop_state)
++ibus_engine_property_activate (IBusEngine  *engine,
++                               const gchar *prop_name,
++                               guint        prop_state)
+ {
+     // g_debug ("property-activate ('%s', %d)", prop_name, prop_state);
+ }
+diff --git a/src/ibusengine.h b/src/ibusengine.h
+index 0a827af..1a35c06 100644
+--- a/src/ibusengine.h
++++ b/src/ibusengine.h
+@@ -91,7 +91,7 @@ struct _IBusEngineClass {
+     void        (* property_activate)
+                                     (IBusEngine     *engine,
+                                      const gchar    *prop_name,
+-                                     gint            prop_state);
++                                     guint           prop_state);
+     void        (* property_show)   (IBusEngine     *engine,
+                                      const gchar    *prop_name);
+     void        (* property_hide)   (IBusEngine     *engine,
 diff --git a/src/ibuslookuptable.c b/src/ibuslookuptable.c
 index e2935b8..37342c5 100644
 --- a/src/ibuslookuptable.c
