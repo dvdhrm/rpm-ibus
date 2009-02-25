@@ -2,8 +2,8 @@
 %{!?gtk_binary_version: %define gtk_binary_version %(pkg-config  --variable=gtk_binary_version gtk+-2.0)}
 %define mod_path ibus-1.1
 Name:       ibus
-Version:    1.1.0.20090211
-Release:    10%{?dist}
+Version:    1.1.0.20090225
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -95,7 +95,7 @@ docs for ibus.
 
 %prep
 %setup -q
-%patch0 -p1
+# %patch0 -p1
 
 %build
 %configure --disable-static \
@@ -116,6 +116,10 @@ mkdir -pm 755 ${RPM_BUILD_ROOT}/%{_sysconfdir}/X11/xinit/xinput.d
 install -pm 644 %{SOURCE1} ${RPM_BUILD_ROOT}/%{_xinputconf}
 
 # install .desktop files
+echo "NoDisplay=true" >> $RPM_BUILD_ROOT%{_datadir}/applications/ibus.desktop
+echo "NoDisplay=true" >> $RPM_BUILD_ROOT%{_datadir}/applications/ibus-setup.desktop
+echo "X-GNOME-Autostart-enabled=false" >> $RPM_BUILD_ROOT%{_sysconfdir}/xdg/autostart/ibus.desktop
+rm -rf $RPM_BUILD_ROOT%{_sysconfdir}/xdg/autostart/ibus.desktop
 desktop-file-install --delete-original          \
   --dir $RPM_BUILD_ROOT%{_datadir}/applications \
   $RPM_BUILD_ROOT%{_datadir}/applications/*
@@ -125,22 +129,26 @@ desktop-file-install --delete-original          \
 %clean
 rm -rf $RPM_BUILD_ROOT
 
-%post libs
-/sbin/ldconfig
+%post
 update-desktop-database -q
 %{_sbindir}/alternatives --install %{_sysconfdir}/X11/xinit/xinputrc xinputrc %{_xinputconf} 83 || :
+
+%post libs
+/sbin/ldconfig
 
 %post gtk
 %{_bindir}/update-gtk-immodules %{_host} || :
 
-%postun libs
-/sbin/ldconfig
+%postun
 update-desktop-database -q
 if [ "$1" = "0" ]; then
   %{_sbindir}/alternatives --remove xinputrc %{_xinputconf} || :
   # if alternative was set to manual, reset to auto
   [ -L %{_sysconfdir}/alternatives/xinputrc -a "`readlink %{_sysconfdir}/alternatives/xinputrc`" = "%{_xinputconf}" ] && %{_sbindir}/alternatives --auto xinputrc || :
 fi
+
+%postun libs
+/sbin/ldconfig
 
 %postun gtk
 %{_bindir}/update-gtk-immodules %{_host} || :
@@ -159,6 +167,7 @@ fi
 %{_libexecdir}/ibus-gconf
 %{_libexecdir}/ibus-ui-gtk
 %{_libexecdir}/ibus-x11
+# %{_sysconfdir}/xdg/autostart/ibus.desktop
 %config %{_xinputconf}
 
 %files libs
@@ -181,6 +190,11 @@ fi
 %{_libdir}/pkgconfig/*
 
 %changelog
+* Tue Feb 25 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090225-1
+- Update to ibus-1.1.0.20090225.
+- Fix problems in %post and %postun scripts.
+- Hide ibus & ibus preferences menu items.
+
 * Tue Feb 17 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090211-10
 - Recreate the ibus-HEAD.patch from upstream git source tree.
 - Put 'Select an input method' in engine select combobox (#485861).
