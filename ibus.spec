@@ -62,7 +62,7 @@ This package contains the libraries for IBus
 Summary:    IBus im module for gtk2
 Group:      System Environment/Libraries
 Requires:   %{name} = %{version}-%{release}
-Requires:   glib2 >= %{glib_ver}
+Requires(post): glib2 >= %{glib_ver}
 
 %description gtk
 This package contains ibus im module for gtk2
@@ -185,6 +185,9 @@ fi
 %{_libdir}/pkgconfig/*
 
 %changelog
+* Tue Mar  3 2009 Jens Petersen <petersen@redhat.com>
+- use post for ibus-gtk requires glib2
+
 * Mon Mar  2 2009 Jens Petersen <petersen@redhat.com> - 1.1.0.20090225-2
 - drop the superfluous ibus-0.1 engine obsoletes
 - move glib2 requires to gtk package
