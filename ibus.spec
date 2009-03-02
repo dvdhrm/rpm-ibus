@@ -3,7 +3,7 @@
 %define mod_path ibus-1.1
 Name:       ibus
 Version:    1.1.0.20090225
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -35,7 +35,6 @@ Requires(post):  %{_sbindir}/alternatives
 Requires(postun):  desktop-file-utils
 Requires(postun):  %{_sbindir}/alternatives
 
-Requires:   glib2 >= %{glib_ver}
 Requires:   pygtk2
 Requires:   dbus-python >= 0.83.0
 Requires:   notification-daemon
@@ -43,12 +42,7 @@ Requires:   pyxdg
 Requires:   iso-codes
 Requires:   im-chooser >= 1.2.5
 
-Obsoletes:  ibus-qt <= 1.1.0
-Obsoletes: 	ibus-anthy <= 1.1.0
-Obsoletes:  ibus-pinyin <= 1.1.0
-Obsoletes:  ibus-m17n <= 1.1.0
-Obsoletes:  ibus-hangul <= 1.1.0
-Obsoletes:  ibus-chewing <= 1.1.0
+Obsoletes:  ibus-qt < 1.1.0
 
 %define _xinputconf %{_sysconfdir}/X11/xinit/xinput.d/ibus.conf
 
@@ -68,6 +62,7 @@ This package contains the libraries for IBus
 Summary:    IBus im module for gtk2
 Group:      System Environment/Libraries
 Requires:   %{name} = %{version}-%{release}
+Requires:   glib2 >= %{glib_ver}
 
 %description gtk
 This package contains ibus im module for gtk2
@@ -190,6 +185,10 @@ fi
 %{_libdir}/pkgconfig/*
 
 %changelog
+* Mon Mar  2 2009 Jens Petersen <petersen@redhat.com> - 1.1.0.20090225-2
+- drop the superfluous ibus-0.1 engine obsoletes
+- move glib2 requires to gtk package
+
 * Tue Feb 25 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090225-1
 - Update to ibus-1.1.0.20090225.
 - Fix problems in %post and %postun scripts.
