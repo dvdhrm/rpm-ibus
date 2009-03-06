@@ -3,7 +3,7 @@
 
 %define glib_ver %([ -a %{_libdir}/pkgconfig/glib-2.0.pc ] && pkg-config --modversion glib-2.0 | cut -d. -f 1,2 || echo -n "999")
 %define gconf2_version 2.12.0
-%define dbus_version 0.83.0
+%define dbus_python_version 0.83.0
 %define im_chooser_version 1.2.5
 
 Name:       ibus
@@ -24,8 +24,8 @@ BuildRequires:  gettext-devel
 BuildRequires:  libtool
 BuildRequires:  python
 BuildRequires:  gtk2-devel
-BuildRequires:  dbus-devel >= %{dbus_version}
 BuildRequires:  dbus-glib-devel
+BuildRequires:  dbus-python-devel >= %{dbus_python_version}
 BuildRequires:  desktop-file-utils
 BuildRequires:  gtk-doc
 BuildRequires:  GConf2-devel
@@ -38,7 +38,7 @@ Requires:   pygtk2
 Requires:   notification-daemon
 Requires:   pyxdg
 Requires:   iso-codes
-Requires:   dbus-python >= %{dbus_version}
+Requires:   dbus-python >= %{dbus_python_version}
 Requires:   im-chooser >= %{im_chooser_version}
 Requires:   GConf2 >= %{gconf2_version}
 
