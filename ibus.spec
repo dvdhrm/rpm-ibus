@@ -1,9 +1,14 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
 %{!?gtk_binary_version: %define gtk_binary_version %(pkg-config  --variable=gtk_binary_version gtk+-2.0)}
-%define mod_path ibus-1.1
+
+%define glib_ver %([ -a %{_libdir}/pkgconfig/glib-2.0.pc ] && pkg-config --modversion glib-2.0 | cut -d. -f 1,2 || echo -n "999")
+%define gconf2_version 2.12.0
+%define dbus_version 0.83.0
+%define im_chooser_version 1.2.5
+
 Name:       ibus
-Version:    1.1.0.20090225
-Release:    2%{?dist}
+Version:    1.1.0.20090306
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -14,13 +19,12 @@ Patch0:     ibus-HEAD.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
-%define glib_ver %([ -a %{_libdir}/pkgconfig/glib-2.0.pc ] && pkg-config --modversion glib-2.0 | cut -d. -f 1,2 || echo -n "999")
 
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
 BuildRequires:  python
 BuildRequires:  gtk2-devel
-BuildRequires:  dbus-devel
+BuildRequires:  dbus-devel >= %{dbus_version}
 BuildRequires:  dbus-glib-devel
 BuildRequires:  desktop-file-utils
 BuildRequires:  gtk-doc
@@ -30,17 +34,23 @@ BuildRequires:  pygobject2-devel
 
 Requires:   %{name}-libs = %{version}-%{release}
 
-Requires(post):  desktop-file-utils
-Requires(post):  %{_sbindir}/alternatives
-Requires(postun):  desktop-file-utils
-Requires(postun):  %{_sbindir}/alternatives
-
 Requires:   pygtk2
-Requires:   dbus-python >= 0.83.0
 Requires:   notification-daemon
 Requires:   pyxdg
 Requires:   iso-codes
-Requires:   im-chooser >= 1.2.5
+Requires:   dbus-python >= %{dbus_version}
+Requires:   im-chooser >= %{im_chooser_version}
+Requires:   GConf2 >= %{gconf2_version}
+
+Requires(post):  desktop-file-utils
+Requires(postun):  desktop-file-utils
+
+Requires(pre): GConf2 >= %{gconf2_version}
+Requires(post): GConf2 >= %{gconf2_version}
+Requires(preun): GConf2 >= %{gconf2_version}
+
+Requires(post):  %{_sbindir}/alternatives
+Requires(postun):  %{_sbindir}/alternatives
 
 Obsoletes:  ibus-qt < 1.1.0
 
@@ -54,6 +64,9 @@ developers to develop input method easily.
 %package libs
 Summary:    IBus libraries
 Group:      System Environment/Libraries
+
+Requires:   glib2 >= %{glib_ver}
+Requires:   dbus >= 1.2.4
 
 %description libs
 This package contains the libraries for IBus
@@ -128,11 +141,20 @@ rm -rf $RPM_BUILD_ROOT
 update-desktop-database -q
 %{_sbindir}/alternatives --install %{_sysconfdir}/X11/xinit/xinputrc xinputrc %{_xinputconf} 83 || :
 
-%post libs
-/sbin/ldconfig
+export GCONF_CONFIG_SOURCE=`gconftool-2 --get-default-source`
+gconftool-2 --makefile-install-rule %{_sysconfdir}/gconf/schemas/ibus.schemas >& /dev/null || :
 
-%post gtk
-%{_bindir}/update-gtk-immodules %{_host} || :
+%pre
+if [ "$1" -gt 1 ]; then
+	export GCONF_CONFIG_SOURCE=`gconftool-2 --get-default-source`
+	gconftool-2 --makefile-uninstall-rule %{_sysconfdir}/gconf/schemas/ibus.schemas >& /dev/null || :
+fi
+
+%preun
+if [ "$1" -eq 0 ]; then
+	export GCONF_CONFIG_SOURCE=`gconftool-2 --get-default-source`
+	gconftool-2 --makefile-uninstall-rule %{_sysconfdir}/gconf/schemas/ibus.schemas >& /dev/null || :
+fi
 
 %postun
 update-desktop-database -q
@@ -142,8 +164,14 @@ if [ "$1" = "0" ]; then
   [ -L %{_sysconfdir}/alternatives/xinputrc -a "`readlink %{_sysconfdir}/alternatives/xinputrc`" = "%{_xinputconf}" ] && %{_sbindir}/alternatives --auto xinputrc || :
 fi
 
+%post libs
+/sbin/ldconfig
+
 %postun libs
 /sbin/ldconfig
+
+%post gtk
+%{_bindir}/update-gtk-immodules %{_host} || :
 
 %postun gtk
 %{_bindir}/update-gtk-immodules %{_host} || :
@@ -163,6 +191,7 @@ fi
 %{_libexecdir}/ibus-ui-gtk
 %{_libexecdir}/ibus-x11
 # %{_sysconfdir}/xdg/autostart/ibus.desktop
+%{_sysconfdir}/gconf/schemas/ibus.schemas
 %config %{_xinputconf}
 
 %files libs
@@ -185,6 +214,9 @@ fi
 %{_libdir}/pkgconfig/*
 
 %changelog
+* Fri Mar  6 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090306-1
+- Update to ibus-1.1.0.20090306.
+
 * Tue Mar  3 2009 Jens Petersen <petersen@redhat.com>
 - use post for ibus-gtk requires glib2
 
