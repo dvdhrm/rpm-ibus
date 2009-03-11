@@ -7,7 +7,7 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.1.0.20090306
+Version:    1.1.0.20090311
 Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
@@ -214,6 +214,10 @@ fi
 %{_libdir}/pkgconfig/*
 
 %changelog
+* Wed Mar 11 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090311-1
+- Update to ibus-1.1.0.20090311.
+- Update setup ui follow GNOME Human Interface Guidelines 2.2 (#489497).
+
 * Fri Mar  6 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090306-1
 - Update to ibus-1.1.0.20090306.
 
