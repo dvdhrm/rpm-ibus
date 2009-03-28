@@ -8,7 +8,7 @@
 
 Name:       ibus
 Version:    1.1.0.20090311
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -20,6 +20,7 @@ Patch0:     ibus-HEAD.patch
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 
+BuildRequires:  cvs
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
 BuildRequires:  python
@@ -103,7 +104,9 @@ docs for ibus.
 
 %prep
 %setup -q
-# %patch0 -p1
+rm -rf docs/reference/ibus/ibus-sections.txt
+%patch0 -p1
+./autogen.sh --help
 
 %build
 %configure --disable-static \
@@ -214,6 +217,11 @@ fi
 %{_libdir}/pkgconfig/*
 
 %changelog
+* Sat Mar 28 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090311-2
+- Recreate the ibus-HEAD.patch from upstream git source tree.
+- Fixe bug 490009 - Deleting Next Engine shortcuts doesn't work
+- Fixe bug 490381 - Change "Next/Previous engine" labels
+
 * Wed Mar 11 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090311-1
 - Update to ibus-1.1.0.20090311.
 - Update setup ui follow GNOME Human Interface Guidelines 2.2 (#489497).
