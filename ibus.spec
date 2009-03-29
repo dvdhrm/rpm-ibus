@@ -8,7 +8,7 @@
 
 Name:       ibus
 Version:    1.1.0.20090311
-Release:    2%{?dist}
+Release:    3%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -217,10 +217,14 @@ fi
 %{_libdir}/pkgconfig/*
 
 %changelog
+* Sun Mar 29 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090311-3
+- Recreate the ibus-HEAD.patch from upstream git source tree
+- Fix bug 491999 - up/down arrow keys broken in xchat
+
 * Sat Mar 28 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090311-2
 - Recreate the ibus-HEAD.patch from upstream git source tree.
-- Fixe bug 490009 - Deleting Next Engine shortcuts doesn't work
-- Fixe bug 490381 - Change "Next/Previous engine" labels
+- Fix bug 490009 - Deleting Next Engine shortcuts doesn't work
+- Fix bug 490381 - Change "Next/Previous engine" labels
 
 * Wed Mar 11 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090311-1
 - Update to ibus-1.1.0.20090311.
