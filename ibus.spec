@@ -7,8 +7,8 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.1.0.20090311
-Release:    3%{?dist}
+Version:    1.1.0.20090331
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -104,9 +104,9 @@ docs for ibus.
 
 %prep
 %setup -q
-rm -rf docs/reference/ibus/ibus-sections.txt
-%patch0 -p1
-./autogen.sh --help
+# rm -rf docs/reference/ibus/ibus-sections.txt
+# %patch0 -p1
+# ./autogen.sh --help
 
 %build
 %configure --disable-static \
@@ -217,6 +217,11 @@ fi
 %{_libdir}/pkgconfig/*
 
 %changelog
+* Tue Mar 31 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090331-1
+- Update to ibus-1.1.0.20090331.
+- Fix bug 492956 - screws up keyboard input in firefox
+- Fix bug 490143 - ibus issue with gnome-keyring
+
 * Sun Mar 29 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090311-3
 - Recreate the ibus-HEAD.patch from upstream git source tree
 - Fix bug 491999 - up/down arrow keys broken in xchat
