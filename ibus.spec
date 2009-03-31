@@ -31,6 +31,7 @@ BuildRequires:  desktop-file-utils
 BuildRequires:  gtk-doc
 BuildRequires:  GConf2-devel
 BuildRequires:  pygobject2-devel
+BuildRequires:  intltool
 # BuildRequires:  qt-devel
 
 Requires:   %{name}-libs = %{version}-%{release}
