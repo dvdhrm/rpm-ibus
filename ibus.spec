@@ -7,7 +7,7 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.1.0.20090331
+Version:    1.1.0.20090407
 Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
@@ -218,6 +218,14 @@ fi
 %{_libdir}/pkgconfig/*
 
 %changelog
+* Tue Apr 07 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090407-1
+- Update to ibus-1.1.0.20090407.
+- Fix bug 491042 - ibus default trigger hotkeys
+- Fix bug 492929 - ibus-hangul can cause gtk app to lockup
+- Fix bug 493701 -  (ibus) imsettings disconnect/reconnect kills gtk app
+- Fix bug 493687 -  ibus-hangul should default to vertical candidate selection
+- Fix bug 493449 -  ibus broke Alt-F2 command auto-completion
+
 * Tue Mar 31 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090331-1
 - Update to ibus-1.1.0.20090331.
 - Fix bug 492956 - screws up keyboard input in firefox
