@@ -8,7 +8,7 @@
 
 Name:       ibus
 Version:    1.1.0.20090407
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -16,6 +16,7 @@ URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
 Patch0:     ibus-HEAD.patch
+Patch1:     ibus-default-hotkeys.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -108,6 +109,7 @@ docs for ibus.
 # rm -rf docs/reference/ibus/ibus-sections.txt
 # %patch0 -p1
 # ./autogen.sh --help
+%patch1 -p1
 
 %build
 %configure --disable-static \
@@ -218,6 +220,9 @@ fi
 %{_libdir}/pkgconfig/*
 
 %changelog
+* Tue Apr 07 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090407-2
+- Update default hotkey settings.
+
 * Tue Apr 07 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090407-1
 - Update to ibus-1.1.0.20090407.
 - Fix bug 491042 - ibus default trigger hotkeys
