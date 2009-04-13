@@ -7,8 +7,8 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.1.0.20090407
-Release:    3%{?dist}
+Version:    1.1.0.20090413
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -218,6 +218,11 @@ fi
 %{_libdir}/pkgconfig/*
 
 %changelog
+* Mon Apr 13 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090413-1
+- Update to ibus-1.1.0.20090413.
+- Fix crash when restart the ibus-daemon
+- Add some translations.
+
 * Tue Apr 07 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090407-3
 - Update the tarball.
 - Fix bug 494511 - ibus-gtk makes gnome-terminal abort 
