@@ -8,7 +8,7 @@
 
 Name:       ibus
 Version:    1.1.0.20090413
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -105,8 +105,7 @@ docs for ibus.
 
 %prep
 %setup -q
-# rm -rf docs/reference/ibus/ibus-sections.txt
-# %patch0 -p1
+%patch0 -p1
 # ./autogen.sh --help
 
 %build
@@ -218,6 +217,11 @@ fi
 %{_libdir}/pkgconfig/*
 
 %changelog
+* Tue Apr 14 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090413-2
+- Update ibus-HEAD.patch.
+- Change the mode of /tmp/ibus-$USER to 0700 to improve security
+- Change the mode of /tmp/ibus-$USER/socket-address to 0600 to improve security
+
 * Mon Apr 13 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090413-1
 - Update to ibus-1.1.0.20090413.
 - Fix crash when restart the ibus-daemon
