@@ -221,6 +221,7 @@ fi
 - Update ibus-HEAD.patch.
 - Change the mode of /tmp/ibus-$USER to 0700 to improve security
 - Change the mode of /tmp/ibus-$USER/socket-address to 0600 to improve security
+- Update as.po
 
 * Mon Apr 13 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090413-1
 - Update to ibus-1.1.0.20090413.
