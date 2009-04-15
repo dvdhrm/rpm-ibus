@@ -17,6 +17,121 @@ index 7245bd3..425dd86 100644
  
      if (!retval) {
          g_printerr ("Can not listen on %s! Please try remove directory %s and run again.", address, path);
+diff --git a/client/gtk2/ibusimcontext.c b/client/gtk2/ibusimcontext.c
+index 5da4dec..168e45a 100644
+--- a/client/gtk2/ibusimcontext.c
++++ b/client/gtk2/ibusimcontext.c
+@@ -190,14 +190,20 @@ _key_snooper_cb (GtkWidget   *widget,
+     IBusIMContext *ibusimcontext;
+     ibusimcontext = (IBusIMContext *) _focus_im_context;
+ 
+-    if (!_use_key_snooper)
++    if (G_UNLIKELY (!_use_key_snooper))
+         return retval;
+ 
+     if (ibusimcontext == NULL)
+-        return retval;
++        return FALSE;
+ 
+-    if (ibusimcontext->ibuscontext == NULL || ibusimcontext->has_focus == FALSE)
+-        return retval;
++    if (G_UNLIKELY (ibusimcontext->ibuscontext == NULL || ibusimcontext->has_focus == FALSE))
++        return FALSE;
++
++    if (G_UNLIKELY (event->state & IBUS_HANDLED_MASK))
++        return TRUE;
++
++    if (G_UNLIKELY (event->state & IBUS_IGNORED_MASK))
++        return FALSE;
+ 
+     switch (event->type) {
+     case GDK_KEY_RELEASE:
+@@ -212,6 +218,14 @@ _key_snooper_cb (GtkWidget   *widget,
+         break;
+     default:
+         retval = FALSE;
++        break;
++    }
++
++    if (retval) {
++        event->state |= IBUS_HANDLED_MASK;
++    }
++    else {
++        event->state |= IBUS_IGNORED_MASK;
+     }
+ 
+     return retval;
+@@ -383,11 +397,18 @@ ibus_im_context_filter_keypress (GtkIMContext *context,
+ 
+     IBusIMContext *ibusimcontext = (IBusIMContext *) context;
+ 
+-    if (ibusimcontext->ibuscontext && ibusimcontext->has_focus) {
++    if (G_LIKELY (ibusimcontext->ibuscontext && ibusimcontext->has_focus)) {
+         /* If context does not have focus, ibus will process key event in sync mode.
+          * It is a workaround for increase search in treeview.
+          */
+-        gboolean retval;
++        gboolean retval = FALSE;
++
++        if (event->state & IBUS_HANDLED_MASK)
++            return TRUE;
++
++        if (event->state & IBUS_IGNORED_MASK)
++            return gtk_im_context_filter_keypress (ibusimcontext->slave, event);
++
+         switch (event->type) {
+         case GDK_KEY_RELEASE:
+             retval = ibus_input_context_process_key_event (ibusimcontext->ibuscontext,
+@@ -404,9 +425,13 @@ ibus_im_context_filter_keypress (GtkIMContext *context,
+         }
+ 
+         if (retval) {
++            event->state |= IBUS_HANDLED_MASK;
+             return TRUE;
+         }
+-        return gtk_im_context_filter_keypress (ibusimcontext->slave, event);
++        else {
++            event->state |= IBUS_IGNORED_MASK;
++            return gtk_im_context_filter_keypress (ibusimcontext->slave, event);
++        }
+     }
+     else {
+         return gtk_im_context_filter_keypress (ibusimcontext->slave, event);
+diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
+index be4b980..a976eec 100644
+--- a/data/ibus.schemas.in
++++ b/data/ibus.schemas.in
+@@ -18,7 +18,7 @@
+       <owner>ibus</owner>
+       <type>list</type>
+       <list_type>string</list_type>
+-      <default>[Control+space,Zenkaku_Hankaku,Alt+Zenkaku_Hankaku,Alt+grave,Hangul]</default>
++      <default>[Control+space,Zenkaku_Hankaku,Alt+Zenkaku_Hankaku,Alt+grave,Hangul,Alt+Release+Alt_R]</default>
+       <locale name="C">
+         <short>Trigger Hotkey</short>
+ 	    <long>Trigger hotkey for enable or disable input context</long>
+diff --git a/ibus/modifier.py b/ibus/modifier.py
+index 7f6afad..56d8be9 100644
+--- a/ibus/modifier.py
++++ b/ibus/modifier.py
+@@ -33,11 +33,15 @@ BUTTON2_MASK = 1 << 9
+ BUTTON3_MASK = 1 << 10
+ BUTTON4_MASK = 1 << 11
+ BUTTON5_MASK = 1 << 12
+-  
++
++HANDLED_MASK = 1 << 24
++IGNORED_MASK = 1 << 25
++FORWARD_MASK = 1 << 25
++
+ SUPER_MASK = 1 << 26
+ HYPER_MASK = 1 << 27
+ META_MASK = 1 << 28
+-  
++
+ RELEASE_MASK = 1 << 30
+ 
+ MODIFIER_MASK = 0x5c001fff
 diff --git a/po/as.po b/po/as.po
 index 8e33ca2..9b81669 100644
 --- a/po/as.po
@@ -416,3 +531,166 @@ index 8e33ca2..9b81669 100644
  
 +#~ msgid "prev engine"
 +#~ msgstr "আগৰ কলঘৰ"
+diff --git a/po/te.po b/po/te.po
+index 3b8c0da..9c65afd 100644
+--- a/po/te.po
++++ b/po/te.po
+@@ -1,21 +1,21 @@
+-# translation of ibus.master.ibus.po to Telugu
++# translation of ibus.master.te.po to Telugu
+ # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+ # This file is distributed under the same license as the PACKAGE package.
+ #
+ # Krishna Babu K <kkrothap@redhat.com>, 2009.
+ msgid ""
+ msgstr ""
+-"Project-Id-Version: ibus.master.ibus\n"
++"Project-Id-Version: ibus.master.te\n"
+ "Report-Msgid-Bugs-To: \n"
+-"POT-Creation-Date: 2009-04-07 15:38+0800\n"
+-"PO-Revision-Date: 2009-04-07 00:39+0530\n"
++"POT-Creation-Date: 2009-04-06 11:45+0800\n"
++"PO-Revision-Date: 2009-04-14 15:04+0530\n"
+ "Last-Translator: Krishna Babu K <kkrothap@redhat.com>\n"
+ "Language-Team: Telugu <en@li.org>\n"
+ "MIME-Version: 1.0\n"
+ "Content-Type: text/plain; charset=UTF-8\n"
+ "Content-Transfer-Encoding: 8bit\n"
+ "X-Generator: KBabel 1.11.4\n"
+-"Plural-Forms: nplurals=2; plural=(n!=1);\n"
++"Plural-Forms: nplurals=2; plural=(n!=1);\n\n"
+ "\n"
+ 
+ #: ../bus/ibus.desktop.in.h:1
+@@ -49,23 +49,20 @@ msgstr "కృష్ణబాబు కె <kkrothap@redhat.com> 2009."
+ 
+ #. create input methods menu
+ #: ../ui/gtk/languagebar.py:84
+-#, fuzzy
+ msgid "Switch input method"
+-msgstr "ఎటువంటి ఇన్పుట్ పద్దతిలేదు"
++msgstr "ఇన్పుట్ పద్దతి మార్చుము"
+ 
+ #: ../setup/main.py:103
+ msgid "trigger"
+ msgstr "బిస (ట్రిగ్గర్)"
+ 
+ #: ../setup/main.py:113
+-#, fuzzy
+ msgid "next input method"
+-msgstr "తరువాతి ఇన్పుట్ పద్దతి:"
++msgstr "తరువాతి ఇన్పుట్ పద్దతి"
+ 
+ #: ../setup/main.py:123
+-#, fuzzy
+ msgid "previous input method"
+-msgstr "మునుపటి ఇన్పుట్ పద్దతి:"
++msgstr "మునుపటి ఇన్పుట్ పద్దతి"
+ 
+ #: ../setup/main.py:204
+ msgid "IBus daemon is not started. Do you want to start it now?"
+@@ -201,7 +198,6 @@ msgid "Next input method:"
+ msgstr "తరువాతి ఇన్పుట్ పద్దతి:"
+ 
+ #: ../setup/setup.glade.h:25
+-#, fuzzy
+ msgid "Previous input method:"
+ msgstr "మునుపటి ఇన్పుట్ పద్దతి:"
+ 
+@@ -285,14 +281,7 @@ msgstr "మలచుకొనిన ఫాంటు వుపయోగించ
+ msgid "Use custom font name for language panel"
+ msgstr "భాషా ప్యానల్ కొరకు మలచుకొనిన ఫాంట్ నామము వుపయోగించుము"
+ 
+-#~ msgid "Switch engine"
+-#~ msgstr "ఇంజన్‌ను మార్చుము"
+-
+-#~ msgid "next engine"
+-#~ msgstr "తరువాతి యింజన్"
+-
+-#~ msgid "prev engine"
+-#~ msgstr "మునుపటి యింజన్"
++#: ../data/ibus.schemas.in.h:17
++msgid "[Control+space]"
++msgstr "[Control+space]"
+ 
+-#~ msgid "[Control+space]"
+-#~ msgstr "[Control+space]"
+diff --git a/setup/keyboardshortcut.py b/setup/keyboardshortcut.py
+index a9e2233..f954343 100644
+--- a/setup/keyboardshortcut.py
++++ b/setup/keyboardshortcut.py
+@@ -27,6 +27,7 @@ __all__ = (
+ import gobject
+ import gtk
+ from gtk import gdk
++from gtk import keysyms
+ 
+ from gettext import dgettext
+ _  = lambda a : dgettext("ibus", a)
+@@ -217,8 +218,29 @@ class KeyboardShortcutSelection(gtk.VBox):
+         if id != gtk.RESPONSE_OK or not out:
+             return
+         keyevent = out[0]
++        state = keyevent.state & (gdk.CONTROL_MASK | \
++                                  gdk.SHIFT_MASK   | \
++                                  gdk.MOD1_MASK    | \
++                                  gdk.META_MASK    | \
++                                  gdk.SUPER_MASK   | \
++                                  gdk.HYPER_MASK)
++        if state == 0:
++            state = state | gdk.RELEASE_MASK
++        elif keyevent.keyval in (keysyms.Control_L, keysyms.Control_R) and state == gdk.CONTROL_MASK:
++            state = state | gdk.RELEASE_MASK
++        elif keyevent.keyval in (keysyms.Shift_L, keysyms.Shift_R) and state == gdk.SHIFT_MASK:
++            state = state | gdk.RELEASE_MASK
++        elif keyevent.keyval in (keysyms.Alt_L, keysyms.Alt_R) and state == gdk.MOD1_MASK:
++            state = state | gdk.RELEASE_MASK
++        elif keyevent.keyval in (keysyms.Meta_L, keysyms.Meta_R) and state == gdk.META_MASK:
++            state = state | gdk.RELEASE_MASK
++        elif keyevent.keyval in (keysyms.Super_L, keysyms.Super_R) and state == gdk.SUPER_MASK:
++            state = state | gdk.RELEASE_MASK
++        elif keyevent.keyval in (keysyms.Hyper_L, keysyms.Hyper_R) and state == gdk.HYPER_MASK:
++            state = state | gdk.RELEASE_MASK
++
+         for name, button, mask in self.__modifier_buttons:
+-            if keyevent.state & mask:
++            if state & mask:
+                 button.set_active(True)
+             else:
+                 button.set_active(False)
+diff --git a/src/ibusinputcontext.c b/src/ibusinputcontext.c
+index 95754cf..52547ff 100644
+--- a/src/ibusinputcontext.c
++++ b/src/ibusinputcontext.c
+@@ -553,7 +553,10 @@ ibus_input_context_process_key_event (IBusInputContext *context,
+     IBusError *error = NULL;
+     gboolean retval;
+ 
+-    if (state & IBUS_FORWARD_MASK)
++    if (state & IBUS_HANDLED_MASK)
++        return TRUE;
++
++    if (state & IBUS_IGNORED_MASK)
+         return FALSE;
+ 
+     retval = ibus_proxy_call_with_reply ((IBusProxy *) context,
+diff --git a/src/ibustypes.h b/src/ibustypes.h
+index d2f15ba..2f7c0bf 100644
+--- a/src/ibustypes.h
++++ b/src/ibustypes.h
+@@ -69,11 +69,13 @@ typedef enum
+     IBUS_BUTTON5_MASK  = 1 << 12,
+ 
+     /* The next few modifiers are used by XKB, so we skip to the end.
+-     * Bits 15 - 24 are currently unused. Bit 29 is used internally.
++     * Bits 15 - 23 are currently unused. Bit 29 is used internally.
+      */
+ 
+-    /* forward mask */
++    /* ibus mask */
++    IBUS_HANDLED_MASK  = 1 << 24,
+     IBUS_FORWARD_MASK  = 1 << 25,
++    IBUS_IGNORED_MASK  = IBUS_FORWARD_MASK,
+ 
+     IBUS_SUPER_MASK    = 1 << 26,
+     IBUS_HYPER_MASK    = 1 << 27,

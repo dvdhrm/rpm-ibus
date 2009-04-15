@@ -8,7 +8,7 @@
 
 Name:       ibus
 Version:    1.1.0.20090413
-Release:    2%{?dist}
+Release:    3%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -217,6 +217,13 @@ fi
 %{_libdir}/pkgconfig/*
 
 %changelog
+* Wed Apr 15 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090413-3
+- Update ibus-HEAD.patch.
+- Fix bug 495431 -  ibus Release modifier doesn't work with Alt
+- Fix bug 494445 -  ibus-hangul missing Hangul Han/En mode
+  (and Alt_R+release hotkey)
+- Update te.po
+
 * Tue Apr 14 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090413-2
 - Update ibus-HEAD.patch.
 - Change the mode of /tmp/ibus-$USER to 0700 to improve security
