@@ -8,7 +8,7 @@
 
 Name:       ibus
 Version:    1.1.0.20090413
-Release:    3%{?dist}
+Release:    4%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -217,6 +217,10 @@ fi
 %{_libdir}/pkgconfig/*
 
 %changelog
+* Fri Apr 17 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090413-4
+- Update ibus-HEAD.patch.
+- Next Engine hotkey will do nothing if the IM is not active.
+
 * Wed Apr 15 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090413-3
 - Update ibus-HEAD.patch.
 - Fix bug 495431 -  ibus Release modifier doesn't work with Alt

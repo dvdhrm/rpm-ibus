@@ -1,12 +1,49 @@
+diff --git a/bus/ibus.desktop.in b/bus/ibus.desktop.in
+index fcf2f21..cd2ad60 100644
+--- a/bus/ibus.desktop.in
++++ b/bus/ibus.desktop.in
+@@ -7,7 +7,7 @@ Exec=ibus-daemon --xim
+ Icon=ibus
+ Terminal=false
+ Type=Application
+-X-GNOME-Autostart-Phase=Panel
++X-GNOME-Autostart-Phase=Applications
+ X-GNOME-AutoRestart=false
+ X-GNOME-Autostart-Notify=true
+ X-KDE-autostart-after=panel
+diff --git a/bus/inputcontext.c b/bus/inputcontext.c
+index 456e049..7003bd7 100644
+--- a/bus/inputcontext.c
++++ b/bus/inputcontext.c
+@@ -2091,10 +2091,10 @@ bus_input_context_filter_keyboard_shortcuts (BusInputContext    *context,
+         return TRUE;
+     }
+     else if (event == next_factory) {
+-        g_signal_emit (context, context_signals[REQUEST_NEXT_ENGINE], 0);
+-        if (priv->engine && !priv->enabled) {
+-            bus_input_context_enable (context);
++        if (priv->engine == NULL || priv->enabled == FALSE) {
++            return FALSE;
+         }
++        g_signal_emit (context, context_signals[REQUEST_NEXT_ENGINE], 0);
+         return TRUE;
+     }
+     else if (event == prev_factory) {
 diff --git a/bus/server.c b/bus/server.c
-index 7245bd3..425dd86 100644
+index 7245bd3..1c796f2 100644
 --- a/bus/server.c
 +++ b/bus/server.c
-@@ -90,10 +90,13 @@ bus_server_listen (BusServer *server)
+@@ -86,21 +86,23 @@ bus_server_listen (BusServer *server)
+ 
+     // const gchar *address = "unix:abstract=/tmp/ibus-c"
+     const gchar *address;
+-    gchar *path;
++    const gchar *path;
      gboolean retval;
  
-     path = g_strdup_printf("/tmp/ibus-%s", ibus_get_user_name ());
+-    path = g_strdup_printf("/tmp/ibus-%s", ibus_get_user_name ());
 -    mkdir (path, 0775);
++    path = ibus_get_socket_folder ();
 +    mkdir (path, 0700);
 +    chmod (path, 0700);
 +
@@ -17,6 +54,13 @@ index 7245bd3..425dd86 100644
  
      if (!retval) {
          g_printerr ("Can not listen on %s! Please try remove directory %s and run again.", address, path);
+         exit (-1);
+     }
+ 
+-    g_free(path);
+     return retval;
+ }
+ 
 diff --git a/client/gtk2/ibusimcontext.c b/client/gtk2/ibusimcontext.c
 index 5da4dec..168e45a 100644
 --- a/client/gtk2/ibusimcontext.c
@@ -110,6 +154,24 @@ index be4b980..a976eec 100644
        <locale name="C">
          <short>Trigger Hotkey</short>
  	    <long>Trigger hotkey for enable or disable input context</long>
+diff --git a/ibus/common.py b/ibus/common.py
+index 527d3a5..571ebaa 100644
+--- a/ibus/common.py
++++ b/ibus/common.py
+@@ -67,7 +67,12 @@ if not __username:
+ if not __username:
+     __username = os.getenv ("USERNAME")
+ 
+-IBUS_ADDR = "unix:path=/tmp/ibus-%s/ibus-%s-%s" % (__username, __hostname, __display_number)
++__session_id = os.getenv ("IBUS_SESSION_ID")
++
++IBUS_ADDR = "unix:path=/tmp/ibus-%s%s/ibus-%s-%s" % (__username,
++                                                     "-" + __session_id if __session_id else "",
++                                                     __hostname,
++                                                     __display_number)
+ # IBUS_ADDR  = "tcp:host=localhost,port=7799"
+ 
+ IBUS_IFACE_IBUS     = "org.freedesktop.IBus"
 diff --git a/ibus/modifier.py b/ibus/modifier.py
 index 7f6afad..56d8be9 100644
 --- a/ibus/modifier.py
@@ -658,6 +720,30 @@ index a9e2233..f954343 100644
                  button.set_active(True)
              else:
                  button.set_active(False)
+diff --git a/src/ibusbus.c b/src/ibusbus.c
+index 373e5d4..756f8e5 100644
+--- a/src/ibusbus.c
++++ b/src/ibusbus.c
+@@ -220,14 +220,17 @@ ibus_bus_init (IBusBus *bus)
+ 
+     ibus_bus_connect (bus);
+ 
+-    path = g_strdup_printf ("/tmp/ibus-%s/", ibus_get_user_name ());
++    path = ibus_get_socket_folder ();
++    mkdir (path, 0700);
++    chmod (path, 0700);
++
++
+     file = g_file_new_for_path (path);
+     priv->monitor = g_file_monitor_directory (file, 0, NULL, NULL);
+ 
+     g_signal_connect (priv->monitor, "changed", (GCallback) _changed_cb, bus);
+ 
+     g_object_unref (file);
+-    g_free (path);
+ }
+ 
+ static void
 diff --git a/src/ibusinputcontext.c b/src/ibusinputcontext.c
 index 95754cf..52547ff 100644
 --- a/src/ibusinputcontext.c
@@ -674,6 +760,81 @@ index 95754cf..52547ff 100644
          return FALSE;
  
      retval = ibus_proxy_call_with_reply ((IBusProxy *) context,
+diff --git a/src/ibusshare.c b/src/ibusshare.c
+index c7aa1fe..186be85 100644
+--- a/src/ibusshare.c
++++ b/src/ibusshare.c
+@@ -69,6 +69,31 @@ ibus_get_user_name (void)
+ }
+ 
+ const gchar *
++ibus_get_session_id (void)
++{
++    return g_getenv("IBUS_SESSION_ID");
++}
++
++const gchar *
++ibus_get_socket_folder (void)
++{
++    static gchar *folder = NULL;
++
++    if (folder == NULL) {
++        const gchar *session = ibus_get_session_id ();
++        if (session && session[0] != '\0') {
++            folder = g_strdup_printf ("/tmp/ibus-%s-%s",
++                ibus_get_user_name (), session);
++        }
++        else {
++            folder = g_strdup_printf ("/tmp/ibus-%s",
++                ibus_get_user_name ());
++        }
++    }
++    return folder;
++}
++
++const gchar *
+ ibus_get_socket_path (void)
+ {
+     static gchar *path = NULL;
+@@ -78,7 +103,7 @@ ibus_get_socket_path (void)
+         gchar *display;
+         gchar *displaynumber = "0";
+         gchar *screennumber = "0";
+-        const gchar *username = NULL;
++        const gchar *folder= NULL;
+         gchar *p;
+ 
+         if (_display == NULL) {
+@@ -111,14 +136,14 @@ ibus_get_socket_path (void)
+             }
+         }
+ 
+-        username = ibus_get_user_name ();
++        folder = ibus_get_socket_folder ();
+ 
+         if (hostname[0] == '\0')
+             hostname = "unix";
+ 
+         path = g_strdup_printf (
+-            "/tmp/ibus-%s/ibus-%s-%s",
+-            username, hostname, displaynumber);
++            "%s/ibus-%s-%s",
++            folder, hostname, displaynumber);
+         g_free (display);
+     }
+     return path;
+diff --git a/src/ibusshare.h b/src/ibusshare.h
+index f3b34c4..4c0c645 100644
+--- a/src/ibusshare.h
++++ b/src/ibusshare.h
+@@ -49,6 +49,7 @@ void             ibus_set_display       (const gchar    *display);
+ const gchar     *ibus_get_address       (void);
+ const gchar     *ibus_get_user_name     (void);
+ const gchar     *ibus_get_socket_path   (void);
++const gchar     *ibus_get_socket_folder (void);
+ 
+ const gchar     *ibus_keyval_name       (guint           keyval);
+ guint            ibus_keyval_from_name  (const gchar    *keyval_name);
 diff --git a/src/ibustypes.h b/src/ibustypes.h
 index d2f15ba..2f7c0bf 100644
 --- a/src/ibustypes.h
