@@ -7,15 +7,15 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.1.0.20090413
-Release:    4%{?dist}
+Version:    1.1.0.20090417
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
 URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
-Patch0:     ibus-HEAD.patch
+# Patch0:     ibus-HEAD.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -105,7 +105,7 @@ docs for ibus.
 
 %prep
 %setup -q
-%patch0 -p1
+# %patch0 -p1
 # ./autogen.sh --help
 
 %build
@@ -217,6 +217,10 @@ fi
 %{_libdir}/pkgconfig/*
 
 %changelog
+* Fri Apr 17 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090417-1
+- Update to ibus-1.1.0.20090417.
+- Fix bug 496199 -  cannot remove Ctrl+Space hotkey with ibus-setup
+
 * Fri Apr 17 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090413-4
 - Update ibus-HEAD.patch.
 - Next Engine hotkey will do nothing if the IM is not active.
