@@ -7,7 +7,7 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.1.0.20090417
+Version:    1.1.0.20090423
 Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
@@ -97,11 +97,20 @@ Group:      Development/Libraries
 Requires:   %{name} = %{version}-%{release}
 Requires:   glib2-devel
 Requires:   dbus-devel
-Requires:   gtk-doc
 
 %description devel
 The ibus-devel package contains the header files and developer
 docs for ibus.
+
+%package devel-docs
+Summary:    Developer documents for ibus
+Group:      Development/Libraries
+Requires:   %{name} = %{version}-%{release}
+Requires:   gtk-doc
+
+%description devel-docs
+The ibus-devel-docs package contains developer documentation for ibus
+
 
 %prep
 %setup -q
@@ -213,10 +222,18 @@ fi
 %defattr(-,root,root,-)
 %{_libdir}/lib*.so
 %{_includedir}/*
-%{_datadir}/gtk-doc/html/*
 %{_libdir}/pkgconfig/*
 
+%files devel-docs
+%{_datadir}/gtk-doc/html/*
+
 %changelog
+* Thu Apr 23 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090423-1
+- Update to ibus-1.1.0.20090423.
+- Fix bug 497265 -  [mai_IN] Maithili language name is not correct.
+- Fix bug 497279 -  IBus does not works with evolution correctly.
+- Enhance authentication both in daemon & clients
+
 * Fri Apr 17 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090417-1
 - Update to ibus-1.1.0.20090417.
 - Fix bug 496199 -  cannot remove Ctrl+Space hotkey with ibus-setup
