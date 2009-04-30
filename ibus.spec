@@ -59,9 +59,9 @@ Obsoletes:  ibus-qt < 1.1.0
 %define _xinputconf %{_sysconfdir}/X11/xinit/xinput.d/ibus.conf
 
 %description
-IBus means Intelligent Input Bus. It is a new input framework for Linux OS. It provides
-full featured and user friendly input method user interface. It also may help
-developers to develop input method easily.
+IBus means Intelligent Input Bus. It is a new input framework for Linux OS.
+It provides full featured and user friendly input method user interface.
+It also may help developers to develop input method easily.
 
 %package libs
 Summary:    IBus libraries
