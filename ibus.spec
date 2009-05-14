@@ -7,8 +7,8 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.1.0.20090423
-Release:    1%{?dist}
+Version:    1.1.0.20090508
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -35,9 +35,9 @@ BuildRequires:  intltool
 # BuildRequires:  qt-devel
 
 Requires:   %{name}-libs = %{version}-%{release}
+Requires:   %{name}-gtk = %{version}-%{release}
 
 Requires:   pygtk2
-Requires:   notification-daemon
 Requires:   pyxdg
 Requires:   iso-codes
 Requires:   dbus-python >= %{dbus_python_version}
@@ -59,9 +59,9 @@ Obsoletes:  ibus-qt < 1.1.0
 %define _xinputconf %{_sysconfdir}/X11/xinit/xinput.d/ibus.conf
 
 %description
-IBus means Intelligent Input Bus. It is a new input framework for Linux OS.
-It provides full featured and user friendly input method user interface.
-It also may help developers to develop input method easily.
+IBus means Intelligent Input Bus. It is a new input framework for Linux OS. It provides
+full featured and user friendly input method user interface. It also may help
+developers to develop input method easily.
 
 %package libs
 Summary:    IBus libraries
@@ -208,7 +208,7 @@ fi
 
 %files libs
 %defattr(-,root,root,-)
-%{_libdir}/libibus.so*
+%{_libdir}/libibus.so.*
 
 %files gtk
 %defattr(-,root,root,-)
@@ -228,10 +228,27 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu May 14 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090508-2
+- Remove requires notification-daemon
+- Fix bug 500588 - Hardcoded requirement for notification-daemon
+
+* Fri May 08 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090508-1
+- Update to 1.1.0.20090508
+- Fix bug 499533 - [Indic] ibus should allow input in KDE using all supported Indic locales
+- Fix bug 498352 - hotkey config table should list keys in same order as on main setup page
+- Fix bug 497707 - ibus French translation update
+
+* Fri May 08 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090423-3
+- Fix bug 498541 - ibus-libs should not contain devel file libibus.so
+
+* Tue May 05 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090423-2
+- Fix bug 498141 - new ibus install needs gtk immodules
+- Separate ibus document from ibus-devel to ibus-devel-docs
+
 * Thu Apr 23 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090423-1
 - Update to ibus-1.1.0.20090423.
-- Fix bug 497265 -  [mai_IN] Maithili language name is not correct.
-- Fix bug 497279 -  IBus does not works with evolution correctly.
+- Fix bug 497265 - [mai_IN] Maithili language name is not correct.
+- Fix bug 497279 - IBus does not works with evolution correctly.
 - Enhance authentication both in daemon & clients
 
 * Fri Apr 17 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090417-1
