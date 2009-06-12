@@ -7,15 +7,15 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.1.0.20090508
-Release:    2%{?dist}
+Version:    1.1.0.20090612
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
 URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
-# Patch0:     ibus-HEAD.patch
+Patch0:     ibus-HEAD.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -228,6 +228,32 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Jun 12 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090612-1
+- Update to Update to 1.1.0.20090612
+- Fix bug 504942 - PageUp and PageDown do not work in candidate list
+- Fix bug 491040 - Implememnt mouse selection in candidate list
+
+* Wed Jun 10 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090609-1
+- Update to Update to 1.1.0.20090609
+- Fix bug 502414 - Implemented on-screen help facility
+- Fix bug 502561 - iBus should show keymap name on iBus panel
+- Fix bug 498043 - ibus Alt-grave trigger conflicts with openoffice.org
+- Implemented API for setting labels for candidates in LookupTable
+
+* Sun May 31 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090531-1
+- Update to Update to 1.1.0.20090531
+
+* Tue May 26 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090508-5
+- Update ibus-HEAD.patch.
+- Show the default input method with bold text
+- Add information text below input methods list
+
+* Mon May 25 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090508-4
+- Update ibus-HEAD.patch.
+- Fix bug 501211 - ibus-setup window should be raised if running or just stay on top/grab focus
+- Fix bug 501640 - ibus should adds new IMEs at end of engine list not beginning
+- Fix bug 501644 - [IBus] focus-out and disabled IME should hide language panel
+
 * Thu May 14 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090508-2
 - Remove requires notification-daemon
 - Fix bug 500588 - Hardcoded requirement for notification-daemon
