@@ -7,7 +7,7 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.1.0.20090612
+Version:    1.2.0.20090617
 Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
@@ -114,8 +114,8 @@ The ibus-devel-docs package contains developer documentation for ibus
 
 %prep
 %setup -q
-# %patch0 -p1
-# ./autogen.sh --help
+%patch0 -p1
+./autogen.sh --help
 
 %build
 %configure --disable-static \
@@ -228,8 +228,11 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon Jun 22 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.2.0.20090617-1
+- Update to 1.2.0.20090617
+
 * Fri Jun 12 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090612-1
-- Update to Update to 1.1.0.20090612
+- Update to 1.1.0.20090612
 - Fix bug 504942 - PageUp and PageDown do not work in candidate list
 - Fix bug 491040 - Implememnt mouse selection in candidate list
 

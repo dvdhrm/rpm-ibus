@@ -1,1 +1,89 @@
-
+diff --git a/bus/factoryproxy.c b/bus/factoryproxy.c
+index cf30b95..521d609 100644
+--- a/bus/factoryproxy.c
++++ b/bus/factoryproxy.c
+@@ -172,21 +172,35 @@ bus_factory_proxy_create_engine (BusFactoryProxy *factory,
+     g_assert (BUS_IS_FACTORY_PROXY (factory));
+     g_assert (IBUS_IS_ENGINE_DESC (desc));
+ 
++    IBusPendingCall *pending = NULL;
+     IBusMessage *reply_message;
+     IBusError *error;
+     BusEngineProxy *engine;
+     gchar *object_path;
++    gboolean retval;
+ 
+     if (g_list_find (factory->component->engines, desc) == NULL) {
+         return NULL;
+     }
+ 
+-    reply_message = ibus_proxy_call_with_reply_and_block ((IBusProxy *) factory,
+-                                                          "CreateEngine",
+-                                                          -1,
+-                                                          &error,
+-                                                          G_TYPE_STRING, &(desc->name),
+-                                                          G_TYPE_INVALID);
++    retval = ibus_proxy_call_with_reply ((IBusProxy *) factory,
++                                         "CreateEngine",
++                                         &pending,
++                                         -1,
++                                         &error,
++                                         G_TYPE_STRING, &(desc->name),
++                                         G_TYPE_INVALID);
++
++    if (!retval) {
++        g_warning ("%s: %s", error->name, error->message);
++        ibus_error_free (error);
++        return NULL;
++    }
++
++    ibus_pending_call_wait (pending);
++    reply_message = ibus_pending_call_steal_reply (pending);
++    ibus_pending_call_unref (pending);
++
+     if (reply_message == NULL) {
+         g_warning ("%s: %s", error->name, error->message);
+         ibus_error_free (error);
+diff --git a/setup/enginetreeview.py b/setup/enginetreeview.py
+index d0c95d1..6f2e2ea 100644
+--- a/setup/enginetreeview.py
++++ b/setup/enginetreeview.py
+@@ -45,7 +45,7 @@ class EngineTreeView(gtk.TreeView):
+         self.__engines = set([])
+         self.__changed = False
+ 
+-        self.set_headers_visible(True)
++        # self.set_headers_visible(True)
+         self.set_reorderable(True)
+ 
+         self.__model = gtk.ListStore(gobject.TYPE_PYOBJECT, gobject.TYPE_STRING)
+@@ -76,6 +76,7 @@ class EngineTreeView(gtk.TreeView):
+         model = gtk.ListStore(gobject.TYPE_STRING)
+         model.append(("us",))
+         model.append(("jp",))
++        model.append(("xkb",))
+         renderer.set_property("xalign", 0)
+         renderer.set_property("model", model)
+         renderer.set_property("text-column", 0)
+@@ -89,7 +90,7 @@ class EngineTreeView(gtk.TreeView):
+         column.set_sizing(gtk.TREE_VIEW_COLUMN_FIXED)
+         column.pack_start(renderer, False)
+         column.set_cell_data_func(renderer, self.__layout_cell_data_cb)
+-        self.append_column (column)
++        # self.append_column(column)
+ 
+         self.set_engines(engines)
+ 
+diff --git a/ui/gtk/engineabout.py b/ui/gtk/engineabout.py
+index dd7bee4..3d7df5a 100644
+--- a/ui/gtk/engineabout.py
++++ b/ui/gtk/engineabout.py
+@@ -61,7 +61,7 @@ class EngineAbout(gtk.Dialog):
+                                              "heading", "left_margin_16")
+         text_buffer.insert_with_tags_by_name(iter, _("Language: %s\n") % ibus.get_language_name(self.__engine_desc.language),
+                                             "small", "bold", "left_margin_16")
+-        text_buffer.insert_with_tags_by_name(iter, _("Kayboard layout: %s\n") % self.__engine_desc.layout,
++        text_buffer.insert_with_tags_by_name(iter, _("Keyboard layout: %s\n") % self.__engine_desc.layout,
+                                             "small", "bold", "left_margin_16")
+         text_buffer.insert_with_tags_by_name(iter, _("Author: %s\n") % self.__engine_desc.author,
+                                             "small", "bold", "left_margin_16")
