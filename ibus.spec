@@ -7,7 +7,7 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.2.0.20090617
+Version:    1.2.0.20090719
 Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
@@ -15,7 +15,7 @@ Group:      System Environment/Libraries
 URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
-Patch0:     ibus-HEAD.patch
+# Patch0:     ibus-HEAD.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -114,8 +114,8 @@ The ibus-devel-docs package contains developer documentation for ibus
 
 %prep
 %setup -q
-%patch0 -p1
-./autogen.sh --help
+# %patch0 -p1
+# ./autogen.sh --help
 
 %build
 %configure --disable-static \
@@ -228,93 +228,96 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Mon Jun 22 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.2.0.20090617-1
+* Sun Jul 19 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090719-1
+- Update to 1.2.0.200907179
+
+* Mon Jun 22 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090617-1
 - Update to 1.2.0.20090617
 
-* Fri Jun 12 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090612-1
+* Fri Jun 12 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090612-1
 - Update to 1.1.0.20090612
 - Fix bug 504942 - PageUp and PageDown do not work in candidate list
 - Fix bug 491040 - Implememnt mouse selection in candidate list
 
-* Wed Jun 10 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090609-1
+* Wed Jun 10 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090609-1
 - Update to Update to 1.1.0.20090609
 - Fix bug 502414 - Implemented on-screen help facility
 - Fix bug 502561 - iBus should show keymap name on iBus panel
 - Fix bug 498043 - ibus Alt-grave trigger conflicts with openoffice.org
 - Implemented API for setting labels for candidates in LookupTable
 
-* Sun May 31 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090531-1
+* Sun May 31 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090531-1
 - Update to Update to 1.1.0.20090531
 
-* Tue May 26 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090508-5
+* Tue May 26 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090508-5
 - Update ibus-HEAD.patch.
 - Show the default input method with bold text
 - Add information text below input methods list
 
-* Mon May 25 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090508-4
+* Mon May 25 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090508-4
 - Update ibus-HEAD.patch.
 - Fix bug 501211 - ibus-setup window should be raised if running or just stay on top/grab focus
 - Fix bug 501640 - ibus should adds new IMEs at end of engine list not beginning
 - Fix bug 501644 - [IBus] focus-out and disabled IME should hide language panel
 
-* Thu May 14 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090508-2
+* Thu May 14 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090508-2
 - Remove requires notification-daemon
 - Fix bug 500588 - Hardcoded requirement for notification-daemon
 
-* Fri May 08 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090508-1
+* Fri May 08 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090508-1
 - Update to 1.1.0.20090508
 - Fix bug 499533 - [Indic] ibus should allow input in KDE using all supported Indic locales
 - Fix bug 498352 - hotkey config table should list keys in same order as on main setup page
 - Fix bug 497707 - ibus French translation update
 
-* Fri May 08 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090423-3
+* Fri May 08 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090423-3
 - Fix bug 498541 - ibus-libs should not contain devel file libibus.so
 
-* Tue May 05 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090423-2
+* Tue May 05 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090423-2
 - Fix bug 498141 - new ibus install needs gtk immodules
 - Separate ibus document from ibus-devel to ibus-devel-docs
 
-* Thu Apr 23 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090423-1
+* Thu Apr 23 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090423-1
 - Update to ibus-1.1.0.20090423.
 - Fix bug 497265 - [mai_IN] Maithili language name is not correct.
 - Fix bug 497279 - IBus does not works with evolution correctly.
 - Enhance authentication both in daemon & clients
 
-* Fri Apr 17 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090417-1
+* Fri Apr 17 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090417-1
 - Update to ibus-1.1.0.20090417.
 - Fix bug 496199 -  cannot remove Ctrl+Space hotkey with ibus-setup
 
-* Fri Apr 17 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090413-4
+* Fri Apr 17 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090413-4
 - Update ibus-HEAD.patch.
 - Next Engine hotkey will do nothing if the IM is not active.
 
-* Wed Apr 15 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090413-3
+* Wed Apr 15 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090413-3
 - Update ibus-HEAD.patch.
 - Fix bug 495431 -  ibus Release modifier doesn't work with Alt
 - Fix bug 494445 -  ibus-hangul missing Hangul Han/En mode
   (and Alt_R+release hotkey)
 - Update te.po
 
-* Tue Apr 14 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090413-2
+* Tue Apr 14 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090413-2
 - Update ibus-HEAD.patch.
 - Change the mode of /tmp/ibus-$USER to 0700 to improve security
 - Change the mode of /tmp/ibus-$USER/socket-address to 0600 to improve security
 - Update as.po
 
-* Mon Apr 13 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090413-1
+* Mon Apr 13 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090413-1
 - Update to ibus-1.1.0.20090413.
 - Fix crash when restart the ibus-daemon
 - Add some translations.
 
-* Tue Apr 07 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090407-3
+* Tue Apr 07 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090407-3
 - Update the tarball.
 - Fix bug 494511 - ibus-gtk makes gnome-terminal abort 
   when a key is pressed
 
-* Tue Apr 07 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090407-2
+* Tue Apr 07 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090407-2
 - Update default hotkey settings.
 
-* Tue Apr 07 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090407-1
+* Tue Apr 07 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090407-1
 - Update to ibus-1.1.0.20090407.
 - Fix bug 491042 - ibus default trigger hotkeys
 - Fix bug 492929 - ibus-hangul can cause gtk app to lockup
@@ -322,25 +325,25 @@ fi
 - Fix bug 493687 -  ibus-hangul should default to vertical candidate selection
 - Fix bug 493449 -  ibus broke Alt-F2 command auto-completion
 
-* Tue Mar 31 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090331-1
+* Tue Mar 31 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090331-1
 - Update to ibus-1.1.0.20090331.
 - Fix bug 492956 - screws up keyboard input in firefox
 - Fix bug 490143 - ibus issue with gnome-keyring
 
-* Sun Mar 29 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090311-3
+* Sun Mar 29 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090311-3
 - Recreate the ibus-HEAD.patch from upstream git source tree
 - Fix bug 491999 - up/down arrow keys broken in xchat
 
-* Sat Mar 28 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090311-2
+* Sat Mar 28 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090311-2
 - Recreate the ibus-HEAD.patch from upstream git source tree.
 - Fix bug 490009 - Deleting Next Engine shortcuts doesn't work
 - Fix bug 490381 - Change "Next/Previous engine" labels
 
-* Wed Mar 11 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090311-1
+* Wed Mar 11 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090311-1
 - Update to ibus-1.1.0.20090311.
 - Update setup ui follow GNOME Human Interface Guidelines 2.2 (#489497).
 
-* Fri Mar  6 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090306-1
+* Fri Mar  6 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090306-1
 - Update to ibus-1.1.0.20090306.
 
 * Tue Mar  3 2009 Jens Petersen <petersen@redhat.com>
@@ -350,60 +353,60 @@ fi
 - drop the superfluous ibus-0.1 engine obsoletes
 - move glib2 requires to gtk package
 
-* Tue Feb 25 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090225-1
+* Tue Feb 25 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090225-1
 - Update to ibus-1.1.0.20090225.
 - Fix problems in %post and %postun scripts.
 - Hide ibus & ibus preferences menu items.
 
-* Tue Feb 17 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090211-10
+* Tue Feb 17 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090211-10
 - Recreate the ibus-HEAD.patch from upstream git source tree.
 - Put 'Select an input method' in engine select combobox (#485861).
 
-* Tue Feb 17 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090211-9
+* Tue Feb 17 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090211-9
 - Add requires im-chooser >= 1.2.5.
 
-* Tue Feb 17 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090211-8
+* Tue Feb 17 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090211-8
 - Recreate the ibus-HEAD.patch from upstream git source tree.
 - Fix ibus-hangul segfault (#485438).
 
-* Mon Feb 16 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090211-6
+* Mon Feb 16 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090211-6
 - Recreate the ibus-HEAD.patch from upstream git source tree.
 - The new patch fixes ibus-x11 segfault (#485661).
 
-* Sun Feb 15 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090211-5
+* Sun Feb 15 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090211-5
 - Recreate the ibus-HEAD.patch from upstream git source tree.
 
-* Sun Feb 15 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090211-4
+* Sun Feb 15 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090211-4
 - Remove gnome-python2-gconf from requires.
 
-* Fri Feb 13 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090211-3
+* Fri Feb 13 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090211-3
 - Update ibus-HEAD.patch, to fix bug 484652.
 
-* Fri Feb 13 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090211-2
+* Fri Feb 13 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090211-2
 - Add patch ibus-HEAD.patch, to update ibus to HEAD version.
 
-* Wed Feb 11 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090211-1
+* Wed Feb 11 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090211-1
 - Add --xim argument in xinput-ibus
 - Add Obsoletes:  ibus-qt <= 1.1.0
 - Move libibus.so.* to ibus-libs to make ibus multilib.
 - Update to 1.1.0.20090211.
 
-* Thu Feb 05 2009 Huang Peng <shawn.p.huang@gmail.com> - 1.1.0.20090205-1
+* Thu Feb 05 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090205-1
 - Update to 1.1.0.20090205.
 
-* Tue Feb 03 2009 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20090203-1
+* Tue Feb 03 2009 Peng Huang <shawn.p.huang@gmail.com> - 0.1.1.20090203-1
 - Update to 0.1.1.20090203.
 
 * Sat Nov 29 2008 Ignacio Vazquez-Abrams <ivazqueznet+rpm@gmail.com> - 0.1.1.20081023-3
 - Rebuild for Python 2.6
 
-* Wed Nov 19 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20081023-2
+* Wed Nov 19 2008 Peng Huang <shawn.p.huang@gmail.com> - 0.1.1.20081023-2
 - Move libibus-gtk.so from ibus.rpm to ibus-gtk.rpm to fix bug 472146.
 
-* Thu Oct 23 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20081023-1
+* Thu Oct 23 2008 Peng Huang <shawn.p.huang@gmail.com> - 0.1.1.20081023-1
 - Update to 0.1.1.20081023.
 
-* Thu Oct 16 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20081016-1
+* Thu Oct 16 2008 Peng Huang <shawn.p.huang@gmail.com> - 0.1.1.20081016-1
 - Update to 0.1.1.20081016.
 
 * Tue Oct  7 2008 Jens Petersen <petersen@redhat.com> - 0.1.1.20081006-3
@@ -412,56 +415,56 @@ fi
 * Tue Oct  7 2008 Jens Petersen <petersen@redhat.com> - 0.1.1.20081006-2
 - add xinputrc alternative when installing or uninstalling
 
-* Mon Oct 06 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20081006-1
+* Mon Oct 06 2008 Peng Huang <shawn.p.huang@gmail.com> - 0.1.1.20081006-1
 - Update to 0.1.1.20081006.
 
-* Sun Oct 05 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20081005-1
+* Sun Oct 05 2008 Peng Huang <shawn.p.huang@gmail.com> - 0.1.1.20081005-1
 - Update to 0.1.1.20081005.
 
-* Sat Oct 04 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20081004-1
+* Sat Oct 04 2008 Peng Huang <shawn.p.huang@gmail.com> - 0.1.1.20081004-1
 - Update to 0.1.1.20081004.
 
-* Wed Oct 01 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20081001-1
+* Wed Oct 01 2008 Peng Huang <shawn.p.huang@gmail.com> - 0.1.1.20081001-1
 - Update to 0.1.1.20081001.
 
-* Tue Sep 30 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20080930-1
+* Tue Sep 30 2008 Peng Huang <shawn.p.huang@gmail.com> - 0.1.1.20080930-1
 - Update to 0.1.1.20080930.
 
-* Tue Sep 23 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20080923-1
+* Tue Sep 23 2008 Peng Huang <shawn.p.huang@gmail.com> - 0.1.1.20080923-1
 - Update to 0.1.1.20080923.
 
-* Wed Sep 17 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20080917-1
+* Wed Sep 17 2008 Peng Huang <shawn.p.huang@gmail.com> - 0.1.1.20080917-1
 - Update to 0.1.1.20080917.
 
-* Tue Sep 16 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20080916-1
+* Tue Sep 16 2008 Peng Huang <shawn.p.huang@gmail.com> - 0.1.1.20080916-1
 - Update to 0.1.1.20080916.
 
-* Mon Sep 15 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20080914-1
+* Mon Sep 15 2008 Peng Huang <shawn.p.huang@gmail.com> - 0.1.1.20080914-1
 - Update to 0.1.1.20080914.
 
-* Mon Sep 08 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20080908-1
+* Mon Sep 08 2008 Peng Huang <shawn.p.huang@gmail.com> - 0.1.1.20080908-1
 - Update to 0.1.1.20080908.
 
-* Mon Sep 01 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20080901-1
+* Mon Sep 01 2008 Peng Huang <shawn.p.huang@gmail.com> - 0.1.1.20080901-1
 - Update to 0.1.1.20080901.
 
-* Sat Aug 30 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20080830-1
+* Sat Aug 30 2008 Peng Huang <shawn.p.huang@gmail.com> - 0.1.1.20080830-1
 - Update to 0.1.1.20080830.
 
-* Mon Aug 25 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20080825-1
+* Mon Aug 25 2008 Peng Huang <shawn.p.huang@gmail.com> - 0.1.1.20080825-1
 - Update to 0.1.1.20080825.
 
-* Sat Aug 23 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20080823-1
+* Sat Aug 23 2008 Peng Huang <shawn.p.huang@gmail.com> - 0.1.1.20080823-1
 - Update to 0.1.1.20080823.
 
-* Fri Aug 15 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20080815-1
+* Fri Aug 15 2008 Peng Huang <shawn.p.huang@gmail.com> - 0.1.1.20080815-1
 - Update to 0.1.1.20080815.
 
-* Thu Aug 12 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.1.20080812-1
+* Thu Aug 12 2008 Peng Huang <shawn.p.huang@gmail.com> - 0.1.1.20080812-1
 - Update to 0.1.1.20080812.
 
-* Mon Aug 11 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.0.20080810-2
+* Mon Aug 11 2008 Peng Huang <shawn.p.huang@gmail.com> - 0.1.0.20080810-2
 - Add gnome-python2-gconf in Requires.
 
-* Thu Aug 07 2008 Huang Peng <shawn.p.huang@gmail.com> - 0.1.0.20080810-1
+* Thu Aug 07 2008 Peng Huang <shawn.p.huang@gmail.com> - 0.1.0.20080810-1
 - The first version.
