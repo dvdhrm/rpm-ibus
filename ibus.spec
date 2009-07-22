@@ -7,7 +7,7 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.2.0.20090719
+Version:    1.2.0.20090722
 Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
@@ -228,8 +228,11 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Jul 22 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090722-1
+- Update to 1.2.0.20090722
+
 * Sun Jul 19 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090719-1
-- Update to 1.2.0.200907179
+- Update to 1.2.0.20090719
 
 * Mon Jun 22 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090617-1
 - Update to 1.2.0.20090617
