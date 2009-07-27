@@ -8,7 +8,7 @@
 
 Name:       ibus
 Version:    1.2.0.20090723
-Release:    2%{?dist}
+Release:    3%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -228,6 +228,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Tue Jul 28 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090723-3
+- Update xinput-ibus: setup QT_IM_MODULE if the ibus qt input method plugin exists. 
+
 * Fri Jul 24 2009 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.2.0.20090723-2
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_12_Mass_Rebuild
 
