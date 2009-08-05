@@ -7,8 +7,8 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.2.0.20090723
-Release:    3%{?dist}
+Version:    1.2.0.20090806
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -228,6 +228,10 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Aug 06 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090806-1
+- Update to 1.2.0.20090806
+- Fix bug 515106 - don't install duplicate files
+
 * Tue Jul 28 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090723-3
 - Update xinput-ibus: setup QT_IM_MODULE if the ibus qt input method plugin exists. 
 
