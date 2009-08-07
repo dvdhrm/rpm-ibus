@@ -7,7 +7,7 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.2.0.20090806
+Version:    1.2.0.20090807
 Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
@@ -228,6 +228,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Aug 07 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090807-1
+- Update to 1.2.0.20090807
+
 * Thu Aug 06 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090806-1
 - Update to 1.2.0.20090806
 - Fix bug 515106 - don't install duplicate files
