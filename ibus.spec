@@ -8,14 +8,14 @@
 
 Name:       ibus
 Version:    1.2.0.20090807
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
 URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
-# Patch0:     ibus-HEAD.patch
+Patch0:     ibus-HEAD.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -114,7 +114,7 @@ The ibus-devel-docs package contains developer documentation for ibus
 
 %prep
 %setup -q
-# %patch0 -p1
+%patch0 -p1
 # ./autogen.sh --help
 
 %build
@@ -228,6 +228,10 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Aug 07 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090807-2
+- Update ibus-HEAD.patch
+- Fix bug 516154.
+
 * Fri Aug 07 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090807-1
 - Update to 1.2.0.20090807
 
