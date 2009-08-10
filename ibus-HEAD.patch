@@ -1,3 +1,20 @@
+diff --git a/bus/dbusimpl.c b/bus/dbusimpl.c
+index 051677e..eee1630 100644
+--- a/bus/dbusimpl.c
++++ b/bus/dbusimpl.c
+@@ -1088,12 +1088,6 @@ bus_dbus_impl_dispatch_message_by_rule (BusDBusImpl     *dbus,
+ 
+     dbus_message_set_data (message, data_slot, (gpointer) TRUE, NULL);
+ 
+-#if 0
+-    if (g_strcmp0 (ibus_message_get_member (message), "ValueChanged") == 0) {
+-        g_debug ("Dispatch ValueChanged");
+-    }
+-#endif
+-
+     for (link = dbus->rules; link != NULL; link = link->next) {
+         GList *list = bus_match_rule_get_recipients (BUS_MATCH_RULE (link->data),
+                                                      message);
 diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
 index 120277f..e841c28 100644
 --- a/bus/ibusimpl.c
@@ -10,6 +27,59 @@ index 120277f..e841c28 100644
          for (i = 0; handlers[i].interface != NULL; i++) {
              if (ibus_message_is_method_call (message,
                                               handlers[i].interface,
+diff --git a/bus/main.c b/bus/main.c
+index 2e227ea..38040b1 100644
+--- a/bus/main.c
++++ b/bus/main.c
+@@ -25,6 +25,7 @@
+ #include <pwd.h>
+ #include <stdlib.h>
+ #include <locale.h>
++#include <signal.h>
+ #include "server.h"
+ #include "ibusimpl.h"
+ 
+@@ -39,6 +40,7 @@ static gchar *config = "default";
+ static gchar *desktop = "gnome";
+ static gchar *address = "";
+ gboolean g_rescan = FALSE;
++gboolean g_mempro = FALSE;
+ gboolean g_verbose = FALSE;
+ 
+ static const GOptionEntry entries[] =
+@@ -52,6 +54,7 @@ static const GOptionEntry entries[] =
+     { "address",   'a', 0, G_OPTION_ARG_STRING, &address,   "specify the address of ibus daemon.", "address" },
+     { "replace",   'r', 0, G_OPTION_ARG_NONE,   &replace,   "if there is an old ibus-daemon is running, it will be replaced.", NULL },
+     { "re-scan",   't', 0, G_OPTION_ARG_NONE,   &g_rescan,  "force to re-scan components, and re-create registry cache.", NULL },
++    { "mem-profile", 'm', 0, G_OPTION_ARG_NONE,   &g_mempro,   "enable memory profile, send SIGUSR2 to print out the memory profile.", NULL },
+     { "verbose",   'v', 0, G_OPTION_ARG_NONE,   &g_verbose,   "verbose.", NULL },
+     { NULL },
+ };
+@@ -143,6 +146,12 @@ _my_log_handler (const gchar    *log_domain,
+     }
+ }
+ 
++static void
++_sig_usr2_handler (int sig)
++{
++    g_mem_profile ();
++}
++
+ gint
+ main (gint argc, gchar **argv)
+ {
+@@ -164,6 +173,11 @@ main (gint argc, gchar **argv)
+         exit (-1);
+     }
+ 
++    if (g_mempro) {
++        g_mem_set_vtable (glib_mem_profiler_table);
++        signal (SIGUSR2, _sig_usr2_handler);
++    }
++
+     /* check uid */
+     {
+         const gchar *username = ibus_get_user_name ();
 diff --git a/client/gtk2/ibusimcontext.c b/client/gtk2/ibusimcontext.c
 index 68a77d8..d914eae 100644
 --- a/client/gtk2/ibusimcontext.c
@@ -40,13 +110,87 @@ index 68a77d8..d914eae 100644
      }
  }
  
+diff --git a/src/ibusbus.c b/src/ibusbus.c
+index b4086cd..cc06586 100644
+--- a/src/ibusbus.c
++++ b/src/ibusbus.c
+@@ -180,9 +180,6 @@ _connection_destroy_cb (IBusConnection  *connection,
+ static void
+ ibus_bus_connect (IBusBus *bus)
+ {
+-    const gchar *socket_path;
+-    struct stat buf;
+-
+     IBusBusPrivate *priv;
+     priv = IBUS_BUS_GET_PRIVATE (bus);
+ 
+diff --git a/src/ibushotkey.c b/src/ibushotkey.c
+index 6cac31f..295dea3 100644
+--- a/src/ibushotkey.c
++++ b/src/ibushotkey.c
+@@ -268,23 +268,29 @@ ibus_hotkey_profile_destroy (IBusHotkeyProfile *profile)
+     IBusHotkeyProfilePrivate *priv;
+     priv = IBUS_HOTKEY_PROFILE_GET_PRIVATE (profile);
+ 
+-    if (priv->hotkeys) {
+-        g_tree_destroy (priv->hotkeys);
+-        priv->hotkeys = NULL;
+-    }
+-
++    /* free events */
+     if (priv->events) {
+-        IBusHotkeyEvent *events, *p;
+-        p = events = (IBusHotkeyEvent *)g_array_free (priv->events, FALSE);
++        IBusHotkeyEvent **p;
++        gint i;
++        p = (IBusHotkeyEvent **)g_array_free (priv->events, FALSE);
+         priv->events = NULL;
+ 
+-        while (p->event != 0) {
+-            if (p->hotkeys)
+-                g_list_free (p->hotkeys);
+-            p ++;
++        for (i = 0; p[i] != NULL; i++) {
++            if (p[i]->event != 0) {
++                /* free the hotkeys list, but do not free data in the list
++                 * The datas will be free in g_tree_destroy
++                 * */
++                g_list_free (p[i]->hotkeys);
++            }
+         }
+-        g_free (events);
++        g_free (p);
+     }
++
++    if (priv->hotkeys) {
++        g_tree_destroy (priv->hotkeys);
++        priv->hotkeys = NULL;
++    }
++
+     IBUS_OBJECT_CLASS (parent_class)->destroy ((IBusObject *)profile);
+ }
+ 
+@@ -363,8 +369,8 @@ ibus_hotkey_profile_add_hotkey (IBusHotkeyProfile *profile,
+ 
+     g_tree_insert (priv->hotkeys, (gpointer) hotkey, GUINT_TO_POINTER (event));
+ 
+-    gint i;
+     IBusHotkeyEvent *p = NULL;
++    gint i;
+     for ( i = 0; i < priv->events->len; i++) {
+         p = &g_array_index (priv->events, IBusHotkeyEvent, i);
+         if (p->event == event)
 diff --git a/src/ibuskeymap.c b/src/ibuskeymap.c
-index 9f59c73..b248e18 100644
+index 9f59c73..d11fac3 100644
 --- a/src/ibuskeymap.c
 +++ b/src/ibuskeymap.c
-@@ -78,11 +78,8 @@ ibus_keymap_init (IBusKeymap *keymap)
-     gint i, j;
- 
+@@ -75,14 +75,10 @@ ibus_keymap_class_init (IBusKeymapClass *klass)
+ static void
+ ibus_keymap_init (IBusKeymap *keymap)
+ {
+-    gint i, j;
+-
++    gint i;
      keymap->name = NULL;
 -
 -    for (i = 0; i < 256; i++) {
@@ -58,7 +202,7 @@ index 9f59c73..b248e18 100644
      }
  }
  
-@@ -306,8 +303,9 @@ ibus_keymap_lookup_keysym (IBusKeymap *keymap,
+@@ -306,8 +302,9 @@ ibus_keymap_lookup_keysym (IBusKeymap *keymap,
  
      if (keycode < 256) {
          /* numlock */
@@ -69,3 +213,190 @@ index 9f59c73..b248e18 100644
  
          state &= IBUS_SHIFT_MASK | IBUS_LOCK_MASK | IBUS_MOD5_MASK;
  
+diff --git a/src/ibuslookuptable.c b/src/ibuslookuptable.c
+index 7f82d62..324534e 100644
+--- a/src/ibuslookuptable.c
++++ b/src/ibuslookuptable.c
+@@ -86,26 +86,26 @@ ibus_lookup_table_init (IBusLookupTable *table)
+ static void
+ ibus_lookup_table_destroy (IBusLookupTable *table)
+ {
+-    IBusText **sp, **p;
++    IBusText **p;
++    gint i;
+ 
+     if (table->candidates != NULL) {
+-        p = sp = (IBusText **) g_array_free (table->candidates, FALSE);
++        p = (IBusText **) g_array_free (table->candidates, FALSE);
+         table->candidates = NULL;
+-        while (*p != NULL) {
+-            g_object_unref (*p);
+-            p ++;
++
++        for (i = 0; p[i] != NULL; i++) {
++            g_object_unref (p[i]);
+         }
+-        g_free (sp);
++        g_free (p);
+     }
+ 
+     if (table->labels != NULL) {
+-        p = sp = (IBusText **) g_array_free (table->labels, FALSE);
++        p = (IBusText **) g_array_free (table->labels, FALSE);
+         table->labels = NULL;
+-        while (*p != NULL) {
+-            g_object_unref (*p);
+-            p ++;
++        for (i = 0; p[i] != NULL; i++) {
++            g_object_unref (p[i]);
+         }
+-        g_free (sp);
++        g_free (p);
+     }
+ 
+     IBUS_OBJECT_CLASS (parent_class)->destroy ((IBusObject *) table);
+@@ -220,6 +220,7 @@ ibus_lookup_table_deserialize (IBusLookupTable *table,
+         ibus_message_iter_next (&array_iter);
+ 
+         ibus_lookup_table_append_candidate (table, text);
++        g_object_unref (text);
+     }
+ 
+     ibus_message_iter_next (iter);
+@@ -235,6 +236,7 @@ ibus_lookup_table_deserialize (IBusLookupTable *table,
+         ibus_message_iter_next (&array_iter);
+ 
+         ibus_lookup_table_append_label (table, text);
++        g_object_unref (text);
+     }
+ 
+     ibus_message_iter_next (iter);
+diff --git a/src/ibusobject.c b/src/ibusobject.c
+index 2c2c25a..5e7ea58 100644
+--- a/src/ibusobject.c
++++ b/src/ibusobject.c
+@@ -36,6 +36,12 @@ struct _IBusObjectPrivate {
+ 
+ static guint            object_signals[LAST_SIGNAL] = { 0 };
+ 
++// #define DEBUG_MEMORY
++#ifdef DEBUG_MEMORY
++static GHashTable      *_count_table;
++static guint            _count = 0;
++#endif
++
+ /* functions prototype */
+ static void      ibus_object_class_init     (IBusObjectClass    *klass);
+ static void      ibus_object_init           (IBusObject         *obj);
+@@ -114,6 +120,10 @@ ibus_object_class_init     (IBusObjectClass *klass)
+             NULL, NULL,
+             ibus_marshal_VOID__VOID,
+             G_TYPE_NONE, 0);
++#ifdef DEBUG_MEMORY
++    _count_table = g_hash_table_new (g_direct_hash, g_direct_equal);
++#endif
++
+ }
+ 
+ static void
+@@ -123,6 +133,7 @@ ibus_object_init (IBusObject *obj)
+     priv = IBUS_OBJECT_GET_PRIVATE (obj);
+ 
+     obj->flags = 0;
++
+ }
+ 
+ 
+@@ -135,6 +146,18 @@ ibus_object_constructor (GType                   type,
+ 
+     object = parent_class->constructor (type, n ,args);
+ 
++#ifdef DEBUG_MEMORY
++    if (object != NULL) {
++        guint count;
++        _count ++;
++
++        count = GPOINTER_TO_UINT (g_hash_table_lookup (_count_table, (gpointer) type));
++        g_hash_table_replace (_count_table, (gpointer) type, GUINT_TO_POINTER (++count));
++
++        g_debug ("new %s, count = %d, all = %d", g_type_name (type), count, _count);
++    }
++#endif
++
+     return object;
+ }
+ 
+@@ -157,6 +180,15 @@ ibus_object_dispose (IBusObject *obj)
+ static void
+ ibus_object_finalize (IBusObject *obj)
+ {
++#ifdef DEBUG_MEMORY 
++    guint count;
++
++    _count --;
++    count = GPOINTER_TO_UINT (g_hash_table_lookup (_count_table, (gpointer)G_OBJECT_TYPE (obj)));
++    g_hash_table_replace (_count_table, (gpointer)G_OBJECT_TYPE (obj), GUINT_TO_POINTER (--count));
++    g_debug ("Finalize %s, count = %d, all = %d", G_OBJECT_TYPE_NAME (obj), count, _count);
++#endif
++
+     G_OBJECT_CLASS(parent_class)->finalize (G_OBJECT (obj));
+ }
+ 
+diff --git a/src/ibusproperty.c b/src/ibusproperty.c
+index 1759b94..1b70f70 100644
+--- a/src/ibusproperty.c
++++ b/src/ibusproperty.c
+@@ -97,15 +97,17 @@ ibus_property_init (IBusProperty *prop)
+     prop->sensitive = FALSE;
+     prop->visible = FALSE;
+     prop->state = 0;
++
++    prop->sub_props = NULL;
+ }
+ 
+ static void
+ ibus_property_destroy (IBusProperty *prop)
+ {
+     g_free (prop->key);
+-    g_free (prop->icon);
+-
+     prop->key = NULL;
++
++    g_free (prop->icon);
+     prop->icon = NULL;
+ 
+     if (prop->label) {
+@@ -118,6 +120,11 @@ ibus_property_destroy (IBusProperty *prop)
+         prop->tooltip = NULL;
+     }
+ 
++    if (prop->sub_props) {
++        g_object_unref (prop->sub_props);
++        prop->sub_props = NULL;
++    }
++
+     IBUS_OBJECT_CLASS (parent_class)->destroy ((IBusObject *)prop);
+ }
+ 
+@@ -427,14 +434,15 @@ ibus_prop_list_init (IBusPropList *prop_list)
+ static void
+ ibus_prop_list_destroy (IBusPropList *prop_list)
+ {
+-    IBusProperty **ps, **p;
+-    p = ps = (IBusProperty **) g_array_free (prop_list->properties, FALSE);
++    IBusProperty **p;
++    gint i;
++
++    p = (IBusProperty **) g_array_free (prop_list->properties, FALSE);
+ 
+-    while (*p != NULL) {
+-        g_object_unref (*p);
+-        p ++;
++    for (i = 0; p[i] != NULL; i++) {
++        g_object_unref (p[i]);
+     }
+-    g_free (ps);
++    g_free (p);
+ 
+     IBUS_OBJECT_CLASS (parent_class)->destroy ((IBusObject *) prop_list);
+ }

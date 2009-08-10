@@ -8,7 +8,7 @@
 
 Name:       ibus
 Version:    1.2.0.20090807
-Release:    3%{?dist}
+Release:    4%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -228,9 +228,10 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Mon Aug 10 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090807-3
+* Mon Aug 10 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090807-4
 - Update ibus-HEAD.patch
 - Fix Numlock problem.
+- Fix some memory leaks.
 
 * Fri Aug 07 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090807-2
 - Update ibus-HEAD.patch
