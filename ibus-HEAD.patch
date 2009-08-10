@@ -1,3 +1,15 @@
+diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
+index 120277f..e841c28 100644
+--- a/bus/ibusimpl.c
++++ b/bus/ibusimpl.c
+@@ -1179,7 +1179,6 @@ bus_ibus_impl_ibus_message (BusIBusImpl     *ibus,
+     ibus_message_set_destination (message, DBUS_SERVICE_DBUS);
+ 
+     if (ibus_message_get_type (message) == DBUS_MESSAGE_TYPE_METHOD_CALL) {
+-        g_debug ("Member = %s", ibus_message_get_member (message));
+         for (i = 0; handlers[i].interface != NULL; i++) {
+             if (ibus_message_is_method_call (message,
+                                              handlers[i].interface,
 diff --git a/client/gtk2/ibusimcontext.c b/client/gtk2/ibusimcontext.c
 index 68a77d8..d914eae 100644
 --- a/client/gtk2/ibusimcontext.c
@@ -27,4 +39,33 @@ index 68a77d8..d914eae 100644
 +        }
      }
  }
+ 
+diff --git a/src/ibuskeymap.c b/src/ibuskeymap.c
+index 9f59c73..b248e18 100644
+--- a/src/ibuskeymap.c
++++ b/src/ibuskeymap.c
+@@ -78,11 +78,8 @@ ibus_keymap_init (IBusKeymap *keymap)
+     gint i, j;
+ 
+     keymap->name = NULL;
+-
+-    for (i = 0; i < 256; i++) {
+-        for (j = 0; j < 5; j++) {
+-            keymap->keymap[i][j] = IBUS_VoidSymbol;
+-        }
++    for (i = 0; i < sizeof (keymap->keymap) / sizeof (guint); i++) {
++        ((guint *)keymap->keymap)[i] = IBUS_VoidSymbol;
+     }
+ }
+ 
+@@ -306,8 +303,9 @@ ibus_keymap_lookup_keysym (IBusKeymap *keymap,
+ 
+     if (keycode < 256) {
+         /* numlock */
+-        if (state & IBUS_MOD2_MASK && keymap->keymap[keycode][6] != IBUS_VoidSymbol)
++        if ((state & IBUS_MOD2_MASK) && (keymap->keymap[keycode][6] != IBUS_VoidSymbol)) {
+             return keymap->keymap[keycode][6];
++        }
+ 
+         state &= IBUS_SHIFT_MASK | IBUS_LOCK_MASK | IBUS_MOD5_MASK;
  
