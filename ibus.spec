@@ -7,8 +7,8 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.2.0.20090807
-Release:    4%{?dist}
+Version:    1.2.0.20090812
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -114,8 +114,7 @@ The ibus-devel-docs package contains developer documentation for ibus
 
 %prep
 %setup -q
-%patch0 -p1
-# ./autogen.sh --help
+# %patch0 -p1
 
 %build
 %configure --disable-static \
@@ -228,6 +227,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Aug 12 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090812-1
+- Update to 1.2.0.20090812
+
 * Mon Aug 10 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090807-4
 - Update ibus-HEAD.patch
 - Fix Numlock problem.
