@@ -15,6 +15,7 @@ Group:      System Environment/Libraries
 URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
+Source2:    icons.tar.gz
 Patch0:     ibus-HEAD.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
@@ -113,43 +114,55 @@ The ibus-devel-docs package contains developer documentation for ibus
 
 
 %prep
-%setup -q
+%setup -q -a2
 # %patch0 -p1
 
 %build
 %configure --disable-static \
-		   --disable-iso-codes-check \
-		   --enable-gtk-doc \
-		   --disable-qt4-immodule
+	   --disable-iso-codes-check \
+           --enable-gtk-doc \
+           --disable-qt4-immodule
 # make -C po update-gmo
 make %{?_smp_mflags}
 
 %install
 rm -rf $RPM_BUILD_ROOT
-make DESTDIR=${RPM_BUILD_ROOT} install
+make DESTDIR=$RPM_BUILD_ROOT install
 rm -f $RPM_BUILD_ROOT%{_libdir}/libibus.la
 rm -f $RPM_BUILD_ROOT%{_libdir}/gtk-2.0/%{gtk_binary_version}/immodules/im-ibus.la
 
+# install icons
+install -pm 644 -D icons/IBus4-16.png $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/16x16/status/ibus-off.png
+install -pm 644 -D icons/IBus4-22.png $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/22x22/status/ibus-off.png
+install -pm 644 -D icons/IBus4-24.png $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/24x24/status/ibus-off.png
+install -pm 644 -D icons/IBus4-32.png $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/32x32/status/ibus-off.png
+install -pm 644 -D icons/IBus4-48.png $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/48x48/status/ibus-off.png
+install -pm 644 -D icons/IBus4-48.svg $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/scalable/status/ibus-off.svg
+
 # install xinput config file
-mkdir -pm 755 ${RPM_BUILD_ROOT}/%{_sysconfdir}/X11/xinit/xinput.d
-install -pm 644 %{SOURCE1} ${RPM_BUILD_ROOT}/%{_xinputconf}
+mkdir -pm 755 $RPM_BUILD_ROOT/%{_sysconfdir}/X11/xinit/xinput.d
+install -pm 644 %{SOURCE1} $RPM_BUILD_ROOT%{_xinputconf}
 
 # install .desktop files
-echo "NoDisplay=true" >> $RPM_BUILD_ROOT%{_datadir}/applications/ibus.desktop
-echo "NoDisplay=true" >> $RPM_BUILD_ROOT%{_datadir}/applications/ibus-setup.desktop
+echo "NoDisplay=true" >> ${RPM_BUILD_ROOT}%{_datadir}/applications/ibus.desktop
+echo "NoDisplay=true" >> ${RPM_BUILD_ROOT}%{_datadir}/applications/ibus-setup.desktop
 echo "X-GNOME-Autostart-enabled=false" >> $RPM_BUILD_ROOT%{_sysconfdir}/xdg/autostart/ibus.desktop
-rm -rf $RPM_BUILD_ROOT%{_sysconfdir}/xdg/autostart/ibus.desktop
+rm -rf ${RPM_BUILD_ROOT}%{_sysconfdir}/xdg/autostart/ibus.desktop
 desktop-file-install --delete-original          \
-  --dir $RPM_BUILD_ROOT%{_datadir}/applications \
-  $RPM_BUILD_ROOT%{_datadir}/applications/*
+  --dir ${RPM_BUILD_ROOT}%{_datadir}/applications \
+  ${RPM_BUILD_ROOT}%{_datadir}/applications/*
 
 %find_lang %{name}
 
 %clean
-rm -rf $RPM_BUILD_ROOT
+rm -rf ${RPM_BUILD_ROOT}
 
 %post
-update-desktop-database -q
+# recreate icon cache
+touch --no-create %{_datadir}/icons/hicolor || :
+[ -x %{_bindir}/gtk-update-icon-cache ] && \
+  %{_bindir}/gtk-update-icon-cache --quiet %{_datadir}/icons/hicolor || :
+
 %{_sbindir}/alternatives --install %{_sysconfdir}/X11/xinit/xinputrc xinputrc %{_xinputconf} 83 || :
 
 export GCONF_CONFIG_SOURCE=`gconftool-2 --get-default-source`
@@ -168,18 +181,20 @@ if [ "$1" -eq 0 ]; then
 fi
 
 %postun
-update-desktop-database -q
+# recreate icon cache
+touch --no-create %{_datadir}/icons/hicolor || :
+[ -x %{_bindir}/gtk-update-icon-cache ] && \
+  %{_bindir}/gtk-update-icon-cache --quiet %{_datadir}/icons/hicolor || :
+
 if [ "$1" = "0" ]; then
   %{_sbindir}/alternatives --remove xinputrc %{_xinputconf} || :
   # if alternative was set to manual, reset to auto
   [ -L %{_sysconfdir}/alternatives/xinputrc -a "`readlink %{_sysconfdir}/alternatives/xinputrc`" = "%{_xinputconf}" ] && %{_sbindir}/alternatives --auto xinputrc || :
 fi
 
-%post libs
-/sbin/ldconfig
+%post libs -p /sbin/ldconfig
 
-%postun libs
-/sbin/ldconfig
+%postun libs -p /sbin/ldconfig
 
 %post gtk
 %{_bindir}/update-gtk-immodules %{_host} || :
@@ -198,6 +213,7 @@ fi
 %{_datadir}/ibus/*
 %{_datadir}/applications/*
 %{_datadir}/pixmaps/*
+%{_datadir}/icons/hicolor/*/status/*
 %{_libexecdir}/ibus-gconf
 %{_libexecdir}/ibus-ui-gtk
 %{_libexecdir}/ibus-x11
