@@ -140,22 +140,21 @@ install -pm 644 -D icons/IBus4-48.png $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/4
 install -pm 644 -D icons/IBus4-48.svg $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/scalable/status/ibus-off.svg
 
 # install xinput config file
-mkdir -pm 755 $RPM_BUILD_ROOT/%{_sysconfdir}/X11/xinit/xinput.d
-install -pm 644 %{SOURCE1} $RPM_BUILD_ROOT%{_xinputconf}
+install -pm 644 -D %{SOURCE1} $RPM_BUILD_ROOT%{_xinputconf}
 
 # install .desktop files
-echo "NoDisplay=true" >> ${RPM_BUILD_ROOT}%{_datadir}/applications/ibus.desktop
-echo "NoDisplay=true" >> ${RPM_BUILD_ROOT}%{_datadir}/applications/ibus-setup.desktop
+echo "NoDisplay=true" >> $RPM_BUILD_ROOT%{_datadir}/applications/ibus.desktop
+echo "NoDisplay=true" >> $RPM_BUILD_ROOT%{_datadir}/applications/ibus-setup.desktop
 echo "X-GNOME-Autostart-enabled=false" >> $RPM_BUILD_ROOT%{_sysconfdir}/xdg/autostart/ibus.desktop
-rm -rf ${RPM_BUILD_ROOT}%{_sysconfdir}/xdg/autostart/ibus.desktop
+rm -rf $RPM_BUILD_ROOT%{_sysconfdir}/xdg/autostart/ibus.desktop
 desktop-file-install --delete-original          \
-  --dir ${RPM_BUILD_ROOT}%{_datadir}/applications \
-  ${RPM_BUILD_ROOT}%{_datadir}/applications/*
+  --dir $RPM_BUILD_ROOT%{_datadir}/applications \
+  $RPM_BUILD_ROOT%{_datadir}/applications/*
 
 %find_lang %{name}
 
 %clean
-rm -rf ${RPM_BUILD_ROOT}
+rm -rf $RPM_BUILD_ROOT
 
 %post
 # recreate icon cache
