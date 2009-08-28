@@ -7,7 +7,7 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.2.0.20090812
+Version:    1.2.0.20090828
 Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
@@ -242,6 +242,12 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Aug 28 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090828-1
+- Update to 1.2.0.20090828
+- Change the icon on systray.
+- Fix segment fault in ibus_hotkey_profile_destroy
+- Fix some memory leaks.
+
 * Wed Aug 12 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090812-1
 - Update to 1.2.0.20090812
 
