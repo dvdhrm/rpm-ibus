@@ -8,7 +8,7 @@
 
 Name:       ibus
 Version:    1.2.0.20090828
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -242,6 +242,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon Aug 31 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090828-2
+- Change icon path in ibus.conf
+
 * Fri Aug 28 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090828-1
 - Update to 1.2.0.20090828
 - Change the icon on systray.
