@@ -8,7 +8,7 @@
 
 Name:       ibus
 Version:    1.2.0.20090904
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -234,6 +234,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Sep 04 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090904-2
+- Refresh the tarball.
+
 * Fri Sep 04 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090904-1
 - Update to 1.2.0.20090904
 
