@@ -7,16 +7,16 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.2.0.20090828
-Release:    2%{?dist}
+Version:    1.2.0.20090904
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
 URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
-Source2:    icons.tar.gz
-Patch0:     ibus-HEAD.patch
+# Source2:    icons.tar.gz
+# Patch0:     ibus-HEAD.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -114,7 +114,7 @@ The ibus-devel-docs package contains developer documentation for ibus
 
 
 %prep
-%setup -q -a2
+%setup -q -a1
 # %patch0 -p1
 
 %build
@@ -130,14 +130,6 @@ rm -rf $RPM_BUILD_ROOT
 make DESTDIR=$RPM_BUILD_ROOT install
 rm -f $RPM_BUILD_ROOT%{_libdir}/libibus.la
 rm -f $RPM_BUILD_ROOT%{_libdir}/gtk-2.0/%{gtk_binary_version}/immodules/im-ibus.la
-
-# install icons
-install -pm 644 -D icons/IBus4-16.png $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/16x16/status/ibus-off.png
-install -pm 644 -D icons/IBus4-22.png $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/22x22/status/ibus-off.png
-install -pm 644 -D icons/IBus4-24.png $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/24x24/status/ibus-off.png
-install -pm 644 -D icons/IBus4-32.png $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/32x32/status/ibus-off.png
-install -pm 644 -D icons/IBus4-48.png $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/48x48/status/ibus-off.png
-install -pm 644 -D icons/IBus4-48.svg $RPM_BUILD_ROOT%{_datadir}/icons/hicolor/scalable/status/ibus-off.svg
 
 # install xinput config file
 install -pm 644 -D %{SOURCE1} $RPM_BUILD_ROOT%{_xinputconf}
@@ -242,6 +234,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Sep 04 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090904-1
+- Update to 1.2.0.20090904
+
 * Mon Aug 31 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090828-2
 - Change icon path in ibus.conf
 
