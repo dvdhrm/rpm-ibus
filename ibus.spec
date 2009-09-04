@@ -114,7 +114,7 @@ The ibus-devel-docs package contains developer documentation for ibus
 
 
 %prep
-%setup -q -a1
+%setup -q
 # %patch0 -p1
 
 %build
