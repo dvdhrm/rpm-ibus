@@ -7,8 +7,8 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.2.0.20090904
-Release:    2%{?dist}
+Version:    1.2.0.20090915
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -234,6 +234,12 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Tue Sep 15 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090915-1
+- Update to 1.2.0.20090915
+- Fix bug 521591 - check if the icon filename is a real file before trying to open it
+- Fix bug 522310 - Memory leak on show/hide
+- Fix bug 509518 - ibus-anthy should only override to jp layout for kana input
+
 * Fri Sep 04 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090904-2
 - Refresh the tarball.
 
