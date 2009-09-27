@@ -7,7 +7,7 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.2.0.20090915
+Version:    1.2.0.20090927
 Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
@@ -234,6 +234,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon Sep 27 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090927-1
+- Update to 1.2.0.20090927
+
 * Tue Sep 15 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090915-1
 - Update to 1.2.0.20090915
 - Fix bug 521591 - check if the icon filename is a real file before trying to open it
