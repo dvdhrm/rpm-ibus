@@ -7,7 +7,7 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.2.0.20090927
+Version:    1.2.0.20091024
 Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
@@ -33,7 +33,6 @@ BuildRequires:  gtk-doc
 BuildRequires:  GConf2-devel
 BuildRequires:  pygobject2-devel
 BuildRequires:  intltool
-# BuildRequires:  qt-devel
 
 Requires:   %{name}-libs = %{version}-%{release}
 Requires:   %{name}-gtk = %{version}-%{release}
@@ -82,15 +81,6 @@ Requires(post): glib2 >= %{glib_ver}
 
 %description gtk
 This package contains ibus im module for gtk2
-
-# %package qt
-# Summary:    IBus im module for qt4
-# Group:      System Environment/Libraries
-# Requires:   %{name} = %{version}-%{release}
-# Requires:   qt >= 4.4.2
-# 
-# %description qt
-# This package contains ibus im module for qt4
 
 %package devel
 Summary:    Development tools for ibus
@@ -203,8 +193,7 @@ fi
 %{_bindir}/ibus-setup
 %{_datadir}/ibus/*
 %{_datadir}/applications/*
-%{_datadir}/pixmaps/*
-%{_datadir}/icons/hicolor/*/status/*
+%{_datadir}/icons/hicolor/*/apps/*
 %{_libexecdir}/ibus-gconf
 %{_libexecdir}/ibus-ui-gtk
 %{_libexecdir}/ibus-x11
@@ -234,6 +223,13 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Sat Oct 24 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.2001024-1
+- Update to 1.2.0.20091024
+
+* Wed Oct 14 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.2001014-2
+- Update to 1.2.0.20091014
+- Change ICON in ibus.conf 
+
 * Mon Sep 27 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20090927-1
 - Update to 1.2.0.20090927
 
