@@ -7,7 +7,7 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.2.0.20091024
+Version:    1.2.0.20091124
 Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
@@ -223,6 +223,11 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Tue Nov 24 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.2001124-1
+- Update to 1.2.0.20091124
+- Update some translations.
+- Fix bug 538147 - [abrt] crash detected in firefox-3.5.5-1.fc12 
+
 * Sat Oct 24 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.2001024-1
 - Update to 1.2.0.20091024
 
