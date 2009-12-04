@@ -223,7 +223,7 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Fri Oct 04 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.2001204-1
+* Fri Dec 04 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.2001204-1
 - Update to 1.2.0.20091204
 - Fix Bug 529920 - language panel pops up on the wrong monitor
 - Fix Bug 541197 - Ibus crash
