@@ -7,7 +7,7 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.2.0.20091124
+Version:    1.2.0.20091204
 Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
@@ -223,6 +223,11 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Oct 04 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.2001204-1
+- Update to 1.2.0.20091204
+- Fix Bug 529920 - language panel pops up on the wrong monitor
+- Fix Bug 541197 - Ibus crash
+
 * Tue Nov 24 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.2001124-1
 - Update to 1.2.0.20091124
 - Update some translations.
