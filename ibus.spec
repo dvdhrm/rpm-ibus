@@ -8,7 +8,7 @@
 
 Name:       ibus
 Version:    1.2.0.20091204
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -59,9 +59,7 @@ Obsoletes:  ibus-qt < 1.1.0
 %define _xinputconf %{_sysconfdir}/X11/xinit/xinput.d/ibus.conf
 
 %description
-IBus means Intelligent Input Bus. It is a new input framework for Linux OS. It provides
-full featured and user friendly input method user interface. It also may help
-developers to develop input method easily.
+IBus means Intelligent Input Bus. It is an input framework for Linux OS.
 
 %package libs
 Summary:    IBus libraries
@@ -109,7 +107,7 @@ The ibus-devel-docs package contains developer documentation for ibus
 
 %build
 %configure --disable-static \
-	   --disable-iso-codes-check \
+           --disable-iso-codes-check \
            --enable-gtk-doc \
            --disable-qt4-immodule
 # make -C po update-gmo
@@ -151,14 +149,14 @@ gconftool-2 --makefile-install-rule %{_sysconfdir}/gconf/schemas/ibus.schemas >&
 
 %pre
 if [ "$1" -gt 1 ]; then
-	export GCONF_CONFIG_SOURCE=`gconftool-2 --get-default-source`
-	gconftool-2 --makefile-uninstall-rule %{_sysconfdir}/gconf/schemas/ibus.schemas >& /dev/null || :
+    export GCONF_CONFIG_SOURCE=`gconftool-2 --get-default-source`
+    gconftool-2 --makefile-uninstall-rule %{_sysconfdir}/gconf/schemas/ibus.schemas >& /dev/null || :
 fi
 
 %preun
 if [ "$1" -eq 0 ]; then
-	export GCONF_CONFIG_SOURCE=`gconftool-2 --get-default-source`
-	gconftool-2 --makefile-uninstall-rule %{_sysconfdir}/gconf/schemas/ibus.schemas >& /dev/null || :
+    export GCONF_CONFIG_SOURCE=`gconftool-2 --get-default-source`
+    gconftool-2 --makefile-uninstall-rule %{_sysconfdir}/gconf/schemas/ibus.schemas >& /dev/null || :
 fi
 
 %postun
@@ -220,9 +218,13 @@ fi
 %{_libdir}/pkgconfig/*
 
 %files devel-docs
+%defattr(-,root,root,-)
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Dec 10 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.2001204-2
+- Fix rpmlint warnings and errors.
+
 * Fri Dec 04 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.2001204-1
 - Update to 1.2.0.20091204
 - Fix Bug 529920 - language panel pops up on the wrong monitor
@@ -423,7 +425,7 @@ fi
 
 * Tue Feb 25 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090225-1
 - Update to ibus-1.1.0.20090225.
-- Fix problems in %post and %postun scripts.
+- Fix problems in %%post and %%postun scripts.
 - Hide ibus & ibus preferences menu items.
 
 * Tue Feb 17 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.1.0.20090211-10
