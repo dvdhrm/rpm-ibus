@@ -7,8 +7,8 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.2.0.20091204
-Release:    2%{?dist}
+Version:    1.2.0.20091215
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -222,6 +222,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Dec 15 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.2001215-1
+- Update to 1.2.0.20091215
+
 * Thu Dec 10 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.2001204-2
 - Fix rpmlint warnings and errors.
 
