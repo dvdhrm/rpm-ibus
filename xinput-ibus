@@ -1,7 +1,7 @@
 XIM=ibus
 XIM_PROGRAM="/usr/bin/ibus-daemon"
 ICON="/usr/share/icons/hicolor/scalable/apps/ibus.svg"
-XIM_ARGS="--xim"
+XIM_ARGS="--xim -j 60"
 PREFERENCE_PROGRAM=/usr/bin/ibus-setup
 SHORT_DESC="IBus"
 GTK_IM_MODULE=ibus

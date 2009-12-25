@@ -7,7 +7,7 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.2.0.20091215
+Version:    1.2.0.20091225
 Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
@@ -15,7 +15,6 @@ Group:      System Environment/Libraries
 URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
-# Source2:    icons.tar.gz
 # Patch0:     ibus-HEAD.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
@@ -43,6 +42,7 @@ Requires:   iso-codes
 Requires:   dbus-python >= %{dbus_python_version}
 Requires:   im-chooser >= %{im_chooser_version}
 Requires:   GConf2 >= %{gconf2_version}
+Requires:   notify-python
 
 Requires(post):  desktop-file-utils
 Requires(postun):  desktop-file-utils
@@ -108,8 +108,7 @@ The ibus-devel-docs package contains developer documentation for ibus
 %build
 %configure --disable-static \
            --disable-iso-codes-check \
-           --enable-gtk-doc \
-           --disable-qt4-immodule
+           --enable-gtk-doc
 # make -C po update-gmo
 make %{?_smp_mflags}
 
@@ -207,10 +206,6 @@ fi
 %defattr(-,root,root,-)
 %{_libdir}/gtk-2.0/%{gtk_binary_version}/immodules/im-ibus.so
 
-# %files qt
-# %defattr(-,root,root,-)
-# %{_libdir}/qt4/plugins/inputmethods/libibus.so
-
 %files devel
 %defattr(-,root,root,-)
 %{_libdir}/lib*.so
@@ -222,6 +217,12 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Dec 25 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.2001225-1
+- Update to 1.2.0.20091225
+- Fix bug 513895 - new IME does not show up in ibus-setup
+- Fix bug 531857 - applet order should correspond with preferences order
+- Fix bug 532856 - should not list already added input-methods in Add selector
+
 * Wed Dec 15 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.2001215-1
 - Update to 1.2.0.20091215
 
