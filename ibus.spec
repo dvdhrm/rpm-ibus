@@ -7,7 +7,7 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.2.0.20091225
+Version:    1.2.0.20100111
 Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
@@ -217,32 +217,35 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Fri Dec 25 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.2001225-1
+* Mon Jan 11 2010 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20100111-1
+- Update to 1.2.0.20100111
+
+* Fri Dec 25 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20091225-1
 - Update to 1.2.0.20091225
 - Fix bug 513895 - new IME does not show up in ibus-setup
 - Fix bug 531857 - applet order should correspond with preferences order
 - Fix bug 532856 - should not list already added input-methods in Add selector
 
-* Wed Dec 15 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.2001215-1
+* Wed Dec 15 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20091215-1
 - Update to 1.2.0.20091215
 
-* Thu Dec 10 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.2001204-2
+* Thu Dec 10 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20091204-2
 - Fix rpmlint warnings and errors.
 
-* Fri Dec 04 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.2001204-1
+* Fri Dec 04 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20091204-1
 - Update to 1.2.0.20091204
 - Fix Bug 529920 - language panel pops up on the wrong monitor
 - Fix Bug 541197 - Ibus crash
 
-* Tue Nov 24 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.2001124-1
+* Tue Nov 24 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20091124-1
 - Update to 1.2.0.20091124
 - Update some translations.
 - Fix bug 538147 - [abrt] crash detected in firefox-3.5.5-1.fc12 
 
-* Sat Oct 24 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.2001024-1
+* Sat Oct 24 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20091024-1
 - Update to 1.2.0.20091024
 
-* Wed Oct 14 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.2001014-2
+* Wed Oct 14 2009 Peng Huang <shawn.p.huang@gmail.com> - 1.2.0.20091014-2
 - Update to 1.2.0.20091014
 - Change ICON in ibus.conf 
 
