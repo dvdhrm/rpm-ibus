@@ -7,7 +7,7 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.2.99.20100202
+Version:    1.3.2
 Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
@@ -32,6 +32,7 @@ BuildRequires:  gtk-doc
 BuildRequires:  GConf2-devel
 BuildRequires:  pygobject2-devel
 BuildRequires:  intltool
+BuildRequires:  iso-codes-devel
 
 Requires:   %{name}-libs = %{version}-%{release}
 Requires:   %{name}-gtk = %{version}-%{release}
@@ -107,7 +108,6 @@ The ibus-devel-docs package contains developer documentation for ibus
 
 %build
 %configure --disable-static \
-           --disable-iso-codes-check \
            --enable-gtk-doc
 # make -C po update-gmo
 make %{?_smp_mflags}
@@ -217,6 +217,24 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Apr 21 2010 Peng Huang <shawn.p.huang@gmail.com> - 1.3.2-1
+- Update to 1.3.2
+- Fix bug 583446 - [abrt] crash in ibus-1.3.1-1.fc12
+
+* Mon Apr 05 2010 Peng Huang <shawn.p.huang@gmail.com> - 1.3.1-1
+- Update to 1.3.1
+
+* Fri Mar 26 2010 Peng Huang <shawn.p.huang@gmail.com> - 1.3.0-3
+- Update ibus-HEAD.patch
+- Fix bug - some time panel does not show candidates.
+- Update some po files
+
+* Mon Mar 22 2010 Peng Huang <shawn.p.huang@gmail.com> - 1.3.0-2
+- Does not check glib micro version in ibus im module.
+
+* Mon Mar 22 2010 Peng Huang <shawn.p.huang@gmail.com> - 1.3.0-1
+- Update to 1.3.0
+
 * Tue Feb 02 2010 Peng Huang <shawn.p.huang@gmail.com> - 1.2.99.20100202-1
 - Update to 1.2.99.20100202
 
