@@ -8,7 +8,7 @@
 
 Name:       ibus
 Version:    1.3.2
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -44,6 +44,7 @@ Requires:   dbus-python >= %{dbus_python_version}
 Requires:   im-chooser >= %{im_chooser_version}
 Requires:   GConf2 >= %{gconf2_version}
 Requires:   notify-python
+Requires:   librsvg2
 
 Requires(post):  desktop-file-utils
 Requires(postun):  desktop-file-utils
@@ -217,6 +218,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Sat Apr 24 2010 Peng Huang <shawn.p.huang@gmail.com> - 1.3.2-2
+- Add requires librsvg2
+
 * Wed Apr 21 2010 Peng Huang <shawn.p.huang@gmail.com> - 1.3.2-1
 - Update to 1.3.2
 - Fix bug 583446 - [abrt] crash in ibus-1.3.1-1.fc12
