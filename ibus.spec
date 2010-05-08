@@ -7,8 +7,8 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.3.2
-Release:    2%{?dist}
+Version:    1.3.3
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -218,8 +218,16 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Tue May 04 2010 Peng Huang <shawn.p.huang@gmail.com> - 1.3.3-1
+- Update to 1.3.3
+
+* Sun May 02 2010 Peng Huang <shawn.p.huang@gmail.com> - 1.3.2-3
+- Embedded language bar in menu by default.
+- Fix bug 587353 - [abrt] crash in ibus-1.3.2-2.fc12
+
 * Sat Apr 24 2010 Peng Huang <shawn.p.huang@gmail.com> - 1.3.2-2
 - Add requires librsvg2
+- Update ibus-HEAD.patch: Update po files and and setting 
 
 * Wed Apr 21 2010 Peng Huang <shawn.p.huang@gmail.com> - 1.3.2-1
 - Update to 1.3.2
