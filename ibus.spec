@@ -8,7 +8,7 @@
 
 Name:       ibus
 Version:    1.3.4
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -218,6 +218,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Sat May 29 2010 Peng Huang <shawn.p.huang@gmail.com> - 1.3.4-2
+- Update to 1.3.4
+
 * Sat May 29 2010 Peng Huang <shawn.p.huang@gmail.com> - 1.3.4-1
 - Update to 1.3.4
 
