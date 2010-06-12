@@ -1,5 +1,6 @@
 %{!?python_sitelib: %define python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib()")}
-%{!?gtk_binary_version: %define gtk_binary_version %(pkg-config  --variable=gtk_binary_version gtk+-2.0)}
+%{!?gtk2_binary_version: %define gtk2_binary_version %(pkg-config  --variable=gtk_binary_version gtk+-2.0)}
+%{!?gtk3_binary_version: %define gtk3_binary_version %(pkg-config  --variable=gtk_binary_version gtk+-3.0)}
 
 %define glib_ver %([ -a %{_libdir}/pkgconfig/glib-2.0.pc ] && pkg-config --modversion glib-2.0 | cut -d. -f 1,2 || echo -n "999")
 %define gconf2_version 2.12.0
@@ -7,8 +8,8 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.3.4
-Release:    2%{?dist}
+Version:    1.3.5
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -25,6 +26,7 @@ BuildRequires:  gettext-devel
 BuildRequires:  libtool
 BuildRequires:  python
 BuildRequires:  gtk2-devel
+BuildRequires:  gtk3-devel
 BuildRequires:  dbus-glib-devel
 BuildRequires:  dbus-python-devel >= %{dbus_python_version}
 BuildRequires:  desktop-file-utils
@@ -35,7 +37,8 @@ BuildRequires:  intltool
 BuildRequires:  iso-codes-devel
 
 Requires:   %{name}-libs = %{version}-%{release}
-Requires:   %{name}-gtk = %{version}-%{release}
+Requires:   %{name}-gtk2 = %{version}-%{release}
+Requires:   %{name}-gtk3 = %{version}-%{release}
 
 Requires:   pygtk2
 Requires:   pyxdg
@@ -73,14 +76,25 @@ Requires:   dbus >= 1.2.4
 %description libs
 This package contains the libraries for IBus
 
-%package gtk
+%package gtk2
 Summary:    IBus im module for gtk2
 Group:      System Environment/Libraries
 Requires:   %{name} = %{version}-%{release}
 Requires(post): glib2 >= %{glib_ver}
+Obsoletes:  ibus-gtk
+Provides:   ibus-gtk
 
-%description gtk
+%description gtk2
 This package contains ibus im module for gtk2
+
+%package gtk3
+Summary:    IBus im module for gtk3
+Group:      System Environment/Libraries
+Requires:   %{name} = %{version}-%{release}
+Requires(post): glib2 >= %{glib_ver}
+
+%description gtk3
+This package contains ibus im module for gtk3
 
 %package devel
 Summary:    Development tools for ibus
@@ -108,8 +122,14 @@ The ibus-devel-docs package contains developer documentation for ibus
 # %patch0 -p1
 
 %build
-%configure --disable-static \
-           --enable-gtk-doc
+%configure \
+    --disable-static \
+    --enable-gtk2 \
+    --enable-gtk3 \
+    --enable-xim \
+    --disable-gtk-doc \
+    --enable-introspection
+
 # make -C po update-gmo
 make %{?_smp_mflags}
 
@@ -117,7 +137,8 @@ make %{?_smp_mflags}
 rm -rf $RPM_BUILD_ROOT
 make DESTDIR=$RPM_BUILD_ROOT install
 rm -f $RPM_BUILD_ROOT%{_libdir}/libibus.la
-rm -f $RPM_BUILD_ROOT%{_libdir}/gtk-2.0/%{gtk_binary_version}/immodules/im-ibus.la
+rm -f $RPM_BUILD_ROOT%{_libdir}/gtk-2.0/%{gtk2_binary_version}/immodules/im-ibus.la
+rm -f $RPM_BUILD_ROOT%{_libdir}/gtk-3.0/%{gtk3_binary_version}/immodules/im-ibus.la
 
 # install xinput config file
 install -pm 644 -D %{SOURCE1} $RPM_BUILD_ROOT%{_xinputconf}
@@ -175,11 +196,17 @@ fi
 
 %postun libs -p /sbin/ldconfig
 
-%post gtk
-%{_bindir}/update-gtk-immodules %{_host} || :
+%post gtk2
+%{_bindir}/update-gtk-immodules %{_host}
 
-%postun gtk
-%{_bindir}/update-gtk-immodules %{_host} || :
+%postun gtk2
+%{_bindir}/update-gtk-immodules %{_host}
+
+%post gtk3
+%{_bindir}/gtk-query-immodules-3.0-%{__isa_bits} --update-cache
+
+%postun gtk3
+%{_bindir}/gtk-query-immodules-3.0-%{__isa_bits} --update-cache
 
 %files -f %{name}.lang
 %defattr(-,root,root,-)
@@ -202,22 +229,33 @@ fi
 %files libs
 %defattr(-,root,root,-)
 %{_libdir}/libibus.so.*
+%{_libdir}/girepository-1.0/IBus-1.0.typelib
 
-%files gtk
+%files gtk2
 %defattr(-,root,root,-)
-%{_libdir}/gtk-2.0/%{gtk_binary_version}/immodules/im-ibus.so
+%{_libdir}/gtk-2.0/%{gtk2_binary_version}/immodules/im-ibus.so
+
+%files gtk3
+%defattr(-,root,root,-)
+%{_libdir}/gtk-3.0/%{gtk3_binary_version}/immodules/im-ibus.so
 
 %files devel
 %defattr(-,root,root,-)
 %{_libdir}/lib*.so
-%{_includedir}/*
 %{_libdir}/pkgconfig/*
+%{_includedir}/*
+%{_datadir}/gir-1.0/IBus-1.0.gir
+%{_datadir}/vala/vapi/ibus-1.0.vapi
 
 %files devel-docs
 %defattr(-,root,root,-)
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Sat Jun 12 2010 Peng Huang <shawn.p.huang@gmail.com> - 1.3.5-1
+- Update to 1.3.5
+- Support gtk3, gobject-introspection and vala.
+
 * Sat May 29 2010 Peng Huang <shawn.p.huang@gmail.com> - 1.3.4-2
 - Update to 1.3.4
 
