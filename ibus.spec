@@ -9,7 +9,7 @@
 
 Name:       ibus
 Version:    1.3.5
-Release:    2%{?dist}
+Release:    3%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -252,6 +252,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon Jun 28 2010 Matthias Clasen <mclasen@redhat.com> - 1.3.5-3
+- Rebuild against newer gtk
+
 * Tue Jun 22 2010 Colin Walters <walters@verbum.org> - 1.3.5-2
 - Bump Release to keep ahead of F-13
 
