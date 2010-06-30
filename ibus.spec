@@ -9,14 +9,14 @@
 
 Name:       ibus
 Version:    1.3.5
-Release:    3%{?dist}
+Release:    4%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
 URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
-# Patch0:     ibus-HEAD.patch
+Patch0:     ibus-HEAD.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -111,7 +111,6 @@ docs for ibus.
 Summary:    Developer documents for ibus
 Group:      Development/Libraries
 Requires:   %{name} = %{version}-%{release}
-Requires:   gtk-doc
 
 %description devel-docs
 The ibus-devel-docs package contains developer documentation for ibus
@@ -119,7 +118,7 @@ The ibus-devel-docs package contains developer documentation for ibus
 
 %prep
 %setup -q
-# %patch0 -p1
+%patch0 -p1
 
 %build
 %configure \
@@ -252,6 +251,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Jun 30 2010 Takao Fujiwara <takao.fujiwara1@gmail.com> - 1.3.5-4
+- Add patch from HEAD.
+
 * Mon Jun 28 2010 Matthias Clasen <mclasen@redhat.com> - 1.3.5-3
 - Rebuild against newer gtk
 
