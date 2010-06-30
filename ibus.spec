@@ -59,8 +59,6 @@ Requires(preun): GConf2 >= %{gconf2_version}
 Requires(post):  %{_sbindir}/alternatives
 Requires(postun):  %{_sbindir}/alternatives
 
-Obsoletes:  ibus-qt < 1.1.0
-
 %define _xinputconf %{_sysconfdir}/X11/xinit/xinput.d/ibus.conf
 
 %description
@@ -81,8 +79,9 @@ Summary:    IBus im module for gtk2
 Group:      System Environment/Libraries
 Requires:   %{name} = %{version}-%{release}
 Requires(post): glib2 >= %{glib_ver}
-Obsoletes:  ibus-gtk
-Provides:   ibus-gtk
+# Added for F14
+Obsoletes:  ibus-gtk < 1.3.5-1
+Provides:   ibus-gtk = %{version}-%{release}
 
 %description gtk2
 This package contains ibus im module for gtk2
@@ -251,6 +250,10 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Jun 30 2010 Jens Petersen <petersen@redhat.com>
+- version the ibus-gtk obsolete and provides
+- drop the old redundant ibus-qt obsoletes
+
 * Wed Jun 30 2010 Takao Fujiwara <takao.fujiwara1@gmail.com> - 1.3.5-4
 - Add patch from HEAD.
 
