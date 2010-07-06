@@ -8,8 +8,8 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.3.5
-Release:    4%{?dist}
+Version:    1.3.6
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -250,12 +250,12 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Tue Jul 06 2010 Takao Fujiwara <takao.fujiwara1@gmail.com> - 1.3.6-1
+- Update to 1.3.6
+
 * Wed Jun 30 2010 Jens Petersen <petersen@redhat.com>
 - version the ibus-gtk obsolete and provides
 - drop the old redundant ibus-qt obsoletes
-
-* Wed Jun 30 2010 Takao Fujiwara <takao.fujiwara1@gmail.com> - 1.3.5-4
-- Add patch from HEAD.
 
 * Mon Jun 28 2010 Matthias Clasen <mclasen@redhat.com> - 1.3.5-3
 - Rebuild against newer gtk
