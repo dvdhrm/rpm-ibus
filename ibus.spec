@@ -9,7 +9,7 @@
 
 Name:       ibus
 Version:    1.3.6
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -250,6 +250,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Jul 15 2010 Colin Walters <walters@verbum.org> - 1.3.6-2
+- Rebuild with new gobject-introspection
+
 * Tue Jul 06 2010 Takao Fujiwara <takao.fujiwara1@gmail.com> - 1.3.6-1
 - Update to 1.3.6
 
