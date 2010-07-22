@@ -9,7 +9,7 @@
 
 Name:       ibus
 Version:    1.3.6
-Release:    2%{?dist}
+Release:    3%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -250,6 +250,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Jul 21 2010 David Malcolm <dmalcolm@redhat.com> - 1.3.6-3
+- Rebuilt for https://fedoraproject.org/wiki/Features/Python_2.7/MassRebuild
+
 * Thu Jul 15 2010 Colin Walters <walters@verbum.org> - 1.3.6-2
 - Rebuild with new gobject-introspection
 
