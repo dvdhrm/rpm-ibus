@@ -9,7 +9,7 @@
 
 Name:       ibus
 Version:    1.3.6
-Release:    4%{?dist}
+Release:    5%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -250,6 +250,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Jul 28 2010 Mamoru Tasaka <mtasaka@ioa.s.u-tokyo.ac.jp> - 1.3.6-5
+- Rebuild against python 2.7
+
 * Thu Jul 22 2010 Jens Petersen <petersen@redhat.com> - 1.3.6-4
 - keep bumping ibus-gtk obsoletes to avoid upgrade problems
 
