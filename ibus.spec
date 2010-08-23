@@ -2,21 +2,24 @@
 %{!?gtk2_binary_version: %define gtk2_binary_version %(pkg-config  --variable=gtk_binary_version gtk+-2.0)}
 %{!?gtk3_binary_version: %define gtk3_binary_version %(pkg-config  --variable=gtk_binary_version gtk+-3.0)}
 
+%define have_libxkbfile 1
+
 %define glib_ver %([ -a %{_libdir}/pkgconfig/glib-2.0.pc ] && pkg-config --modversion glib-2.0 | cut -d. -f 1,2 || echo -n "999")
 %define gconf2_version 2.12.0
 %define dbus_python_version 0.83.0
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.3.6
-Release:    5%{?dist}
+Version:    1.3.7
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
 URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
-Patch0:     ibus-HEAD.patch
+# Patch0:     ibus-HEAD.patch
+Patch1:     ibus-541492-xkb.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -35,6 +38,9 @@ BuildRequires:  GConf2-devel
 BuildRequires:  pygobject2-devel
 BuildRequires:  intltool
 BuildRequires:  iso-codes-devel
+%if %have_libxkbfile
+BuildRequires:  libxkbfile-devel
+%endif
 
 Requires:   %{name}-libs = %{version}-%{release}
 Requires:   %{name}-gtk2 = %{version}-%{release}
@@ -117,9 +123,18 @@ The ibus-devel-docs package contains developer documentation for ibus
 
 %prep
 %setup -q
-%patch0 -p1
+# %patch0 -p1
+%if %have_libxkbfile
+%patch1 -p1 -b .xkb
+%endif
 
 %build
+%if %have_libxkbfile
+aclocal -I m4
+autoheader
+autoconf -f
+automake -a -c -f
+%endif
 %configure \
     --disable-static \
     --enable-gtk2 \
@@ -223,6 +238,10 @@ fi
 # %{_sysconfdir}/xdg/autostart/ibus.desktop
 %{_sysconfdir}/gconf/schemas/ibus.schemas
 %config %{_xinputconf}
+%if %have_libxkbfile
+%{_libexecdir}/ibus-engine-xkb
+%{_libexecdir}/ibus-xkb
+%endif
 
 %files libs
 %defattr(-,root,root,-)
@@ -250,6 +269,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon Aug 23 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.7-1
+- Update to 1.3.7
+
 * Wed Jul 28 2010 Mamoru Tasaka <mtasaka@ioa.s.u-tokyo.ac.jp> - 1.3.6-5
 - Rebuild against python 2.7
 
