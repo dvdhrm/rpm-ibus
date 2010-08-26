@@ -267,7 +267,7 @@ new file mode 100644
 index 0000000..b5f1a06
 --- /dev/null
 +++ b/ibus/xkblayout.py.in
-@@ -0,0 +1,86 @@
+@@ -0,0 +1,87 @@
 +# vim:set et sts=4 sw=4:
 +#
 +# ibus - The Input Bus
@@ -340,7 +340,8 @@ index 0000000..b5f1a06
 +        if need_us_layout:
 +            layout = layout + ",us"
 +        args.append(layout)
-+        os.spawnl(os.P_NOWAIT, *args)
++        pid = os.spawnl(os.P_NOWAIT, *args)
++        os.waitpid(pid, 0)
 +
 +    def set_default_layout(self, layout="default"):
 +        if self.__command == None:
