@@ -1,6 +1,6 @@
-From a3819467deea74b82c55a4cfc8cecd6285f54e00 Mon Sep 17 00:00:00 2001
+From 509ffdfc4b27f977f255f348c84743b4be40f25f Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Mon, 23 Aug 2010 11:31:55 +0900
+Date: Mon, 30 Aug 2010 10:58:41 +0900
 Subject: [PATCH] Add XKB layouts
 
 ---
@@ -11,7 +11,7 @@ Subject: [PATCH] Add XKB layouts
  ibus/__init__.py           |    2 +
  ibus/bus.py                |    3 +
  ibus/interface/iibus.py    |    3 +
- ibus/xkblayout.py.in       |   86 ++++++
+ ibus/xkblayout.py.in       |   91 ++++++
  ibus/xkbxml.py.in          |  337 +++++++++++++++++++++
  setup/main.py              |  228 ++++++++++++++-
  setup/setup.ui             |  300 +++++++++++++++++++-
@@ -28,7 +28,7 @@ Subject: [PATCH] Add XKB layouts
  xkb/xkblib.h               |   36 +++
  xkb/xkbxml.c               |  695 ++++++++++++++++++++++++++++++++++++++++++++
  xkb/xkbxml.h               |  188 ++++++++++++
- 24 files changed, 2941 insertions(+), 7 deletions(-)
+ 24 files changed, 2946 insertions(+), 7 deletions(-)
  create mode 100644 ibus/xkblayout.py.in
  create mode 100644 ibus/xkbxml.py.in
  create mode 100644 xkb/Makefile.am
@@ -264,10 +264,10 @@ index e63caa3..8b7b6f7 100644
  
 diff --git a/ibus/xkblayout.py.in b/ibus/xkblayout.py.in
 new file mode 100644
-index 0000000..b5f1a06
+index 0000000..75f925c
 --- /dev/null
 +++ b/ibus/xkblayout.py.in
-@@ -0,0 +1,87 @@
+@@ -0,0 +1,91 @@
 +# vim:set et sts=4 sw=4:
 +#
 +# ibus - The Input Bus
@@ -304,9 +304,11 @@ index 0000000..b5f1a06
 +        self.__config = config
 +        self.__command = command
 +        self.__default_layout = self.get_layout()
-+        self.__xkb_latin_layouts = list(self.__config.get_value("general",
-+                                                               "xkb_latin_layouts",
-+                                                               []))
++        self.__xkb_latin_layouts = []
++        if config != None:
++            self.__xkb_latin_layouts = list(self.__config.get_value("general",
++                                                                    "xkb_latin_layouts",
++                                                                    []))
 +
 +
 +    def get_layout(self):
@@ -324,10 +326,6 @@ index 0000000..b5f1a06
 +    def set_layout(self, layout="default"):
 +        if self.__command == None:
 +            return
-+        args = []
-+        args.append(self.__command)
-+        args.append(os.path.basename(self.__command))
-+        args.append("--set")
 +        layout = str(layout)
 +        if layout == "default":
 +            layout = self.__default_layout
@@ -339,6 +337,12 @@ index 0000000..b5f1a06
 +                break
 +        if need_us_layout:
 +            layout = layout + ",us"
++        if layout == self.get_layout():
++            return
++        args = []
++        args.append(self.__command)
++        args.append(os.path.basename(self.__command))
++        args.append("--set")
 +        args.append(layout)
 +        pid = os.spawnl(os.P_NOWAIT, *args)
 +        os.waitpid(pid, 0)

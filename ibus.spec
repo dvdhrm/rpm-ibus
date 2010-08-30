@@ -11,7 +11,7 @@
 
 Name:       ibus
 Version:    1.3.7
-Release:    2%{?dist}
+Release:    3%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -269,8 +269,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Thu Aug 26 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.7-2
+* Mon Aug 30 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.7-3
 - Fix #627107 and update ibus-541492-xkb.patch
+- Fix #628161 and update ibus-541492-xkb.patch
 
 * Mon Aug 23 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.7-1
 - Update to 1.3.7
