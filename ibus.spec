@@ -11,7 +11,7 @@
 
 Name:       ibus
 Version:    1.3.7
-Release:    3%{?dist}
+Release:    4%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -19,7 +19,12 @@ URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
 # Patch0:     ibus-HEAD.patch
-Patch1:     ibus-541492-xkb.patch
+Patch1:     ibus-621795-engineproxy-segv.patch
+Patch2:     ibus-626652-leak.patch
+# Patch3:     ibus-xx-va_list.patch
+# Patch4:     ibus-530711-preload-sys.patch
+Patch5:     ibus-541492-xkb.patch
+Patch6:     ibus-435880-surrounding-text.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -124,9 +129,14 @@ The ibus-devel-docs package contains developer documentation for ibus
 %prep
 %setup -q
 # %patch0 -p1
+%patch1 -p1 -b .segv
+%patch2 -p1 -b .leak
+# %patch3 -p1 -b .valist
+# %patch4 -p1 -b .preload-sys
 %if %have_libxkbfile
-%patch1 -p1 -b .xkb
+%patch5 -p1 -b .xkb
 %endif
+%patch6 -p1 -b .surrounding
 
 %build
 %if %have_libxkbfile
@@ -269,9 +279,15 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Mon Aug 30 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.7-3
-- Fix #627107 and update ibus-541492-xkb.patch
-- Fix #628161 and update ibus-541492-xkb.patch
+* Tue Sep 14 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.7-4
+- Added ibus-621795-engineproxy-segv.patch
+  Fixes crash in ibus_object_destroy
+- Added ibus-626652-leak.patch
+  Fixes Bug 626652 - ibus memory leak with ibus_input_context_process_key_event
+- Added ibus-541492-xkb.patch
+  Fixes Bug 541492 - ibus needs to support some xkb layout switching
+- Added ibus-435880-surrounding-text.patch
+  Fixes Bug 435880 - ibus-gtk requires surrounding-text support
 
 * Mon Aug 23 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.7-1
 - Update to 1.3.7
