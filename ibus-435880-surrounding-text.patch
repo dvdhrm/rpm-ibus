@@ -1,6 +1,6 @@
-From 34e8a6e359ac7c44ec6e66776feb8b47d12ec2c2 Mon Sep 17 00:00:00 2001
+From 808fee2b1148fda896055328a680666ed29d9d93 Mon Sep 17 00:00:00 2001
 From: Daiki Ueno <ueno@unixuser.org>
-Date: Tue, 14 Sep 2010 10:09:56 +0900
+Date: Tue, 14 Sep 2010 19:51:24 +0900
 Subject: [PATCH] Support surrounding-text retrieval.
 
 This change adds a new API function ibus_engine_get_surrounding_text().
@@ -22,17 +22,20 @@ Also,
 - destroy
 resets the current surrounding-text.
 ---
- bus/engineproxy.c           |   14 ++++++
- bus/engineproxy.h           |    4 ++
- bus/inputcontext.c          |   67 +++++++++++++++++++++++++++++++
- bus/inputcontext.h          |    4 ++
- client/gtk2/ibusimcontext.c |   84 +++++++++++++++++++++++++++++++++++---
- src/ibusengine.c            |   93 +++++++++++++++++++++++++++++++++++++++++++
- src/ibusengine.h            |   21 +++++++++-
- src/ibusinputcontext.c      |   14 ++++++
- src/ibusinputcontext.h      |   11 +++++
- src/ibusmarshalers.list     |    1 +
- 10 files changed, 305 insertions(+), 8 deletions(-)
+ bus/engineproxy.c               |   14 ++++++
+ bus/engineproxy.h               |    4 ++
+ bus/inputcontext.c              |   67 ++++++++++++++++++++++++++++
+ bus/inputcontext.h              |    4 ++
+ client/gtk2/ibusimcontext.c     |   84 ++++++++++++++++++++++++++++++++---
+ ibus/engine.py                  |    6 +++
+ ibus/interface/iengine.py       |    3 +
+ ibus/interface/iinputcontext.py |    3 +
+ src/ibusengine.c                |   93 +++++++++++++++++++++++++++++++++++++++
+ src/ibusengine.h                |   21 ++++++++-
+ src/ibusinputcontext.c          |   14 ++++++
+ src/ibusinputcontext.h          |   11 +++++
+ src/ibusmarshalers.list         |    1 +
+ 13 files changed, 317 insertions(+), 8 deletions(-)
 
 diff --git a/bus/engineproxy.c b/bus/engineproxy.c
 index 64dda4f..4193a30 100644
@@ -370,6 +373,58 @@ index 2ddae8c..09a2260 100644
  }
  
  #ifdef OS_CHROMEOS
+diff --git a/ibus/engine.py b/ibus/engine.py
+index b1df2fe..ec42fa4 100644
+--- a/ibus/engine.py
++++ b/ibus/engine.py
+@@ -46,6 +46,9 @@ class EngineBase(object.Object):
+     def set_cursor_location(self, x, y, w, h):
+         pass
+ 
++    def set_surrounding_text(self, text, cursor_index):
++        pass
++
+     def set_capabilities(self, cap):
+         pass
+ 
+@@ -163,6 +166,9 @@ class EngineProxy(interface.IEngine):
+     def SetCursorLocation(self, x, y, w, h):
+         return self.__engine.set_cursor_location(x, y, w, h)
+ 
++    def SetSurroundingText(self, text, cursor_index):
++        return self.__engine.set_surrounding_text(text, cursor_index)
++
+     def SetCapabilities(self, caps):
+         return self.__engine.set_capabilities(caps)
+ 
+diff --git a/ibus/interface/iengine.py b/ibus/interface/iengine.py
+index 4d42c2d..ee23efe 100644
+--- a/ibus/interface/iengine.py
++++ b/ibus/interface/iengine.py
+@@ -50,6 +50,9 @@ class IEngine(dbus.service.Object):
+     @method(in_signature="iiii")
+     def SetCursorLocation(self, x, y, w, h): pass
+ 
++    @method(in_signature="vu")
++    def SetSurroundingText(self, text, cursor_index): pass
++
+     @method(in_signature="u")
+     def SetCapabilities(self, cap): pass
+ 
+diff --git a/ibus/interface/iinputcontext.py b/ibus/interface/iinputcontext.py
+index 89f6dbd..2db1c9b 100644
+--- a/ibus/interface/iinputcontext.py
++++ b/ibus/interface/iinputcontext.py
+@@ -49,6 +49,9 @@ class IInputContext(dbus.service.Object):
+     @method(in_signature="iiii")
+     def SetCursorLocation(self, x, y, w, h): pass
+ 
++    @method(in_signature="vu")
++    def SetSurroundingText(self, text, cursor_index): pass
++
+     @method()
+     def FocusIn(self): pass
+ 
 diff --git a/src/ibusengine.c b/src/ibusengine.c
 index 899d7c8..a5101bb 100644
 --- a/src/ibusengine.c

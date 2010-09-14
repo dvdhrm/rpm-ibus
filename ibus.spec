@@ -11,7 +11,7 @@
 
 Name:       ibus
 Version:    1.3.7
-Release:    4%{?dist}
+Release:    5%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -279,7 +279,7 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Tue Sep 14 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.7-4
+* Tue Sep 14 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.7-5
 - Added ibus-621795-engineproxy-segv.patch
   Fixes crash in ibus_object_destroy
 - Added ibus-626652-leak.patch
