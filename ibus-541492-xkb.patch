@@ -729,7 +729,7 @@ index c6612d2..b8dd1cf 100644
          # use global ime setting
          self.__checkbutton_use_global_engine = self.__builder.get_object("checkbutton_use_global_engine")
          self.__checkbutton_use_global_engine.set_active(
-@@ -233,6 +243,145 @@ class Setup(object):
+@@ -223,6 +233,145 @@ class Setup(object):
          self.__combobox.connect("notify::active-engine", self.__combobox_notify_active_engine_cb)
          self.__treeview.connect("notify", self.__treeview_notify_cb)
  
@@ -875,9 +875,9 @@ index c6612d2..b8dd1cf 100644
      def __combobox_notify_active_engine_cb(self, combobox, property):
          engine = self.__combobox.get_active_engine()
          button = self.__builder.get_object("button_engine_add")
-@@ -282,6 +431,80 @@ class Setup(object):
-         dlg.run()
-         dlg.destroy()
+@@ -255,6 +404,80 @@ class Setup(object):
+             about.run()
+             about.destroy()
  
 +    def __button_config_layouts_cb(self, button):
 +        self.__dialog_config_layouts.run()
@@ -956,7 +956,7 @@ index c6612d2..b8dd1cf 100644
      def __init_bus(self):
          try:
              self.__bus = ibus.Bus()
-@@ -470,6 +693,7 @@ class Setup(object):
+@@ -439,6 +662,7 @@ class Setup(object):
      def __checkbutton_use_sys_layout_toggled_cb(self, button):
          value = self.__checkbutton_use_sys_layout.get_active()
          self.__config.set_value("general", "use_system_keyboard_layout", value)
