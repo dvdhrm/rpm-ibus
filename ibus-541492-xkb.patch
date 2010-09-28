@@ -1,6 +1,6 @@
-From 21ebb5e408f048561d845231062165bf154fde8e Mon Sep 17 00:00:00 2001
+From 84003d36b7a2bf7b52faec42311c4904e44b606d Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Tue, 14 Sep 2010 19:49:33 +0900
+Date: Tue, 28 Sep 2010 10:11:44 +0900
 Subject: [PATCH] Add XKB layouts
 
 ---
@@ -923,7 +923,7 @@ index c6612d2..fd2995b 100644
          # use global ime setting
          self.__checkbutton_use_global_engine = self.__builder.get_object("checkbutton_use_global_engine")
          self.__checkbutton_use_global_engine.set_active(
-@@ -223,6 +234,160 @@ class Setup(object):
+@@ -233,6 +244,160 @@ class Setup(object):
          self.__combobox.connect("notify::active-engine", self.__combobox_notify_active_engine_cb)
          self.__treeview.connect("notify", self.__treeview_notify_cb)
  
@@ -1084,7 +1084,7 @@ index c6612d2..fd2995b 100644
      def __combobox_notify_active_engine_cb(self, combobox, property):
          engine = self.__combobox.get_active_engine()
          button = self.__builder.get_object("button_engine_add")
-@@ -255,6 +420,114 @@ class Setup(object):
+@@ -282,6 +447,114 @@ class Setup(object):
              about.run()
              about.destroy()
  
@@ -1199,7 +1199,7 @@ index c6612d2..fd2995b 100644
      def __init_bus(self):
          try:
              self.__bus = ibus.Bus()
-@@ -439,6 +712,7 @@ class Setup(object):
+@@ -470,6 +743,7 @@ class Setup(object):
      def __checkbutton_use_sys_layout_toggled_cb(self, button):
          value = self.__checkbutton_use_sys_layout.get_active()
          self.__config.set_value("general", "use_system_keyboard_layout", value)
@@ -1786,10 +1786,10 @@ index 0000000..3d942be
 +        return self.get_property("active-engine")
 +
 diff --git a/src/ibusfactory.c b/src/ibusfactory.c
-index e0ec2a5..c70bfde 100644
+index 0a95108..3acd6a6 100644
 --- a/src/ibusfactory.c
 +++ b/src/ibusfactory.c
-@@ -28,6 +28,7 @@
+@@ -29,6 +29,7 @@
     (G_TYPE_INSTANCE_GET_PRIVATE ((o), IBUS_TYPE_FACTORY, IBusFactoryPrivate))
  
  enum {
@@ -1797,7 +1797,7 @@ index e0ec2a5..c70bfde 100644
      LAST_SIGNAL,
  };
  
-@@ -45,6 +46,8 @@ struct _IBusFactoryPrivate {
+@@ -46,6 +47,8 @@ struct _IBusFactoryPrivate {
  };
  typedef struct _IBusFactoryPrivate IBusFactoryPrivate;
  
@@ -1806,7 +1806,7 @@ index e0ec2a5..c70bfde 100644
  /* functions prototype */
  static void     ibus_factory_destroy        (IBusFactory        *factory);
  static void     ibus_factory_set_property   (IBusFactory        *engine,
-@@ -111,7 +114,16 @@ ibus_factory_class_init (IBusFactoryClass *klass)
+@@ -112,7 +115,16 @@ ibus_factory_class_init (IBusFactoryClass *klass)
                  IBUS_TYPE_CONNECTION,
                  G_PARAM_READWRITE |  G_PARAM_CONSTRUCT_ONLY));
  
@@ -1824,7 +1824,7 @@ index e0ec2a5..c70bfde 100644
  }
  
  static void
-@@ -245,6 +257,9 @@ ibus_factory_ibus_message (IBusFactory    *factory,
+@@ -246,6 +258,9 @@ ibus_factory_ibus_message (IBusFactory    *factory,
              return TRUE;
          }
  
@@ -1835,10 +1835,10 @@ index e0ec2a5..c70bfde 100644
  
          if (engine_type == G_TYPE_INVALID) {
 diff --git a/src/ibusfactory.h b/src/ibusfactory.h
-index e92c810..570e464 100644
+index 515083d..42c29b9 100644
 --- a/src/ibusfactory.h
 +++ b/src/ibusfactory.h
-@@ -117,10 +117,13 @@ struct _IBusFactoryClass {
+@@ -118,10 +118,13 @@ struct _IBusFactoryClass {
      IBusServiceClass parent;
  
      /* signals */
