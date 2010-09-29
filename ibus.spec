@@ -11,7 +11,7 @@
 
 Name:       ibus
 Version:    1.3.7
-Release:    7%{?dist}
+Release:    8%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -21,10 +21,11 @@ Source1:    xinput-ibus
 # Patch0:     ibus-HEAD.patch
 Patch1:     ibus-621795-engineproxy-segv.patch
 Patch2:     ibus-626652-leak.patch
-# Patch3:     ibus-xx-va_list.patch
-# Patch4:     ibus-530711-preload-sys.patch
-Patch5:     ibus-541492-xkb.patch
-Patch6:     ibus-435880-surrounding-text.patch
+Patch3:     ibus-xx-g-ir-compiler.patch
+# Patch4:     ibus-xx-va_list.patch
+# Patch5:     ibus-530711-preload-sys.patch
+Patch6:     ibus-541492-xkb.patch
+Patch7:     ibus-435880-surrounding-text.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -131,12 +132,13 @@ The ibus-devel-docs package contains developer documentation for ibus
 # %patch0 -p1
 %patch1 -p1 -b .segv
 %patch2 -p1 -b .leak
-# %patch3 -p1 -b .valist
-# %patch4 -p1 -b .preload-sys
+%patch3 -p1 -b .gir
+# %patch4 -p1 -b .valist
+# %patch5 -p1 -b .preload-sys
 %if %have_libxkbfile
-%patch5 -p1 -b .xkb
+%patch6 -p1 -b .xkb
 %endif
-%patch6 -p1 -b .surrounding
+%patch7 -p1 -b .surrounding
 
 %build
 %if %have_libxkbfile
@@ -279,7 +281,8 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Wed Sep 29 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.7-7
+* Wed Sep 29 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.7-8
+- Added ibus-xx-g-ir-compiler.patch to fix g-ir-compiler error.
 - Updated ibus-435880-surrounding-text.patch
   Fixes Bug 634829 - ibus_im_context_set_surrounding() to get strings.
 

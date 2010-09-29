@@ -1,0 +1,32 @@
+--- ibus-1.3.7/src/Makefile.am.orig	2010-09-29 15:46:18.941239947 +0900
++++ ibus-1.3.7/src/Makefile.am	2010-09-29 15:45:50.288225017 +0900
+@@ -139,7 +139,7 @@ introspection_files = \
+ 		$(NULL)
+ IBus-1.0.gir: $(ibustargetlib) Makefile
+ IBus_1_0_gir_SCANNERFLAGS = --strip-prefix=IBus --pkg=dbus-1,glib-2.0
+-IBus_1_0_gir_INCLUDES = GLib-2.0 GObject-2.0
++IBus_1_0_gir_INCLUDES = GLib-2.0 GObject-2.0 DBus-1.0
+ IBus_1_0_gir_LIBS = $(ibustargetlib)
+ IBus_1_0_gir_FILES = $(addprefix $(srcdir)/,$(introspection_files))
+ IBus_1_0_gir_CFLAGS = $(INCLUDES)
+--- ibus-1.3.7/src/Makefile.in.orig	2010-09-29 15:46:30.076225797 +0900
++++ ibus-1.3.7/src/Makefile.in	2010-09-29 15:47:13.322226068 +0900
+@@ -537,7 +537,7 @@ ibusincludedir = $(includedir)/ibus-1.0
+ @HAVE_INTROSPECTION_TRUE@		$(NULL)
+ 
+ @HAVE_INTROSPECTION_TRUE@IBus_1_0_gir_SCANNERFLAGS = --strip-prefix=IBus --pkg=dbus-1,glib-2.0
+-@HAVE_INTROSPECTION_TRUE@IBus_1_0_gir_INCLUDES = GLib-2.0 GObject-2.0
++@HAVE_INTROSPECTION_TRUE@IBus_1_0_gir_INCLUDES = GLib-2.0 GObject-2.0 DBus-1.0
+ @HAVE_INTROSPECTION_TRUE@IBus_1_0_gir_LIBS = $(ibustargetlib)
+ @HAVE_INTROSPECTION_TRUE@IBus_1_0_gir_FILES = $(addprefix $(srcdir)/,$(introspection_files))
+ @HAVE_INTROSPECTION_TRUE@IBus_1_0_gir_CFLAGS = $(INCLUDES)
+--- ibus-1.3.7/client/gtk3/ibusimcontext.c.orig	2010-09-29 16:05:47.435225305 +0900
++++ ibus-1.3.7/client/gtk3/ibusimcontext.c	2010-09-29 16:06:15.385224305 +0900
+@@ -24,6 +24,7 @@
+ #endif
+ 
+ #include <gdk/gdkkeysyms.h>
++#include <gdk/gdkkeysyms-compat.h>
+ #include <gdk/gdkx.h>
+ #include <sys/types.h>
+ #include <sys/socket.h>
