@@ -1,6 +1,6 @@
-From 1a1f0ce17184ca1a67137cf5fade3d250f2aaac2 Mon Sep 17 00:00:00 2001
+From d4b10b2e9aec0e1fb0674bab70c439ccc91ea07b Mon Sep 17 00:00:00 2001
 From: Daiki Ueno <ueno@unixuser.org>
-Date: Tue, 28 Sep 2010 10:30:27 +0900
+Date: Wed, 29 Sep 2010 13:40:58 +0900
 Subject: [PATCH] Support surrounding-text retrieval.
 
 This change adds a new API function ibus_engine_get_surrounding_text().
@@ -22,22 +22,22 @@ Also,
 - destroy
 resets the current surrounding-text.
 ---
- bus/engineproxy.c               |   42 +++++++++++++-
+ bus/engineproxy.c               |   34 +++++++++++
  bus/engineproxy.h               |    7 ++
  bus/inputcontext.c              |   48 ++++++++++++++++
- client/gtk2/ibusimcontext.c     |   85 ++++++++++++++++++++++++++--
+ client/gtk2/ibusimcontext.c     |   80 ++++++++++++++++++++++++--
  ibus/engine.py                  |    6 ++
  ibus/interface/iengine.py       |    3 +
  ibus/interface/iinputcontext.py |    3 +
- src/ibusengine.c                |  117 ++++++++++++++++++++++++++++++++++++++-
- src/ibusengine.h                |   20 ++++++-
- src/ibusinputcontext.c          |   48 ++++++++++++++++-
+ src/ibusengine.c                |  119 +++++++++++++++++++++++++++++++++++++++
+ src/ibusengine.h                |   21 +++++++-
+ src/ibusinputcontext.c          |   43 ++++++++++++++
  src/ibusinputcontext.h          |   11 ++++
  src/ibusmarshalers.list         |    1 +
- 12 files changed, 377 insertions(+), 14 deletions(-)
+ 12 files changed, 368 insertions(+), 8 deletions(-)
 
 diff --git a/bus/engineproxy.c b/bus/engineproxy.c
-index 03592d7..ca5a8f3 100644
+index 03592d7..915f999 100644
 --- a/bus/engineproxy.c
 +++ b/bus/engineproxy.c
 @@ -52,6 +52,8 @@ enum {
@@ -53,7 +53,7 @@ index 03592d7..ca5a8f3 100644
              1,
              IBUS_TYPE_PROPERTY);
  
-+    text_empty = ibus_text_new_from_string ("");
++    text_empty = ibus_text_new_from_static_string ("");
 +    g_object_ref_sink (text_empty);
  }
  
@@ -79,26 +79,13 @@ index 03592d7..ca5a8f3 100644
      IBUS_OBJECT_CLASS(bus_engine_proxy_parent_class)->destroy (IBUS_OBJECT (engine));
  }
  
-@@ -721,8 +732,9 @@ bus_engine_proxy_property_show (BusEngineProxy *engine,
+@@ -733,6 +744,29 @@ void bus_engine_proxy_property_hide (BusEngineProxy *engine,
                       G_TYPE_INVALID);
  }
  
--void bus_engine_proxy_property_hide (BusEngineProxy *engine,
--                                     const gchar    *prop_name)
-+void
-+bus_engine_proxy_property_hide (BusEngineProxy *engine,
-+                                const gchar    *prop_name)
- {
-     g_assert (BUS_IS_ENGINE_PROXY (engine));
-     g_assert (prop_name != NULL);
-@@ -733,6 +745,32 @@ void bus_engine_proxy_property_hide (BusEngineProxy *engine,
-                      G_TYPE_INVALID);
- }
- 
-+void
-+bus_engine_proxy_set_surrounding_text (BusEngineProxy *engine,
-+                                       IBusText       *text,
-+                                       guint           cursor_pos)
++void bus_engine_proxy_set_surrounding_text (BusEngineProxy *engine,
++                                            IBusText       *text,
++                                            guint           cursor_pos)
 +{
 +    g_assert (BUS_IS_ENGINE_PROXY (engine));
 +    g_assert (text != NULL);
@@ -106,10 +93,8 @@ index 03592d7..ca5a8f3 100644
 +    if (!engine->surrounding_text ||
 +        g_strcmp0 (text->text, engine->surrounding_text->text) != 0 ||
 +        cursor_pos != engine->surrounding_cursor_pos) {
-+        if (engine->surrounding_text) {
++        if (engine->surrounding_text)
 +            g_object_unref (engine->surrounding_text);
-+        }
-+
 +        engine->surrounding_text = (IBusText *) g_object_ref_sink (text);
 +        engine->surrounding_cursor_pos = cursor_pos;
 +
@@ -222,7 +207,7 @@ index b5ab201..1aa9f21 100644
  
      ibus_message_set_sender (message, bus_connection_get_unique_name (connection));
 diff --git a/client/gtk2/ibusimcontext.c b/client/gtk2/ibusimcontext.c
-index c104f38..7b4b97c 100644
+index c104f38..86350f5 100644
 --- a/client/gtk2/ibusimcontext.c
 +++ b/client/gtk2/ibusimcontext.c
 @@ -107,6 +107,12 @@ static void     ibus_im_context_set_cursor_location
@@ -309,7 +294,7 @@ index c104f38..7b4b97c 100644
  }
  
  static void
-@@ -706,6 +730,44 @@ ibus_im_context_set_use_preedit (GtkIMContext *context, gboolean use_preedit)
+@@ -706,6 +730,39 @@ ibus_im_context_set_use_preedit (GtkIMContext *context, gboolean use_preedit)
  }
  
  static void
@@ -318,15 +303,13 @@ index c104f38..7b4b97c 100644
 +                                 gint           len,
 +                                 gint           cursor_index)
 +{
-+    IBusIMContext *ibusimcontext;
-+
 +    g_return_if_fail (context != NULL);
 +    g_return_if_fail (IBUS_IS_IM_CONTEXT (context));
 +    g_return_if_fail (text != NULL);
 +    g_return_if_fail (strlen (text) >= len);
 +    g_return_if_fail (0 <= cursor_index && cursor_index <= len);
 +
-+    ibusimcontext = IBUS_IM_CONTEXT (context);
++    IBusIMContext *ibusimcontext = IBUS_IM_CONTEXT (context);
 +
 +    if (ibusimcontext->enable && ibusimcontext->ibuscontext) {
 +        IBusText *ibustext;
@@ -337,13 +320,10 @@ index c104f38..7b4b97c 100644
 +        cursor_pos = g_utf8_strlen (p, cursor_index);
 +        ibustext = ibus_text_new_from_string (p);
 +        g_free (p);
-+        g_object_ref_sink (ibustext);
 +        ibus_input_context_set_surrounding_text (ibusimcontext->ibuscontext,
 +                                                 ibustext,
 +                                                 cursor_pos);
-+        g_object_unref (ibustext);
 +    }
-+
 +    gtk_im_context_set_surrounding (ibusimcontext->slave,
 +                                    text,
 +                                    len,
@@ -354,7 +334,7 @@ index c104f38..7b4b97c 100644
  _bus_connected_cb (IBusBus          *bus,
                     IBusIMContext    *ibusimcontext)
  {
-@@ -724,6 +786,8 @@ _ibus_context_commit_text_cb (IBusInputContext *ibuscontext,
+@@ -724,6 +781,8 @@ _ibus_context_commit_text_cb (IBusInputContext *ibuscontext,
      IDEBUG ("%s", __FUNCTION__);
  
      g_signal_emit (ibusimcontext, _signal_commit_id, 0, text->text);
@@ -363,7 +343,7 @@ index c104f38..7b4b97c 100644
  }
  
  static gboolean
-@@ -954,6 +1018,8 @@ _ibus_context_show_preedit_text_cb (IBusInputContext   *ibuscontext,
+@@ -954,6 +1013,8 @@ _ibus_context_show_preedit_text_cb (IBusInputContext   *ibuscontext,
      ibusimcontext->preedit_visible = TRUE;
      g_signal_emit (ibusimcontext, _signal_preedit_start_id, 0);
      g_signal_emit (ibusimcontext, _signal_preedit_changed_id, 0);
@@ -372,7 +352,7 @@ index c104f38..7b4b97c 100644
  }
  
  static void
-@@ -1118,17 +1184,21 @@ _slave_preedit_end_cb (GtkIMContext  *slave,
+@@ -1118,17 +1179,21 @@ _slave_preedit_end_cb (GtkIMContext  *slave,
      g_signal_emit (ibusimcontext, _signal_preedit_end_id, 0);
  }
  
@@ -398,7 +378,7 @@ index c104f38..7b4b97c 100644
  _slave_delete_surrounding_cb (GtkIMContext  *slave,
                                gint           offset_from_cursor,
                                guint          nchars,
-@@ -1137,9 +1207,10 @@ _slave_delete_surrounding_cb (GtkIMContext  *slave,
+@@ -1137,9 +1202,10 @@ _slave_delete_surrounding_cb (GtkIMContext  *slave,
      gboolean return_value;
  
      if (ibusimcontext->enable && ibusimcontext->ibuscontext) {
@@ -463,7 +443,7 @@ index 89f6dbd..2db1c9b 100644
      def FocusIn(self): pass
  
 diff --git a/src/ibusengine.c b/src/ibusengine.c
-index b5f53d4..a517aad 100644
+index b5f53d4..da1e643 100644
 --- a/src/ibusengine.c
 +++ b/src/ibusengine.c
 @@ -45,6 +45,7 @@ enum {
@@ -535,7 +515,7 @@ index b5f53d4..a517aad 100644
 +            G_TYPE_OBJECT,
 +            G_TYPE_UINT);
 +
-+    text_empty = ibus_text_new_from_string ("");
++    text_empty = ibus_text_new_from_static_string ("");
 +    g_object_ref_sink (text_empty);
  }
  
@@ -562,7 +542,7 @@ index b5f53d4..a517aad 100644
      IBUS_OBJECT_CLASS(ibus_engine_parent_class)->destroy (IBUS_OBJECT (engine));
  }
  
-@@ -879,6 +921,37 @@ ibus_engine_ibus_message (IBusEngine     *engine,
+@@ -879,6 +921,33 @@ ibus_engine_ibus_message (IBusEngine     *engine,
              ibus_object_destroy ((IBusObject *) engine);
              return TRUE;
          }
@@ -584,23 +564,19 @@ index b5f53d4..a517aad 100644
 +                ibus_error_free (error);
 +            }
 +            else {
-+                if (priv->surrounding_text) {
-+                    g_object_unref (priv->surrounding_text);
-+                }
-+
-+                priv->surrounding_text = (IBusText *) g_object_ref_sink (text ? text : text_empty);
-+                priv->surrounding_cursor_pos = cursor_pos;
-+
 +                g_signal_emit (engine, engine_signals[SET_SURROUNDING_TEXT], 0,
-+                               priv->surrounding_text,
-+                               priv->surrounding_cursor_pos);
++                               text,
++                               cursor_pos);
++                if (g_object_is_floating (text)) {
++                    g_object_unref (text);
++                }
 +                reply = ibus_message_new_method_return (message);
 +            }
 +        }
          else {
              reply = ibus_message_new_error_printf (message,
                          DBUS_ERROR_UNKNOWN_METHOD,
-@@ -1003,6 +1076,14 @@ ibus_engine_property_hide (IBusEngine *engine, const gchar *prop_name)
+@@ -1003,6 +1072,26 @@ ibus_engine_property_hide (IBusEngine *engine, const gchar *prop_name)
  }
  
  static void
@@ -608,6 +584,18 @@ index b5f53d4..a517aad 100644
 +                                  IBusText   *text,
 +                                  guint       cursor_pos)
 +{
++    g_assert (IBUS_IS_ENGINE (engine));
++
++    IBusEnginePrivate *priv;
++
++    priv = IBUS_ENGINE_GET_PRIVATE (engine);
++
++    if (priv->surrounding_text) {
++        g_object_unref (priv->surrounding_text);
++    }
++
++    priv->surrounding_text = (IBusText *) g_object_ref_sink (text ? text : text_empty);
++    priv->surrounding_cursor_pos = cursor_pos;
 +    // g_debug ("set-surrounding-text ('%s', %d)", text->text, cursor_pos);
 +}
 +
@@ -615,21 +603,13 @@ index b5f53d4..a517aad 100644
  _send_signal (IBusEngine  *engine,
                const gchar *name,
                GType        first_arg_type,
-@@ -1199,10 +1280,24 @@ void ibus_engine_forward_key_event (IBusEngine      *engine,
-                   G_TYPE_INVALID);
- }
- 
--void ibus_engine_delete_surrounding_text (IBusEngine      *engine,
--                                          gint             offset_from_cursor,
--                                          guint            nchars)
-+void
-+ibus_engine_delete_surrounding_text (IBusEngine      *engine,
-+                                     gint             offset_from_cursor,
-+                                     guint            nchars)
+@@ -1203,6 +1292,19 @@ void ibus_engine_delete_surrounding_text (IBusEngine      *engine,
+                                           gint             offset_from_cursor,
+                                           guint            nchars)
  {
-+    IBusEnginePrivate *priv;
-+
 +    g_assert (IBUS_IS_ENGINE (engine));
++
++    IBusEnginePrivate *priv;
 +
 +    priv = IBUS_ENGINE_GET_PRIVATE (engine);
 +
@@ -643,7 +623,7 @@ index b5f53d4..a517aad 100644
      _send_signal (engine,
                    "DeleteSurroundingText",
                    G_TYPE_INT,  &offset_from_cursor,
-@@ -1211,6 +1306,22 @@ void ibus_engine_delete_surrounding_text (IBusEngine      *engine,
+@@ -1211,6 +1313,23 @@ void ibus_engine_delete_surrounding_text (IBusEngine      *engine,
  }
  
  void
@@ -653,12 +633,13 @@ index b5f53d4..a517aad 100644
 +{
 +    IBusEnginePrivate *priv;
 +
++    g_return_if_fail (IBUS_IS_ENGINE (engine));
 +    g_return_if_fail (text != NULL);
 +    g_return_if_fail (cursor_pos != NULL);
 +
 +    priv = IBUS_ENGINE_GET_PRIVATE (engine);
 +
-+    *text = ibus_text_new_from_string (priv->surrounding_text->text);
++    *text = g_object_ref (priv->surrounding_text);
 +    *cursor_pos = priv->surrounding_cursor_pos;
 +}
 +
@@ -667,7 +648,7 @@ index b5f53d4..a517aad 100644
                                   IBusPropList *prop_list)
  {
 diff --git a/src/ibusengine.h b/src/ibusengine.h
-index 95be408..56b1704 100644
+index 95be408..2c6e1d3 100644
 --- a/src/ibusengine.h
 +++ b/src/ibusengine.h
 @@ -124,10 +124,14 @@ struct _IBusEngineClass {
@@ -686,7 +667,7 @@ index 95be408..56b1704 100644
  };
  
  GType        ibus_engine_get_type       (void);
-@@ -367,6 +371,20 @@ void ibus_engine_delete_surrounding_text(IBusEngine         *engine,
+@@ -367,6 +371,21 @@ void ibus_engine_delete_surrounding_text(IBusEngine         *engine,
                                           guint               nchars);
  
  /**
@@ -703,20 +684,19 @@ index 95be408..56b1704 100644
 +                                      IBusText          **text,
 +                                      guint              *cursor_pos);
 +
++
 +/**
   * ibus_engine_get_name:
   * @engine: An IBusEngine.
   * @returns: Name of IBusEngine.
 diff --git a/src/ibusinputcontext.c b/src/ibusinputcontext.c
-index b00ad3b..a55c2c6 100644
+index b00ad3b..158979e 100644
 --- a/src/ibusinputcontext.c
 +++ b/src/ibusinputcontext.c
-@@ -57,13 +57,19 @@ enum {
- 
+@@ -58,12 +58,18 @@ enum {
  /* BusInputContextPriv */
  struct _IBusInputContextPrivate {
--    gboolean own;
-+    gboolean  own;
+     gboolean own;
 +
 +    /* surrounding text */
 +    IBusText *surrounding_text;
@@ -737,7 +717,7 @@ index b00ad3b..a55c2c6 100644
              1,
              IBUS_TYPE_PROPERTY);
 +
-+    text_empty = ibus_text_new_from_string ("");
++    text_empty = ibus_text_new_from_static_string ("");
 +    g_object_ref_sink (text_empty);
  }
  
@@ -763,7 +743,7 @@ index b00ad3b..a55c2c6 100644
      IBUS_OBJECT_CLASS(ibus_input_context_parent_class)->destroy (IBUS_OBJECT (context));
  }
  
-@@ -914,6 +930,36 @@ ibus_input_context_property_hide (IBusInputContext *context,
+@@ -914,6 +930,33 @@ ibus_input_context_property_hide (IBusInputContext *context,
                       G_TYPE_INVALID);
  }
  
@@ -772,20 +752,17 @@ index b00ad3b..a55c2c6 100644
 +                                         IBusText           *text,
 +                                         guint32             cursor_pos)
 +{
-+    IBusInputContextPrivate *priv;
-+
 +    g_assert (IBUS_IS_INPUT_CONTEXT (context));
 +    g_assert (IBUS_IS_TEXT (text));
 +
++    IBusInputContextPrivate *priv;
 +    priv = IBUS_INPUT_CONTEXT_GET_PRIVATE (context);
 +
 +    if (priv->surrounding_text == NULL ||
 +        g_strcmp0 (text->text, priv->surrounding_text->text) != 0 ||
 +        cursor_pos != priv->surrounding_cursor_pos) {
-+        if (priv->surrounding_text) {
++        if (priv->surrounding_text)
 +            g_object_unref (priv->surrounding_text);
-+        }
-+
 +        priv->surrounding_text = (IBusText *) g_object_ref_sink (text);
 +        priv->surrounding_cursor_pos = cursor_pos;
 +

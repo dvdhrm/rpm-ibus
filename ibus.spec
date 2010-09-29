@@ -11,7 +11,7 @@
 
 Name:       ibus
 Version:    1.3.7
-Release:    6%{?dist}
+Release:    7%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -279,7 +279,7 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Tue Sep 28 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.7-6
+* Wed Sep 29 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.7-7
 - Updated ibus-435880-surrounding-text.patch
   Fixes Bug 634829 - ibus_im_context_set_surrounding() to get strings.
 
