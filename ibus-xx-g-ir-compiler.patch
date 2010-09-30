@@ -27,7 +27,7 @@ index c104f38..a7a2c59 100644
  #include <ibus.h>
  #include "ibusimcontext.h"
  
-+#if !GTK_CHECK_VERSION (2, 90, 0)
++#if !GTK_CHECK_VERSION (2, 90, 7)
 +#  define DEPRECATED_GDK_KEYSYMS 1
 +#endif
 +

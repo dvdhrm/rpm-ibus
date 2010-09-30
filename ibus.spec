@@ -50,7 +50,9 @@ BuildRequires:  libxkbfile-devel
 
 Requires:   %{name}-libs = %{version}-%{release}
 Requires:   %{name}-gtk2 = %{version}-%{release}
+%if (0%{?fedora} > 14 || 0%{?rhel} > 6)
 Requires:   %{name}-gtk3 = %{version}-%{release}
+%endif
 
 Requires:   pygtk2
 Requires:   pyxdg
