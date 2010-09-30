@@ -11,10 +11,10 @@ Fix a build error with DBus-1.0.gir in gobject-introspection 0.9.6
  src/Makefile.am             |    2 +-
  3 files changed, 56 insertions(+), 1 deletions(-)
 
-diff --git a/client/gtk2/ibusimcontext.c b/client/gtk2/ibusimcontext.c
+diff --git a/client/gtk3/ibusimcontext.c b/client/gtk3/ibusimcontext.c
 index c104f38..a7a2c59 100644
---- a/client/gtk2/ibusimcontext.c
-+++ b/client/gtk2/ibusimcontext.c
+--- a/client/gtk3/ibusimcontext.c
++++ b/client/gtk3/ibusimcontext.c
 @@ -24,6 +24,7 @@
  #  include <config.h>
  #endif
