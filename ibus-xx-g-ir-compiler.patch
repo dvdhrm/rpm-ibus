@@ -1,15 +1,15 @@
 From 9a6f41415b774541c69cb45cec96839b7228fe70 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Thu, 30 Sep 2010 10:58:31 +0900
+Date: Fri, 1 Oct 2010 12:13:14 +0900
 Subject: [PATCH] Fix a build error with GTK3 gdkkeysyms.h
 
 Fix a build error with DBus-1.0.gir in gobject-introspection 0.9.6
 
 ---
- configure.ac                |    8 ++++++++
+ configure.ac                |   21 +++++++++++++++++++++
  client/gtk2/ibusimcontext.c |   47 +++++++++++++++++++++++++++++++++++++++++++
- src/Makefile.am             |    2 +-
- 3 files changed, 56 insertions(+), 1 deletions(-)
+ src/Makefile.am             |    4 ++--
+ 3 files changed, 70 insertions(+), 2 deletions(-)
 
 diff --git a/client/gtk3/ibusimcontext.c b/client/gtk3/ibusimcontext.c
 index c104f38..a7a2c59 100644
@@ -112,40 +112,55 @@ index c104f38..a7a2c59 100644
          event->string = g_strdup ("\r");
      }
 diff --git a/configure.ac b/configure.ac
-index 3346d0c..73129f0 100644
+index 3346d0c..9cd60a3 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -171,6 +171,13 @@ fi
+@@ -171,6 +171,25 @@ fi
  # GObject introspection
  GOBJECT_INTROSPECTION_CHECK([0.6.8])
  
++IBUS_GIR_SCANNERFLAGS=
 +IBUS_GIR_INCLUDES=
-+DBUS_GIR_NAME=DBus-1.0
-+if test -f ${INTROSPECTION_GIRDIR}/${DBUS_GIR_NAME}.gir ; then
-+    IBUS_GIR_INCLUDES="${IBUS_GIR_INCLUDES} ${DBUS_GIR_NAME}"
++if test x"$found_introspection" = x"yes" ; then
++    IBUS_GIR_SCANNERFLAGS="--identifier-prefix=IBus --symbol-prefix=ibus"
++    PKG_CHECK_EXISTS([gobject-introspection-1.0 >= 0.9.6],
++                     [gir_symbol_prefix=yes],
++                     [gir_symbol_prefix=no])
++    if test x"$gir_symbol_prefix" = x"no" ; then
++        IBUS_GIR_SCANNERFLAGS="--strip-prefix=IBus"
++    fi
++
++    DBUS_GIR_NAME=DBus-1.0
++    if test -f ${INTROSPECTION_GIRDIR}/${DBUS_GIR_NAME}.gir ; then
++        IBUS_GIR_INCLUDES="${IBUS_GIR_INCLUDES} ${DBUS_GIR_NAME}"
++    fi
 +fi
++AC_SUBST(IBUS_GIR_SCANNERFLAGS)
 +AC_SUBST(IBUS_GIR_INCLUDES)
 +
  # check for gtk-doc
  GTK_DOC_CHECK(1.9)
  if test x"$enable_gtk_doc" = x"no"; then
-@@ -386,6 +393,7 @@ Build options:
+@@ -386,6 +405,8 @@ Build options:
    Build gconf modules       $enable_gconf
    Build memconf modules     $enable_memconf
    Build introspection       $found_introspection
++  IBus-1.0.gir scannerflags "$IBUS_GIR_SCANNERFLAGS"
 +  IBus-1.0.gir includes     "$IBUS_GIR_INCLUDES"
    Build vala binding        $enable_vala
    Build document            $enable_gtk_doc
    Enable key snooper        $enable_key_snooper
 diff --git a/src/Makefile.am b/src/Makefile.am
-index cdd3d7c..3174b23 100644
+index cdd3d7c..9519d5a 100644
 --- a/src/Makefile.am
 +++ b/src/Makefile.am
-@@ -139,7 +139,7 @@ introspection_files = \
+@@ -138,8 +138,8 @@ introspection_files = \
+         ibusenumtypes.h \
  		$(NULL)
  IBus-1.0.gir: $(ibustargetlib) Makefile
- IBus_1_0_gir_SCANNERFLAGS = --strip-prefix=IBus --pkg=dbus-1,glib-2.0
+-IBus_1_0_gir_SCANNERFLAGS = --strip-prefix=IBus --pkg=dbus-1,glib-2.0
 -IBus_1_0_gir_INCLUDES = GLib-2.0 GObject-2.0
++IBus_1_0_gir_SCANNERFLAGS = --pkg=dbus-1,glib-2.0 $(IBUS_GIR_SCANNERFLAGS)
 +IBus_1_0_gir_INCLUDES = GLib-2.0 GObject-2.0 $(IBUS_GIR_INCLUDES)
  IBus_1_0_gir_LIBS = $(ibustargetlib)
  IBus_1_0_gir_FILES = $(addprefix $(srcdir)/,$(introspection_files))

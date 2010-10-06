@@ -1,6 +1,6 @@
-From 84003d36b7a2bf7b52faec42311c4904e44b606d Mon Sep 17 00:00:00 2001
+From 27d62755adfa03c11380414b63d8daa239dda905 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Tue, 28 Sep 2010 10:11:44 +0900
+Date: Tue, 5 Oct 2010 19:24:46 +0900
 Subject: [PATCH] Add XKB layouts
 
 ---
@@ -11,29 +11,30 @@ Subject: [PATCH] Add XKB layouts
  ibus/__init__.py           |    2 +
  ibus/bus.py                |    3 +
  ibus/interface/iibus.py    |    3 +
- ibus/xkblayout.py.in       |  175 +++++++++++
+ ibus/xkblayout.py.in       |  185 ++++++++++++
  ibus/xkbxml.py.in          |  412 ++++++++++++++++++++++++++
  setup/Makefile.am          |    1 +
- setup/main.py              |  278 ++++++++++++++++++-
- setup/setup.ui             |  422 ++++++++++++++++++++++++++-
- setup/xkbcombobox.py       |  106 +++++++
+ setup/enginecombobox.py    |    7 +-
+ setup/main.py              |    3 +
+ setup/setup.ui             |  611 ++++++++++++++++++++++++++++++++++++++-
+ setup/xkbsetup.py          |  451 ++++++++++++++++++++++++++++
  src/ibusfactory.c          |   17 +-
  src/ibusfactory.h          |    5 +-
  ui/gtk/panel.py            |   38 +++
  xkb/Makefile.am            |  104 +++++++
- xkb/ibus-engine-xkb-main.c |  396 +++++++++++++++++++++++++
- xkb/ibus-engine-xkb-main.h |   45 +++
- xkb/ibus-xkb-main.c        |  100 +++++++
+ xkb/ibus-engine-xkb-main.c |  397 +++++++++++++++++++++++++
+ xkb/ibus-engine-xkb-main.h |   46 +++
+ xkb/ibus-xkb-main.c        |  101 +++++++
  xkb/xkblayout.xml.in       |   16 +
  xkb/xkblayoutconfig.xml.in |    6 +
- xkb/xkblib.c               |  296 +++++++++++++++++++
- xkb/xkblib.h               |   39 +++
- xkb/xkbxml.c               |  695 ++++++++++++++++++++++++++++++++++++++++++++
- xkb/xkbxml.h               |  188 ++++++++++++
- 26 files changed, 3462 insertions(+), 7 deletions(-)
+ xkb/xkblib.c               |  297 +++++++++++++++++++
+ xkb/xkblib.h               |   40 +++
+ xkb/xkbxml.c               |  696 ++++++++++++++++++++++++++++++++++++++++++++
+ xkb/xkbxml.h               |  189 ++++++++++++
+ 27 files changed, 3746 insertions(+), 6 deletions(-)
  create mode 100644 ibus/xkblayout.py.in
  create mode 100644 ibus/xkbxml.py.in
- create mode 100644 setup/xkbcombobox.py
+ create mode 100644 setup/xkbsetup.py
  create mode 100644 xkb/Makefile.am
  create mode 100644 xkb/ibus-engine-xkb-main.c
  create mode 100644 xkb/ibus-engine-xkb-main.h
@@ -71,7 +72,7 @@ index 7895940..9f534a4 100644
  
  ACLOCAL_AMFLAGS = -I m4
 diff --git a/configure.ac b/configure.ac
-index 3346d0c..4611776 100644
+index 9cd60a3..b20c5ee 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -168,6 +168,57 @@ else
@@ -117,12 +118,12 @@ index 3346d0c..4611776 100644
 +    XKB_PRELOAD_LAYOUTS=$with_xkb_preload_layouts,
 +    [XKB_PRELOAD_LAYOUTS=""\
 +"us,us(chr),ad,al,am,ara,az,ba,bd,be,bg,br,bt,by,"\
-+"de,dk,ca,ch,cn,cn(tib),cz,ee,epo,es,et,fi,fo,fr,"\
++"de,dk,ca,ch,cn(tib),cz,ee,epo,es,et,fi,fo,fr,"\
 +"gb,ge,ge(dsb),ge(ru),ge(os),gh,gh(akan),gh(ewe),gh(fula),gh(ga),gh(hausa),"\
 +"gn,gr,hu,hr,ie,ie(CloGaelach),il,"\
 +"in,in(ben),in(guj),in(guru),in(jhelum),in(kan),in(mal),in(ori),in(tam),"\
-+"in(tel),in(urd-phonetic),in(bolnagri),iq,iq(ku),ir,ir(ku),is,it,jp,"\
-+"kg,kh,kr,kz,la,latam,lk,lk(tam_unicode),lt,lv,ma,ma(tifinagh),mal,mao,"\
++"in(tel),in(urd-phonetic),in(bolnagri),iq,iq(ku),ir,ir(ku),is,it,"\
++"kg,kh,kz,la,latam,lk,lk(tam_unicode),lt,lv,ma,ma(tifinagh),mal,mao,"\
 +"me,mk,mm,mt,mv,ng,ng(hausa),ng,ng(igbo),ng(yoruba),nl,no,no(smi),np,"\
 +"pk,pl,pl(csb),pt,ro,rs,ru,ru(cv),ru(kom),ru(sah),ru(tt),ru(xal),"\
 +"se,si,sk,sy,sy(ku),th,tj,tr,ua,uz,vn"]
@@ -132,7 +133,7 @@ index 3346d0c..4611776 100644
  # GObject introspection
  GOBJECT_INTROSPECTION_CHECK([0.6.8])
  
-@@ -368,6 +419,7 @@ gconf/Makefile
+@@ -387,6 +438,7 @@ gconf/Makefile
  gconf/gconf.xml.in
  bindings/Makefile
  bindings/vala/Makefile
@@ -140,7 +141,7 @@ index 3346d0c..4611776 100644
  ])
  
  AC_OUTPUT
-@@ -382,6 +434,7 @@ Build options:
+@@ -401,6 +453,7 @@ Build options:
    Build gtk2 immodule       $enable_gtk2
    Build gtk3 immodule       $enable_gtk3
    Build XIM agent server    $enable_xim
@@ -149,7 +150,7 @@ index 3346d0c..4611776 100644
    Build gconf modules       $enable_gconf
    Build memconf modules     $enable_memconf
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index fae710a..5ac6f48 100644
+index fae710a..af0cfad 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
 @@ -194,6 +194,42 @@
@@ -185,7 +186,7 @@ index fae710a..5ac6f48 100644
 +      <owner>ibus</owner>
 +      <type>list</type>
 +      <list_type>string</list_type>
-+      <default>[ara,bg,cz,dev,gr,gur,in,mal,mkd,ru,ua]</default>
++      <default>[ara,bg,cz,dev,gr,gur,in,jp(kana),mal,mkd,ru,ua]</default>
 +      <locale name="C">
 +        <short>Latin layout which have no ASCII</short>
 +	    <long>us layout is appended to the latin layouts. variant is not needed.</long>
@@ -279,10 +280,10 @@ index e63caa3..8b7b6f7 100644
  
 diff --git a/ibus/xkblayout.py.in b/ibus/xkblayout.py.in
 new file mode 100644
-index 0000000..c5422d3
+index 0000000..0503f35
 --- /dev/null
 +++ b/ibus/xkblayout.py.in
-@@ -0,0 +1,175 @@
+@@ -0,0 +1,185 @@
 +# vim:set et sts=4 sw=4:
 +#
 +# ibus - The Input Bus
@@ -414,10 +415,13 @@ index 0000000..c5422d3
 +            if layout == latin_layout:
 +                need_us_layout = True
 +                break
++            if model != None and layout + '(' + model + ')' == latin_layout:
++                need_us_layout = True
++                break
 +        if need_us_layout:
 +            layout = layout + ",us"
 +            if model != None:
-+                model = model + "," + model
++                model = model + ","
 +        if layout == self.get_layout() and \
 +           model == self.get_model() and \
 +           option == self.get_option():
@@ -436,13 +440,20 @@ index 0000000..c5422d3
 +        pid = os.spawnl(os.P_NOWAIT, *args)
 +        os.waitpid(pid, 0)
 +
-+    def set_default_layout(self, layout="default"):
++    def set_default_layout(self, layout="default", model="default"):
 +        if not self.__use_xkb:
 +            return
 +        if layout == 'default':
 +            self.__default_layout = self.get_layout()
++            self.__default_model = self.get_model()
 +        else:
++            if model == 'default':
++                (layout, model) = self.__get_model_from_layout(layout)
 +            self.__default_layout = layout
++            if model == 'default':
++                self.__default_model = None
++            else:
++                self.__default_model = model
 +
 +    def set_default_option(self, option="default"):
 +        if not self.__use_xkb:
@@ -877,338 +888,71 @@ index 0000000..5f0a3ea
 +    test()
 +    test2()
 diff --git a/setup/Makefile.am b/setup/Makefile.am
-index 0b81bf3..9a6a4d6 100644
+index 0b81bf3..ade2791 100644
 --- a/setup/Makefile.am
 +++ b/setup/Makefile.am
 @@ -27,6 +27,7 @@ ibussetup_PYTHON = \
  	enginetreeview.py \
  	engineabout.py \
  	keyboardshortcut.py \
-+	xkbcombobox.py \
++	xkbsetup.py \
  	$(NULL)
  
  ibussetup_DATA = \
+diff --git a/setup/enginecombobox.py b/setup/enginecombobox.py
+index 90b6f6c..6822c04 100644
+--- a/setup/enginecombobox.py
++++ b/setup/enginecombobox.py
+@@ -44,6 +44,7 @@ class EngineComboBox(gtk.ComboBox):
+         self.connect("notify::active", self.__notify_active_cb)
+ 
+         self.__model = None
++        self.__title = _("Select an input method")
+ 
+         renderer = gtk.CellRendererPixbuf()
+         renderer.set_property("xalign", 0)
+@@ -117,7 +118,7 @@ class EngineComboBox(gtk.ComboBox):
+             renderer.set_property("weight", pango.WEIGHT_NORMAL)
+         elif isinstance(engine, int):
+             renderer.set_property("sensitive", True)
+-            renderer.set_property("text", _("Select an input method"))
++            renderer.set_property("text", self.__title)
+             renderer.set_property("weight", pango.WEIGHT_NORMAL)
+         else:
+             renderer.set_property("sensitive", True)
+@@ -140,5 +141,9 @@ class EngineComboBox(gtk.ComboBox):
+     def get_active_engine(self):
+         return self.get_property("active-engine")
+ 
++    def get_title(self):
++        return self.__title
+ 
++    def set_title(self, title):
++        self.__title = title
+ 
 diff --git a/setup/main.py b/setup/main.py
-index c6612d2..fd2995b 100644
+index c6612d2..228b030 100644
 --- a/setup/main.py
 +++ b/setup/main.py
 @@ -36,6 +36,7 @@ from gtk import gdk
  from enginecombobox import EngineComboBox
  from enginetreeview import EngineTreeView
  from engineabout import EngineAbout
-+from xkbcombobox import XKBComboBox
++from xkbsetup import XKBSetup
  
  _  = lambda a : gettext.dgettext("ibus", a)
  N_ = lambda a : a
-@@ -183,10 +184,20 @@ class Setup(object):
- 
-         # use system keyboard layout setting
-         self.__checkbutton_use_sys_layout = self.__builder.get_object("checkbutton_use_sys_layout")
--        self.__checkbutton_use_sys_layout.set_active(
--            self.__config.get_value("general", "use_system_keyboard_layout", True))
-+        use_system_keyboard_layout = self.__config.get_value("general", "use_system_keyboard_layout", True)
-+        self.__checkbutton_use_sys_layout.set_active(use_system_keyboard_layout)
-         self.__checkbutton_use_sys_layout.connect("toggled", self.__checkbutton_use_sys_layout_toggled_cb)
- 
-+        # system keyboard layout setting
-+        self.__button_system_keyboard_layout = self.__builder.get_object("button_system_keyboard_layout")
-+        text = str(self.__config.get_value("general", "system_keyboard_layout", ''))
-+        if text == 'default' or text == '':
-+            text = _("Default")
-+        self.__button_system_keyboard_layout.set_label(text)
-+        if not use_system_keyboard_layout:
-+            self.__button_system_keyboard_layout.set_sensitive(False)
-+        self.__button_system_keyboard_layout.connect("clicked", self.__button_system_keyboard_layout_cb)
-+
-         # use global ime setting
-         self.__checkbutton_use_global_engine = self.__builder.get_object("checkbutton_use_global_engine")
-         self.__checkbutton_use_global_engine.set_active(
-@@ -233,6 +244,160 @@ class Setup(object):
+@@ -233,6 +234,8 @@ class Setup(object):
          self.__combobox.connect("notify::active-engine", self.__combobox_notify_active_engine_cb)
          self.__treeview.connect("notify", self.__treeview_notify_cb)
  
-+        self.__xkblayoutconfig = None
-+        self.__preload_xkb_engines = []
-+        self.__other_xkb_engines = []
-+        if ibus.XKBConfigRegistry.have_xkb():
-+            self.__xkblayoutconfig = ibus.XKBLayoutConfig()
-+
-+        # config layouts dialog
-+        self.__init_config_layouts()
-+
-+        # default system keyboard dialog
-+        self.__init_system_keyboard()
-+
-+    def __get_xkbengines(self):
-+        xkbengines = []
-+        xkbconfig = ibus.XKBConfigRegistry()
-+        layout_list = xkbconfig.get_layout_list()
-+        layout_desc = xkbconfig.get_layout_desc()
-+        layout_lang = xkbconfig.get_layout_lang()
-+        variant_desc = xkbconfig.get_variant_desc()
-+        for layout in layout_list.keys():
-+            if layout not in layout_lang:
-+                continue
-+            langs = layout_lang[layout]
-+            for lang in langs:
-+                engine = ibus.XKBConfigRegistry.engine_desc_new(
-+                    lang,
-+                    layout,
-+                    layout_desc[layout],
-+                    None,
-+                    None)
-+                xkbengines.append(engine)
-+            for variant in layout_list[layout]:
-+                label = "%s(%s)" % (layout, variant)
-+                if label in layout_lang:
-+                    langs = layout_lang[label]
-+                for lang in langs:
-+                    engine = ibus.XKBConfigRegistry.engine_desc_new(
-+                        lang,
-+                        layout,
-+                        layout_desc[layout],
-+                        variant,
-+                        variant_desc[variant])
-+                    xkbengines.append(engine)
-+        return xkbengines
-+
-+    def __init_config_layouts(self):
-+        if not ibus.XKBConfigRegistry.have_xkb():
-+            button = self.__builder.get_object("button_config_layouts")
-+            button.hide()
-+            return
-+
-+        self.__dialog_config_layouts = self.__builder.get_object("dialog_config_layouts")
-+        self.__button_config_layouts_cancel = self.__builder.get_object("button_config_layouts_cancel")
-+        self.__button_config_layouts_cancel.connect("clicked", self.__button_config_layouts_cancel_cb)
-+        self.__button_config_layouts_ok = self.__builder.get_object("button_config_layouts_ok")
-+        self.__button_config_layouts_ok.connect("clicked", self.__button_config_layouts_ok_cb)
-+
-+        xkbengines = self.__get_xkbengines()
-+        preload_engine_list = []
-+        other_engine_list = []
-+
-+        if len(xkbengines) > 0:
-+            button = self.__builder.get_object("button_config_layouts")
-+            button.connect("clicked", self.__button_config_layouts_cb)
-+            button.set_sensitive(True)
-+
-+        engine = ibus.XKBConfigRegistry.engine_desc_new(
-+                     "xkb:layout:none",
-+                     "none",
-+                     _("No Selection"),
-+                     None,
-+                     None)
-+        self.__preload_xkb_engines.append(engine)
-+        self.__other_xkb_engines.append(engine)
-+
-+        preload_xkb_engines = self.__xkblayoutconfig.get_preload_layouts()
-+        for engine in xkbengines:
-+            if not engine.name.startswith("xkb:layout:"):
-+                continue
-+            sub_name = engine.name[len("xkb:layout:"):]
-+            layout_list = sub_name.split(':')
-+            if len(layout_list) > 1:
-+                layout = "%s(%s)" % (layout_list[0], layout_list[1])
-+            else:
-+                layout = layout_list[0]
-+            has_preloaded = False
-+            for preload_name in preload_xkb_engines:
-+                preload_name = str(preload_name)
-+                if len(preload_name) == 0:
-+                    continue
-+                if layout == preload_name:
-+                    has_preloaded = True
-+                    break
-+            if has_preloaded:
-+                self.__preload_xkb_engines.append(engine)
-+            else:
-+                self.__other_xkb_engines.append(engine)
-+        self.__combobox_add_layout = self.__builder.get_object("combobox_add_layout_engines")
-+        self.__combobox_add_layout.set_engines(self.__other_xkb_engines)
-+        self.__combobox_remove_layout = self.__builder.get_object("combobox_remove_layout_engines")
-+        self.__combobox_remove_layout.set_engines(self.__preload_xkb_engines)
-+
-+    def __init_system_keyboard_layout(self):
-+        # get xkb layouts
-+        xkbengines = self.__get_xkbengines()
-+
-+        self.__combobox_system_keyboard_layout = self.__builder.get_object("combobox_system_keyboard_layout_engines")
-+        self.__combobox_system_keyboard_layout.set_engines(xkbengines)
-+        self.__entry_system_keyboard_layout = self.__builder.get_object("entry_system_keyboard_layout")
-+        self.__entry_system_keyboard_layout.set_sensitive(False)
-+        text = str(self.__config.get_value("general", "system_keyboard_layout", ''))
-+        if text != None:
-+            self.__entry_system_keyboard_layout.set_text(text)
-+        button = self.__builder.get_object("radiobutton_combobox_system_keyboard_layout")
-+        button.set_property("name", "radiobutton_combobox_system_keyboard_layout")
-+        button.set_active(True)
-+        button.connect("clicked", self.__radiobutton_system_keyboard_layout_cb)
-+        button = self.__builder.get_object("radiobutton_entry_system_keyboard_layout")
-+        button.set_property("name", "radiobutton_entry_system_keyboard_layout")
-+        button.connect("clicked", self.__radiobutton_system_keyboard_layout_cb)
-+
-+    def __init_system_keyboard_option(self):
-+        xkbconfig = ibus.XKBConfigRegistry()
-+
-+        self.__combobox_system_keyboard_option = self.__builder.get_object("combobox_system_keyboard_option_engines")
-+        self.__combobox_system_keyboard_option.set_xkb_options(xkbconfig)
-+        self.__entry_system_keyboard_option = self.__builder.get_object("entry_system_keyboard_option")
-+        self.__entry_system_keyboard_option.set_sensitive(False)
-+        text = str(self.__config.get_value("general", "system_keyboard_option", ''))
-+        if text != None:
-+            self.__entry_system_keyboard_option.set_text(text)
-+        button = self.__builder.get_object("radiobutton_combobox_system_keyboard_option")
-+        button.set_property("name", "radiobutton_combobox_system_keyboard_option")
-+        button.set_active(True)
-+        button.connect("clicked", self.__radiobutton_system_keyboard_option_cb)
-+        button = self.__builder.get_object("radiobutton_entry_system_keyboard_option")
-+        button.set_property("name", "radiobutton_entry_system_keyboard_option")
-+        button.connect("clicked", self.__radiobutton_system_keyboard_option_cb)
-+
-+    def __init_system_keyboard(self):
-+        if not ibus.XKBConfigRegistry.have_xkb():
-+            hbox = self.__builder.get_object("hbox_system_keyboard_layout")
-+            hbox.hide()
-+            return
-+
-+        self.__dialog_system_keyboard_layout = self.__builder.get_object("dialog_system_keyboard_layout")
-+        self.__button_system_keyboard_layout_cancel = self.__builder.get_object("button_system_keyboard_layout_cancel")
-+        self.__button_system_keyboard_layout_cancel.connect("clicked", self.__button_system_keyboard_layout_cancel_cb)
-+        self.__button_system_keyboard_layout_ok = self.__builder.get_object("button_system_keyboard_layout_ok")
-+        self.__button_system_keyboard_layout_ok.connect("clicked", self.__button_system_keyboard_layout_ok_cb)
-+
-+        self.__init_system_keyboard_layout()
-+        self.__init_system_keyboard_option()
++        XKBSetup(self.__config, self.__builder)
 +
      def __combobox_notify_active_engine_cb(self, combobox, property):
          engine = self.__combobox.get_active_engine()
          button = self.__builder.get_object("button_engine_add")
-@@ -282,6 +447,114 @@ class Setup(object):
-             about.run()
-             about.destroy()
- 
-+    def __button_config_layouts_cb(self, button):
-+        self.__dialog_config_layouts.run()
-+        self.__dialog_config_layouts.hide()
-+
-+    def __button_config_layouts_cancel_cb(self, button):
-+        self.__dialog_config_layouts.hide()
-+
-+    def __button_config_layouts_ok_cb(self, button):
-+        self.__dialog_config_layouts.hide()
-+        add_engine = self.__combobox_add_layout.get_active_engine()
-+        remove_engine = self.__combobox_remove_layout.get_active_engine()
-+        is_modified = False
-+        if add_engine != None and add_engine.name != "xkb:layout:none":
-+            self.__preload_xkb_engines.append(add_engine)
-+            self.__other_xkb_engines.remove(add_engine)
-+            is_modified = True
-+        if remove_engine != None and remove_engine.name != "xkb:layout:none":
-+            self.__preload_xkb_engines.remove(remove_engine)
-+            self.__other_xkb_engines.append(remove_engine)
-+            is_modified = True
-+        if is_modified == False:
-+            return
-+        self.__combobox_add_layout.set_engines(self.__other_xkb_engines)
-+        self.__combobox_remove_layout.set_engines(self.__preload_xkb_engines)
-+        engine_list = []
-+        for engine in self.__preload_xkb_engines:
-+            if not engine.name.startswith("xkb:layout:"):
-+                continue
-+            if engine.name == "xkb:layout:none":
-+                continue
-+            sub_name = engine.name[len("xkb:layout:"):]
-+            layout_list = sub_name.split(':')
-+            if len(layout_list) > 1:
-+                layout = "%s(%s)" % (layout_list[0], layout_list[1])
-+            else:
-+                layout = layout_list[0]
-+            engine_list.append(layout)
-+        if len(engine_list) > 0:
-+            engine_list.sort()
-+            self.__xkblayoutconfig.save_preload_layouts(engine_list)
-+
-+    def __button_system_keyboard_layout_cb(self, button):
-+        self.__dialog_system_keyboard_layout.run()
-+        self.__dialog_system_keyboard_layout.hide()
-+
-+    def __button_system_keyboard_layout_cancel_cb(self, button):
-+        self.__dialog_system_keyboard_layout.hide()
-+
-+    def __button_system_keyboard_layout_ok_cb(self, button):
-+        self.__dialog_system_keyboard_layout.hide()
-+        layout = "default"
-+        if self.__combobox_system_keyboard_layout.get_sensitive():
-+            engine = self.__combobox_system_keyboard_layout.get_active_engine()
-+            if engine != None:
-+                layout = engine.layout
-+        elif self.__entry_system_keyboard_layout.get_sensitive():
-+            layout = self.__entry_system_keyboard_layout.get_text()
-+        if layout == None or layout == "":
-+            layout = "default"
-+        self.__config.set_value("general", "system_keyboard_layout", layout)
-+        if layout == "default":
-+            layout = _("Default")
-+        self.__button_system_keyboard_layout.set_label(layout)
-+        option = "default"
-+        if self.__combobox_system_keyboard_option.get_sensitive():
-+            option_list = self.__combobox_system_keyboard_option.get_active_xkb()
-+            if option_list != None:
-+                option = option_list[0]
-+        elif self.__entry_system_keyboard_option.get_sensitive():
-+            option = self.__entry_system_keyboard_option.get_text()
-+        if option == None or option == "":
-+            option = "default"
-+        if option != "default" and option.find(':') < 0:
-+            message = _("The keyboard option cannot be chosen.")
-+            dlg = gtk.MessageDialog(type = gtk.MESSAGE_INFO,
-+                                    buttons = gtk.BUTTONS_OK,
-+                                    message_format = message)
-+            dlg.run()
-+            dlg.destroy()
-+            return
-+        self.__config.set_value("general", "system_keyboard_option", option)
-+        message = _("Please restart IBus to reload your configuration.")
-+        dlg = gtk.MessageDialog(type = gtk.MESSAGE_INFO,
-+                                buttons = gtk.BUTTONS_OK,
-+                                message_format = message)
-+        dlg.run()
-+        dlg.destroy()
-+
-+    def __radiobutton_system_keyboard_layout_cb(self, button):
-+        if button.get_active() != True:
-+            return
-+        if button.name == "radiobutton_combobox_system_keyboard_layout":
-+            self.__combobox_system_keyboard_layout.set_sensitive(True)
-+            self.__entry_system_keyboard_layout.set_sensitive(False)
-+        elif button.name == "radiobutton_entry_system_keyboard_layout":
-+            self.__combobox_system_keyboard_layout.set_sensitive(False)
-+            self.__entry_system_keyboard_layout.set_sensitive(True)
-+
-+    def __radiobutton_system_keyboard_option_cb(self, button):
-+        if button.get_active() != True:
-+            return
-+        if button.name == "radiobutton_combobox_system_keyboard_option":
-+            self.__combobox_system_keyboard_option.set_sensitive(True)
-+            self.__entry_system_keyboard_option.set_sensitive(False)
-+        elif button.name == "radiobutton_entry_system_keyboard_option":
-+            self.__combobox_system_keyboard_option.set_sensitive(False)
-+            self.__entry_system_keyboard_option.set_sensitive(True)
-+
-     def __init_bus(self):
-         try:
-             self.__bus = ibus.Bus()
-@@ -470,6 +743,7 @@ class Setup(object):
-     def __checkbutton_use_sys_layout_toggled_cb(self, button):
-         value = self.__checkbutton_use_sys_layout.get_active()
-         self.__config.set_value("general", "use_system_keyboard_layout", value)
-+        self.__button_system_keyboard_layout.set_sensitive(value)
- 
-     def __checkbutton_use_global_engine_toggled_cb(self, button):
-         value = self.__checkbutton_use_global_engine.get_active()
 diff --git a/setup/setup.ui b/setup/setup.ui
-index 703b4d8..5fb529b 100644
+index 703b4d8..b08a3e2 100644
 --- a/setup/setup.ui
 +++ b/setup/setup.ui
 @@ -129,7 +129,6 @@
@@ -1301,85 +1045,79 @@ index 703b4d8..5fb529b 100644
                                    </object>
                                  </child>
                                </object>
-@@ -958,4 +1007,371 @@ Homepage: http://code.google.com/p/ibus
+@@ -958,4 +1007,560 @@ Homepage: http://code.google.com/p/ibus
        </object>
      </child>
    </object>
 +  <object class="GtkDialog" id="dialog_config_layouts">
-+    <property name="title" translatable="yes">Layouts Setup</property>
++    <property name="title" translatable="yes">Add or Remove Layouts</property>
 +    <property name="icon_name">ibus-setup</property>
 +    <child internal-child="vbox">
++
 +      <object class="GtkVBox" id="vbox101">
 +        <property name="orientation">vertical</property>
 +        <property name="visible">True</property>
 +        <property name="border-width">10</property>
 +        <property name="spacing">12</property>
 +        <child>
-+          <object class="GtkTable" id="table101">
++          <object class="GtkAlignment" id="alignment101">
 +            <property name="visible">True</property>
-+            <property name="n_rows">2</property>
-+            <property name="n_columns">2</property>
-+            <property name="column_spacing">12</property>
-+            <property name="row_spacing">6</property>
++            <property name="top_padding">12</property>
++            <property name="left_padding">12</property>
 +            <child>
-+              <object class="GtkLabel" id="label101">
++              <object class="GtkFrame" id="frame101">
 +                <property name="visible">True</property>
-+                <property name="label" translatable="yes">Add Layout:</property>
-+                <property name="tooltip_text" translatable="yes">Add layout</property>
-+                <property name="xalign">0</property>
-+              </object>
-+              <packing>
-+                <property name="x_options">GTK_FILL</property>
-+                <property name="y_options">GTK_FILL</property>
-+              </packing>
-+            </child>
-+            <child>
-+              <object class="GtkAlignment" id="alignment101">
-+                <property name="visible">True</property>
++                <property name="label_xalign">0</property>
++                <property name="shadow_type">none</property>
 +                <child>
-+                  <object class="EngineComboBox" id="combobox_add_layout_engines">
-+                   <property name="visible">True</property>
++                  <object class="GtkAlignment" id="alignment102">
++                    <property name="visible">True</property>
++                    <property name="top_padding">12</property>
++                    <property name="left_padding">12</property>
++                    <child>
++                      <object class="GtkVBox" id="vbox102">
++                        <property name="visible">True</property>
++                        <property name="orientation">vertical</property>
++                        <property name="spacing">6</property>
++                        <child>
++                          <object class="GtkScrolledWindow" id="scrolledwindow101">
++                            <property name="visible">True</property>
++                            <property name="can_focus">True</property>
++                            <property name="border_width">5</property>
++                            <property name="width_request">450</property>
++                            <property name="height_request">350</property>
++                            <property name="hscrollbar_policy">automatic</property>
++                            <property name="vscrollbar_policy">automatic</property>
++                            <property name="shadow_type">out</property>
++                            <child>
++                              <object class="GtkViewport" id="viewport101">
++                                <property name="visible">True</property>
++                                <property name="shadow_type">none</property>
++                                <child>
++                                  <object class="GtkVBox" id="vbox_all_keyboard_layouts">
++                                    <property name="visible">True</property>
++                                    <property name="orientation">vertical</property>
++                                  </object>
++                                </child>
++                              </object>
++                            </child>
++                          </object>
++                          <packing>
++                            <property name="position">0</property>
++                          </packing>
++                        </child>
++                      </object>
++                    </child>
++                  </object>
++                </child>
++                <child type="label">
++                  <object class="GtkLabel" id="label101">
++                    <property name="visible">True</property>
++                    <property name="label" translatable="yes">&lt;b&gt;Keyboard Layout&lt;/b&gt;</property>
++                    <property name="use_markup">True</property>
 +                  </object>
 +                </child>
 +              </object>
-+              <packing>
-+                <property name="left_attach">1</property>
-+                <property name="right_attach">2</property>
-+                <property name="x_options">GTK_FILL</property>
-+                <property name="y_options">GTK_FILL</property>
-+              </packing>
-+            </child>
-+            <child>
-+              <object class="GtkLabel" id="label102">
-+                <property name="visible">True</property>
-+                <property name="label" translatable="yes">Remove Layout:</property>
-+                <property name="tooltip_text" translatable="yes">Remove layout</property>
-+                <property name="xalign">0</property>
-+              </object>
-+              <packing>
-+                <property name="top_attach">1</property>
-+                <property name="bottom_attach">2</property>
-+                <property name="x_options">GTK_FILL</property>
-+                <property name="y_options">GTK_FILL</property>
-+              </packing>
-+            </child>
-+            <child>
-+              <object class="GtkAlignment" id="alignment102">
-+                <property name="visible">True</property>
-+                <child>
-+                  <object class="EngineComboBox" id="combobox_remove_layout_engines">
-+                   <property name="visible">True</property>
-+                  </object>
-+                </child>
-+              </object>
-+              <packing>
-+                <property name="left_attach">1</property>
-+                <property name="right_attach">2</property>
-+                <property name="top_attach">1</property>
-+                <property name="bottom_attach">2</property>
-+                <property name="x_options">GTK_FILL</property>
-+                <property name="y_options">GTK_FILL</property>
-+              </packing>
 +            </child>
 +          </object>
 +          <packing>
@@ -1453,66 +1191,178 @@ index 703b4d8..5fb529b 100644
 +                    <property name="top_padding">12</property>
 +                    <property name="left_padding">12</property>
 +                    <child>
-+                      <object class="GtkTable" id="table201">
++                      <object class="GtkVBox" id="vbox202">
 +                        <property name="visible">True</property>
-+                        <property name="n_rows">2</property>
-+                        <property name="n_columns">2</property>
-+                        <property name="column_spacing">12</property>
-+                        <property name="row_spacing">6</property>
++                        <property name="orientation">vertical</property>
++                        <property name="spacing">6</property>
 +                        <child>
-+                          <object class="GtkRadioButton" id="radiobutton_combobox_system_keyboard_layout">
-+                            <property name="visible">True</property>
-+                            <property name="label" translatable="yes">Choose From:</property>
-+                            <property name="tooltip_text" translatable="yes">choose default keyboard layout from list</property>
-+                          </object>
-+                          <packing>
-+                            <property name="x_options">GTK_FILL</property>
-+                            <property name="y_options">GTK_FILL</property>
-+                          </packing>
-+                        </child>
-+                        <child>
-+                          <object class="GtkAlignment" id="alignment203">
++                          <object class="GtkHBox" id="hbox201">
 +                            <property name="visible">True</property>
 +                            <child>
-+                              <object class="EngineComboBox" id="combobox_system_keyboard_layout_engines">
++                              <object class="GtkVBox" id="vbox203">
 +                                <property name="visible">True</property>
++                                <property name="orientation">vertical</property>
++                                <property name="spacing">6</property>
++                                <child>
++                                  <object class="EngineComboBox" id="combobox_system_keyboard_layout_engines">
++                                    <property name="visible">True</property>
++                                  </object>
++                                  <packing>
++                                    <property name="expand">False</property>
++                                    <property name="position">0</property>
++                                  </packing>
++                                </child>
++                                <child>
++                                  <object class="GtkScrolledWindow" id="scrolledwindow201">
++                                    <property name="height_request">150</property>
++                                    <property name="visible">True</property>
++                                    <property name="can_focus">True</property>
++                                    <property name="hscrollbar_policy">automatic</property>
++                                    <property name="vscrollbar_policy">automatic</property>
++                                    <property name="shadow_type">in</property>
++                                    <child>
++    
++                                      <object class="EngineTreeView" id="treeview_system_keyboard_layout_engines">
++                                        <property name="visible">True</property>
++                                        <property name="can_focus">True</property>
++                                        <property name="height_request">150</property>
++                                      </object>
++                                    </child>
++                                  </object>
++                                  <packing>
++                                    <property name="expand">False</property>
++                                    <property name="position">1</property>
++                                  </packing>
++                                </child>
 +                              </object>
++                              <packing>
++                                <property name="position">0</property>
++                              </packing>
++                            </child>
++                            <child>
++                              <object class="GtkVButtonBox" id="vbuttonbox201">
++                                <property name="visible">True</property>
++                                <property name="orientation">vertical</property>
++                                <property name="spacing">5</property>
++                                <property name="layout_style">start</property>
++                                <child>
++                                  <object class="GtkButton" id="button_system_keyboard_layout_engine_add">
++                                    <property name="label">gtk-add</property>
++                                    <property name="visible">True</property>
++                                    <property name="sensitive">False</property>
++                                    <property name="can_focus">True</property>
++                                    <property name="receives_default">True</property>
++                                    <property name="tooltip_text" translatable="yes">Add the selected keyboard layout into the system keyboard layouts</property>
++                                    <property name="use_stock">True</property>
++                                  </object>
++                                  <packing>
++                                    <property name="expand">False</property>
++                                    <property name="fill">False</property>
++                                    <property name="position">0</property>
++                                  </packing>
++                                </child>
++                                <child>
++                                  <object class="GtkButton" id="button_system_keyboard_layout_engine_remove">
++                                    <property name="label">gtk-remove</property>
++                                    <property name="visible">True</property>
++                                    <property name="sensitive">False</property>
++                                    <property name="can_focus">True</property>
++                                    <property name="receives_default">True</property>
++                                    <property name="tooltip_text" translatable="yes">Remove the selected keyboard layout from the system keyboard layouts</property>
++                                    <property name="use_stock">True</property>
++                                  </object>
++                                  <packing>
++                                    <property name="expand">False</property>
++                                    <property name="fill">False</property>
++                                    <property name="position">1</property>
++                                  </packing>
++                                </child>
++                                <child>
++                                  <object class="GtkButton" id="button_system_keyboard_layout_engine_up">
++                                    <property name="label">gtk-go-up</property>
++                                    <property name="visible">True</property>
++                                    <property name="sensitive">False</property>
++                                    <property name="can_focus">True</property>
++                                    <property name="receives_default">True</property>
++                                    <property name="tooltip_text" translatable="yes">Move up the selected keyboard layout in the system keyboard layouts list</property>
++                                    <property name="use_stock">True</property>
++                                  </object>
++                                  <packing>
++                                    <property name="expand">False</property>
++                                    <property name="fill">False</property>
++                                    <property name="position">2</property>
++                                  </packing>
++                                </child>
++                                <child>
++                                  <object class="GtkButton" id="button_system_keyboard_layout_engine_down">
++                                    <property name="label">gtk-go-down</property>
++                                    <property name="visible">True</property>
++                                    <property name="sensitive">False</property>
++                                    <property name="can_focus">True</property>
++                                    <property name="receives_default">True</property>
++                                    <property name="tooltip_text" translatable="yes">Move down the selected keyboard layout in the system keyboard layouts list</property>
++                                    <property name="use_stock">True</property>
++                                  </object>
++                                  <packing>
++                                    <property name="expand">False</property>
++                                    <property name="fill">False</property>
++                                    <property name="position">3</property>
++                                  </packing>
++                                </child>
++                                <child>
++                                  <object class="GtkButton" id="button_system_keyboard_layout_engine_reset">
++                                    <property name="label" translatable="yes">Rese_t</property>
++                                    <property name="visible">True</property>
++                                    <property name="sensitive">False</property>
++                                    <property name="can_focus">True</property>
++                                    <property name="receives_default">True</property>
++                                    <property name="tooltip_text" translatable="yes">Reset the system keyboard layouts list</property>
++                                    <property name="use_underline">True</property>
++                                  </object>
++                                  <packing>
++                                    <property name="expand">False</property>
++                                    <property name="fill">False</property>
++                                    <property name="position">4</property>
++                                  </packing>
++                                </child>
++                              </object>
++                              <packing>
++                                <property name="position">1</property>
++                              </packing>
 +                            </child>
 +                          </object>
 +                          <packing>
-+                            <property name="left_attach">1</property>
-+                            <property name="right_attach">2</property>
-+                            <property name="x_options">GTK_FILL</property>
-+                            <property name="y_options">GTK_FILL</property>
++                            <property name="position">0</property>
 +                          </packing>
 +                        </child>
 +                        <child>
-+                          <object class="GtkRadioButton" id="radiobutton_entry_system_keyboard_layout">
++                          <object class="GtkHBox" id="hbox202">
 +                            <property name="visible">True</property>
-+                            <property name="label" translatable="yes">Manual Type:</property>
-+                            <property name="tooltip_text" translatable="yes">Type default keyboard layout by manual (comma-separated values)</property>
-+                            <property name="group">radiobutton_combobox_system_keyboard_layout</property>
++                            <property name="spacing">6</property>
++                            <child>
++                              <object class="GtkImage" id="image201">
++                                <property name="visible">True</property>
++                                <property name="stock">gtk-info</property>
++                                <property name="icon-size">2</property>
++                              </object>
++                              <packing>
++                                <property name="expand">False</property>
++                                <property name="position">0</property>
++                              </packing>
++                            </child>
++                            <child>
++                              <object class="GtkLabel" id="label_system_keyboard_layout_engines">
++                                <property name="visible">True</property>
++                                <property name="xalign">0</property>
++                                <property name="use_markup">True</property>
++                              </object>
++                              <packing>
++                                <property name="position">1</property>
++                              </packing>
++                            </child>
 +                          </object>
 +                          <packing>
-+                            <property name="top_attach">1</property>
-+                            <property name="bottom_attach">2</property>
-+                            <property name="x_options">GTK_FILL</property>
-+                            <property name="y_options">GTK_FILL</property>
-+                          </packing>
-+                        </child>
-+                        <child>
-+                          <object class="GtkEntry" id="entry_system_keyboard_layout">
-+                            <property name="visible">True</property>
-+                            <property name="can_focus">True</property>
-+                            <property name="editable">True</property>
-+                          </object>
-+                          <packing>
-+                            <property name="left_attach">1</property>
-+                            <property name="right_attach">2</property>
-+                            <property name="top_attach">1</property>
-+                            <property name="bottom_attach">2</property>
-+                            <property name="x_options">GTK_FILL</property>
-+                            <property name="y_options">GTK_FILL</property>
++                            <property name="position">1</property>
 +                          </packing>
 +                        </child>
 +                      </object>
@@ -1550,66 +1400,33 @@ index 703b4d8..5fb529b 100644
 +                    <property name="top_padding">12</property>
 +                    <property name="left_padding">12</property>
 +                    <child>
-+                      <object class="GtkTable" id="table202">
++                      <object class="GtkVBox" id="vbox204">
 +                        <property name="visible">True</property>
-+                        <property name="n_rows">2</property>
-+                        <property name="n_columns">2</property>
-+                        <property name="column_spacing">12</property>
-+                        <property name="row_spacing">6</property>
++                        <property name="orientation">vertical</property>
++                        <property name="spacing">6</property>
 +                        <child>
-+                          <object class="GtkRadioButton" id="radiobutton_combobox_system_keyboard_option">
++                          <object class="GtkHButtonBox" id="hbuttonbox201">
 +                            <property name="visible">True</property>
-+                            <property name="label" translatable="yes">Choose From:</property>
-+                            <property name="tooltip_text" translatable="yes">choose default keyboard option from list</property>
-+                          </object>
-+                          <packing>
-+                            <property name="x_options">GTK_FILL</property>
-+                            <property name="y_options">GTK_FILL</property>
-+                          </packing>
-+                        </child>
-+                        <child>
-+                          <object class="GtkAlignment" id="alignment206">
-+                            <property name="visible">True</property>
++                            <property name="homogeneous">True</property>
++                            <property name="layout_style">start</property>
 +                            <child>
-+                              <object class="XKBComboBox" id="combobox_system_keyboard_option_engines">
++                              <object class="GtkButton" id="button_system_keyboard_option_setup">
 +                                <property name="visible">True</property>
++                                <property name="label" translatable="yes">_Options...</property>
++                                <property name="can_focus">True</property>
++                                <property name="use_underline">True</property>
 +                              </object>
++                              <packing>
++                                <property name="expand">False</property>
++                                <property name="fill">False</property>
++                                <property name="position">0</property>
++                              </packing>
 +                            </child>
 +                          </object>
 +                          <packing>
-+                            <property name="left_attach">1</property>
-+                            <property name="right_attach">2</property>
-+                            <property name="x_options">GTK_FILL</property>
-+                            <property name="y_options">GTK_FILL</property>
-+                          </packing>
-+                        </child>
-+                        <child>
-+                          <object class="GtkRadioButton" id="radiobutton_entry_system_keyboard_option">
-+                            <property name="visible">True</property>
-+                            <property name="label" translatable="yes">Manual Type:</property>
-+                            <property name="tooltip_text" translatable="yes">Type default keyboard option by manual (comma-separated values)</property>
-+                            <property name="group">radiobutton_combobox_system_keyboard_option</property>
-+                          </object>
-+                          <packing>
-+                            <property name="top_attach">1</property>
-+                            <property name="bottom_attach">2</property>
-+                            <property name="x_options">GTK_FILL</property>
-+                            <property name="y_options">GTK_FILL</property>
-+                          </packing>
-+                        </child>
-+                        <child>
-+                          <object class="GtkEntry" id="entry_system_keyboard_option">
-+                            <property name="visible">True</property>
-+                            <property name="can_focus">True</property>
-+                            <property name="editable">True</property>
-+                          </object>
-+                          <packing>
-+                            <property name="left_attach">1</property>
-+                            <property name="right_attach">2</property>
-+                            <property name="top_attach">1</property>
-+                            <property name="bottom_attach">2</property>
-+                            <property name="x_options">GTK_FILL</property>
-+                            <property name="y_options">GTK_FILL</property>
++                            <property name="expand">False</property>
++                            <property name="fill">False</property>
++                            <property name="position">0</property>
 +                          </packing>
 +                        </child>
 +                      </object>
@@ -1632,7 +1449,7 @@ index 703b4d8..5fb529b 100644
 +          </packing>
 +        </child>
 +        <child internal-child="action_area">
-+          <object class="GtkHButtonBox" id="hbuttonbox201">
++          <object class="GtkHButtonBox" id="hbuttonbox202">
 +            <property name="visible">True</property>
 +            <property name="homogeneous">True</property>
 +            <property name="layout_style">end</property>
@@ -1672,13 +1489,129 @@ index 703b4d8..5fb529b 100644
 +      </object>
 +    </child>
 +  </object>
++  <object class="GtkDialog" id="dialog_system_keyboard_option">
++    <property name="title" translatable="yes">System Keyboard Option Setup</property>
++    <property name="icon_name">ibus-setup</property>
++    <child internal-child="vbox">
++      <object class="GtkVBox" id="vbox301">
++        <property name="orientation">vertical</property>
++        <property name="visible">True</property>
++        <property name="border-width">10</property>
++        <property name="spacing">12</property>
++        <child>
++          <object class="GtkAlignment" id="alignment301">
++            <property name="visible">True</property>
++            <property name="top_padding">12</property>
++            <property name="left_padding">12</property>
++            <child>
++              <object class="GtkFrame" id="frame301">
++                <property name="visible">True</property>
++                <property name="label_xalign">0</property>
++                <property name="shadow_type">none</property>
++                <child>
++                  <object class="GtkAlignment" id="alignment302">
++                    <property name="visible">True</property>
++                    <property name="top_padding">12</property>
++                    <property name="left_padding">12</property>
++                    <child>
++                      <object class="GtkVBox" id="vbox302">
++                        <property name="visible">True</property>
++                        <property name="orientation">vertical</property>
++                        <property name="spacing">6</property>
++                        <child>
++                          <object class="GtkCheckButton" id="checkbutton_use_system_keyboard_option">
++                            <property name="label" translatable="yes">Use the default keyboard option</property>
++                            <property name="visible">True</property>
++                            <property name="can_focus">True</property>
++                            <property name="receives_default">False</property>
++                            <property name="tooltip_text" translatable="yes">Use the defualt XKB option</property>
++                            <property name="draw_indicator">True</property>
++                          </object>
++                          <packing>
++                            <property name="position">0</property>
++                          </packing>
++                        </child>
++                        <child>
++                          <object class="GtkScrolledWindow" id="scrolledwindow301">
++                            <property name="visible">True</property>
++                            <property name="can_focus">True</property>
++                            <property name="border_width">5</property>
++                            <property name="width_request">450</property>
++                            <property name="height_request">350</property>
++                            <property name="hscrollbar_policy">automatic</property>
++                            <property name="vscrollbar_policy">automatic</property>
++                            <property name="shadow_type">out</property>
++                            <child>
++                              <object class="GtkViewport" id="viewport301">
++                                <property name="visible">True</property>
++                                <property name="shadow_type">none</property>
++                                <child>
++                                  <object class="GtkVBox" id="vbox_system_keyboard_options">
++                                    <property name="visible">True</property>
++                                    <property name="orientation">vertical</property>
++                                  </object>
++                                </child>
++                              </object>
++                            </child>
++                          </object>
++                          <packing>
++                            <property name="position">1</property>
++                          </packing>
++                        </child>
++                      </object>
++                    </child>
++                  </object>
++                </child>
++                <child type="label">
++                  <object class="GtkLabel" id="label301">
++                    <property name="visible">True</property>
++                    <property name="label" translatable="yes">&lt;b&gt;Keyboard Option&lt;/b&gt;</property>
++                    <property name="use_markup">True</property>
++                  </object>
++                </child>
++              </object>
++            </child>
++          </object>
++          <packing>
++            <property name="expand">False</property>
++            <property name="position">0</property>
++          </packing>
++        </child>
++        <child internal-child="action_area">
++          <object class="GtkHButtonBox" id="hbuttonbox301">
++            <property name="visible">True</property>
++            <property name="homogeneous">True</property>
++            <property name="layout_style">end</property>
++            <child>
++              <object class="GtkButton" id="button_system_keyboard_option_close">
++                <property name="label">gtk-close</property>
++                <property name="visible">True</property>
++                <property name="use_stock">True</property>
++              </object>
++              <packing>
++                <property name="expand">False</property>
++                <property name="fill">False</property>
++                <property name="position">0</property>
++              </packing>
++            </child>
++          </object>
++          <packing>
++            <property name="expand">False</property>
++            <property name="fill">False</property>
++            <property name="pack_type">end</property>
++            <property name="position">1</property>
++          </packing>
++        </child>
++      </object>
++    </child>
++  </object>
  </interface>
-diff --git a/setup/xkbcombobox.py b/setup/xkbcombobox.py
+diff --git a/setup/xkbsetup.py b/setup/xkbsetup.py
 new file mode 100644
-index 0000000..3d942be
+index 0000000..0d57a1a
 --- /dev/null
-+++ b/setup/xkbcombobox.py
-@@ -0,0 +1,106 @@
++++ b/setup/xkbsetup.py
+@@ -0,0 +1,451 @@
 +# vim:set et sts=4 sw=4:
 +#
 +# ibus - The Input Bus
@@ -1702,88 +1635,433 @@ index 0000000..3d942be
 +# Free Software Foundation, Inc., 59 Temple Place, Suite 330,
 +# Boston, MA  02111-1307  USA
 +
-+import gtk
-+import gobject
-+import pango
-+import ibus
 +import gettext
-+from icon import load_icon
++import gobject
++import gtk
++import ibus
 +
 +_ = lambda a : gettext.dgettext("ibus", a)
++XKB_MAX_LAYOUTS = 4
 +
-+class XKBComboBox(gtk.ComboBox):
-+    __gtype_name__ = 'XKBComboBox'
-+    __gproperties__ = {
-+        'active-engine' : (
-+            gobject.TYPE_PYOBJECT,
-+            'selected engine',
-+            'selected engine',
-+            gobject.PARAM_READABLE)
-+    }
++class XKBSetup(gobject.GObject):
++    def __init__(self, config, builder):
++        super(XKBSetup, self).__init__()
 +
-+    def __init__(self):
-+        super(XKBComboBox, self).__init__()
-+        self.connect("notify::active", self.__notify_active_cb)
++        self.__config = config
++        self.__builder = builder
 +
-+        self.__model = None
++        # system keyboard layout setting
++        self.__button_system_keyboard_layout = self.__builder.get_object("button_system_keyboard_layout")
++        text = str(self.__config.get_value("general", "system_keyboard_layout", ''))
++        if text == 'default' or text == '':
++            text = _("Default")
++        self.__button_system_keyboard_layout.set_label(text)
++        if not self.__config.get_value("general", "use_system_keyboard_layout", True):
++            self.__button_system_keyboard_layout.set_sensitive(False)
++        self.__button_system_keyboard_layout.connect("clicked", self.__button_system_keyboard_layout_cb)
 +
-+        renderer = gtk.CellRendererText()
-+        renderer.set_property("xalign", 0)
-+        renderer.set_property("xpad", 2)
-+        self.pack_start(renderer, True)
-+        self.set_cell_data_func(renderer, self.__name_cell_data_cb)
++        # use system keyboard layout setting
++        button = self.__builder.get_object("checkbutton_use_sys_layout")
++        button.connect("toggled", lambda button: self.__button_system_keyboard_layout.set_sensitive(button.get_active()))
 +
-+    def set_xkb_options(self, xkbconfig):
++        self.__xkblayoutconfig = None
++        self.__preload_xkb_engines = []
++        self.__other_xkb_engines = []
++        self.__default_xkb_engine = None
++        if ibus.XKBConfigRegistry.have_xkb():
++            self.__xkblayoutconfig = ibus.XKBLayoutConfig()
++
++        # config layouts dialog
++        self.__init_config_layouts()
++
++        # default system keyboard dialog
++        self.__init_system_keyboard()
++
++    def __get_xkb_engines(self):
++        xkb_engines = []
++        xkbconfig = ibus.XKBConfigRegistry()
++        layout_list = xkbconfig.get_layout_list()
++        layout_desc = xkbconfig.get_layout_desc()
++        layout_lang = xkbconfig.get_layout_lang()
++        variant_desc = xkbconfig.get_variant_desc()
++        for layout in layout_list.keys():
++            if layout not in layout_lang:
++                continue
++            langs = layout_lang[layout]
++            for lang in langs:
++                engine = ibus.XKBConfigRegistry.engine_desc_new(
++                    lang,
++                    layout,
++                    layout_desc[layout],
++                    None,
++                    None)
++                xkb_engines.append(engine)
++            for variant in layout_list[layout]:
++                label = "%s(%s)" % (layout, variant)
++                if label in layout_lang:
++                    langs = layout_lang[label]
++                for lang in langs:
++                    engine = ibus.XKBConfigRegistry.engine_desc_new(
++                        lang,
++                        layout,
++                        layout_desc[layout],
++                        variant,
++                        variant_desc[variant])
++                    xkb_engines.append(engine)
++        return xkb_engines
++
++    def __get_default_xkb_engine(self):
++        if self.__default_xkb_engine != None:
++            return self.__default_xkb_engine
++        self.__default_xkb_engine = ibus.XKBConfigRegistry.engine_desc_new(
++            "other",
++            "default",
++            _("Default"),
++            None,
++            None)
++        return self.__default_xkb_engine
++
++    def __init_config_layouts(self):
++        if not ibus.XKBConfigRegistry.have_xkb():
++            button = self.__builder.get_object("button_config_layouts")
++            button.hide()
++            return
++
++        self.__dialog_config_layouts = self.__builder.get_object("dialog_config_layouts")
++        self.__button_config_layouts_cancel = self.__builder.get_object("button_config_layouts_cancel")
++        self.__button_config_layouts_cancel.connect("clicked", self.__button_config_layouts_cancel_cb)
++        self.__button_config_layouts_ok = self.__builder.get_object("button_config_layouts_ok")
++        self.__button_config_layouts_ok.connect("clicked", self.__button_config_layouts_ok_cb)
++        self.__vbox_all_keyboard_layouts = self.__builder.get_object("vbox_all_keyboard_layouts")
++
++        xkb_engines = self.__get_xkb_engines()
++        if len(xkb_engines) > 0:
++            button = self.__builder.get_object("button_config_layouts")
++            button.connect("clicked", self.__button_config_layouts_cb)
++            button.set_sensitive(True)
++
++        engine_dict = {}
++        for engine in xkb_engines:
++            if not engine.name.startswith("xkb:layout:"):
++                continue
++            lang = ibus.get_language_name(engine.language)
++            if lang not in engine_dict:
++                engine_dict[lang] = []
++            engine_dict[lang].append(engine)
++
++        keys = engine_dict.keys()
++        keys.sort()
++        if ibus.get_language_name("Other") in keys:
++            keys.remove(ibus.get_language_name("Other"))
++            keys += [ibus.get_language_name("Other")]
++
++        preload_xkb_engines = self.__xkblayoutconfig.get_preload_layouts()
++        for lang in keys:
++            expander = gtk.Expander("")
++            self.__vbox_all_keyboard_layouts.pack_start(expander, True, True, 0)
++            expander.show()
++            label = expander.get_label_widget()
++            label.set_label(lang)
++            align = gtk.Alignment(0, 0, 1, 0)
++            align.set_padding(6, 0, 18, 0)
++            expander.add(align)
++            align.show()
++            vbox = gtk.VBox(False, 0)
++            align.add(vbox)
++            vbox.show()
++
++            def cmp_engine(a, b):
++                if a.rank == b.rank:
++                    return cmp(a.longname, b.longname)
++                return int(b.rank - a.rank)
++            engine_dict[lang].sort(cmp_engine)
++
++            for engine in engine_dict[lang]:
++                sub_name = engine.name[len("xkb:layout:"):]
++                layout_list = sub_name.split(':')
++                if len(layout_list) > 1:
++                    layout = "%s(%s)" % (layout_list[0], layout_list[1])
++                else:
++                    layout = layout_list[0]
++                has_preloaded = False
++                for preload_name in preload_xkb_engines:
++                    preload_name = str(preload_name)
++                    if len(preload_name) == 0:
++                        continue
++                    if layout == preload_name:
++                        has_preloaded = True
++                        break
++
++                checkbutton = gtk.CheckButton(engine.longname)
++                checkbutton.set_data("layout", layout)
++                if has_preloaded:
++                    checkbutton.set_active(True)
++                vbox.pack_start(checkbutton, False, True, 0)
++                checkbutton.show()
++
++    def __init_system_keyboard_layout(self):
++        self.__dialog_system_keyboard_layout = self.__builder.get_object("dialog_system_keyboard_layout")
++        self.__button_system_keyboard_layout_cancel = self.__builder.get_object("button_system_keyboard_layout_cancel")
++        self.__button_system_keyboard_layout_cancel.connect("clicked", self.__button_system_keyboard_layout_cancel_cb)
++        self.__button_system_keyboard_layout_ok = self.__builder.get_object("button_system_keyboard_layout_ok")
++        self.__button_system_keyboard_layout_ok.connect("clicked", self.__button_system_keyboard_layout_ok_cb)
++
++        # get xkb layouts
++        xkb_engines = self.__get_xkb_engines()
++
++        self.__combobox_system_keyboard_layout = self.__builder.get_object("combobox_system_keyboard_layout_engines")
++        self.__combobox_system_keyboard_layout.set_engines(xkb_engines)
++        self.__combobox_system_keyboard_layout.set_title(_("Select keyboard layouts"))
++        self.__combobox_system_keyboard_layout.connect("notify::active-engine", self.__combobox_notify_active_system_keyboard_layout_cb)
++        self.__treeview_system_keyboard_layout = self.__builder.get_object("treeview_system_keyboard_layout_engines")
++        self.__treeview_system_keyboard_layout.connect("notify", self.__treeview_notify_system_keyboard_layout_cb)
++        column = self.__treeview_system_keyboard_layout.get_column(0)
++        column.set_title(_("Keyboard Layouts"))
++        button = self.__builder.get_object("button_system_keyboard_layout_engine_add")
++        button.connect("clicked", self.__button_system_keyboard_layout_add_cb)
++        button = self.__builder.get_object("button_system_keyboard_layout_engine_remove")
++        button.connect("clicked", self.__button_system_keyboard_layout_remove_cb)
++        button = self.__builder.get_object("button_system_keyboard_layout_engine_up")
++        button.connect("clicked", lambda *args:self.__treeview_system_keyboard_layout.move_up_engine())
++
++        button = self.__builder.get_object("button_system_keyboard_layout_engine_down")
++        button.connect("clicked", lambda *args:self.__treeview_system_keyboard_layout.move_down_engine())
++        button = self.__builder.get_object("button_system_keyboard_layout_engine_reset")
++        button.connect("clicked", self.__button_system_keyboard_layout_reset_cb)
++        button_reset = button
++        text = str(self.__config.get_value("general", "system_keyboard_layout", ''))
++        if text == "default" or text == None:
++            engine = self.__get_default_xkb_engine()
++            self.__treeview_system_keyboard_layout.set_engines([engine])
++            button_reset.set_sensitive(False)
++        else:
++            for layout in text.split(','):
++                layout_engine = None
++                for engine in xkb_engines:
++                    if layout == engine.layout:
++                        layout_engine = engine
++                        break
++                if layout_engine != None:
++                    self.__treeview_system_keyboard_layout.append_engine(layout_engine)
++            button_reset.set_sensitive(True)
++        label = self.__builder.get_object("label_system_keyboard_layout_engines")
++        label.set_markup(_("<small><i>The system keyboard layouts "
++                           "can be set less than or equal to %d.\n"
++                           "You may use Up/Down buttons to change the order."
++                           "</i></small>") % XKB_MAX_LAYOUTS)
++
++    def __init_system_keyboard_option(self):
++        self.__dialog_system_keyboard_option = self.__builder.get_object("dialog_system_keyboard_option")
++        self.__button_system_keyboard_option_close = self.__builder.get_object("button_system_keyboard_option_close")
++        self.__button_system_keyboard_option_close.connect(
++            "clicked", lambda button: self.__dialog_system_keyboard_option.hide())
++
++        button = self.__builder.get_object("button_system_keyboard_option_setup")
++        button.connect("clicked", self.__button_system_keyboard_option_cb)
++        self.__checkbutton_use_system_keyboard_option = self.__builder.get_object("checkbutton_use_system_keyboard_option")
++        self.__vbox_system_keyboard_options = self.__builder.get_object("vbox_system_keyboard_options")
++        option_array = []
++        text = str(self.__config.get_value("general", "system_keyboard_option", ''))
++        if text == None or text == "default":
++            self.__checkbutton_use_system_keyboard_option.set_active(True)
++            self.__vbox_system_keyboard_options.set_sensitive(False)
++        else:
++            self.__checkbutton_use_system_keyboard_option.set_active(False)
++            self.__vbox_system_keyboard_options.set_sensitive(True)
++            option_array = text.split(',')
++        self.__checkbutton_use_system_keyboard_option.connect(
++            "toggled", lambda button: self.__vbox_system_keyboard_options.set_sensitive(not button.get_active()))
++
++        xkbconfig = ibus.XKBConfigRegistry()
 +        option_list = xkbconfig.get_option_list()
 +        option_group_desc = xkbconfig.get_option_group_desc()
 +        option_desc = xkbconfig.get_option_desc()
-+        self.__model = gtk.TreeStore(gobject.TYPE_PYOBJECT)
-+
-+        iter1 = self.__model.append(None)
-+        self.__model.set(iter1, 0, 0)
 +        for option_group in option_list.keys():
-+            iter1 = self.__model.append(None)
-+            self.__model.set(iter1, 0,
-+                             [option_group, option_group_desc[option_group]])
++            expander = gtk.Expander("")
++            self.__vbox_system_keyboard_options.pack_start(expander, True, True, 0)
++            expander.show()
++            checked = 0
++            label = expander.get_label_widget()
++            label.set_label(option_group_desc[option_group])
++            label.set_data("option_group", option_group)
++            expander.set_data("checked", checked)
++            align = gtk.Alignment(0, 0, 1, 0)
++            align.set_padding(6, 0, 18, 0)
++            expander.add(align)
++            align.show()
++            vbox = gtk.VBox(False, 0)
++            align.add(vbox)
++            vbox.show()
 +            for option in option_list[option_group]:
-+                iter2 = self.__model.append(iter1)
-+                self.__model.set(iter2, 0,
-+                                 [option, option_desc[option]])
++                checkbutton = gtk.CheckButton(option_desc[option])
++                checkbutton.set_data("option", option)
++                if option in option_array:
++                    checkbutton.set_active(True)
++                    label.set_markup("<b>" +
++                                     option_group_desc[option_group] +
++                                     "</b>")
++                    checked = checked + 1
++                    expander.set_data("checked", checked)
++                checkbutton.connect("toggled",
++                                    self.__checkbutton_system_keyboard_option_toggled_cb,
++                                    expander)
++                vbox.pack_start(checkbutton, False, True, 0)
++                checkbutton.show()
 +
-+        self.set_model(self.__model)
-+        self.set_active(0)
++    def __init_system_keyboard(self):
++        if not ibus.XKBConfigRegistry.have_xkb():
++            hbox = self.__builder.get_object("hbox_system_keyboard_layout")
++            hbox.hide()
++            return
 +
-+    def __name_cell_data_cb(self, celllayout, renderer, model, iter):
-+        option_list = self.__model.get_value(iter, 0)
++        self.__init_system_keyboard_layout()
++        self.__init_system_keyboard_option()
 +
-+        if isinstance (option_list, str) or isinstance (option_list, unicode):
-+            renderer.set_property("sensitive", False)
-+            renderer.set_property("text", option_list)
-+            renderer.set_property("weight", pango.WEIGHT_NORMAL)
-+        elif isinstance(option_list, int):
-+            renderer.set_property("sensitive", True)
-+            renderer.set_property("text", _("Select an keyboard option"))
-+            renderer.set_property("weight", pango.WEIGHT_NORMAL)
++    def __combobox_notify_active_system_keyboard_layout_cb(self, combobox, property):
++        engine = self.__combobox_system_keyboard_layout.get_active_engine()
++        button = self.__builder.get_object("button_system_keyboard_layout_engine_add")
++        engines = self.__treeview_system_keyboard_layout.get_engines()
++        button.set_sensitive(engine != None and \
++                             engine not in engines and \
++                             len(engines) < XKB_MAX_LAYOUTS)
++
++    def __treeview_notify_system_keyboard_layout_cb(self, treeview, property):
++        if property.name != "active-engine" and property.name != "engines":
++            return
++
++        engines = self.__treeview_system_keyboard_layout.get_engines()
++        engine = self.__treeview_system_keyboard_layout.get_active_engine()
++
++        button = self.__builder.get_object("button_system_keyboard_layout_engine_remove")
++        button.set_sensitive(engine != None)
++        button = self.__builder.get_object("button_system_keyboard_layout_engine_up")
++        button.set_sensitive(engine not in engines[:1])
++        button = self.__builder.get_object("button_system_keyboard_layout_engine_down")
++        button.set_sensitive(engine not in engines[-1:])
++
++    def __button_system_keyboard_layout_add_cb(self, button):
++        engines = self.__treeview_system_keyboard_layout.get_engines()
++        engine = self.__combobox_system_keyboard_layout.get_active_engine()
++        if len(engines) > 0 and engines[0].layout == "default":
++            self.__treeview_system_keyboard_layout.set_engines([engine])
 +        else:
-+            renderer.set_property("sensitive", True)
-+            renderer.set_property("text", option_list[1])
-+            renderer.set_property("weight", pango.WEIGHT_NORMAL)
++            self.__treeview_system_keyboard_layout.append_engine(engine)
++        button_reset = self.__builder.get_object("button_system_keyboard_layout_engine_reset")
++        button_reset.set_sensitive(True)
++        if len(self.__treeview_system_keyboard_layout.get_engines()) >= XKB_MAX_LAYOUTS:
++            button.set_sensitive(False)
 +
-+    def __notify_active_cb(self, combobox, property):
-+        self.notify("active-engine")
++    def __button_system_keyboard_layout_remove_cb(self, button):
++        self.__treeview_system_keyboard_layout.remove_engine()
++        if len(self.__treeview_system_keyboard_layout.get_engines()) < XKB_MAX_LAYOUTS:
++            button_add = self.__builder.get_object("button_system_keyboard_layout_engine_add")
++            button_add.set_sensitive(True)
++        button_reset = self.__builder.get_object("button_system_keyboard_layout_engine_reset")
++        button_reset.set_sensitive(True)
 +
-+    def do_get_property(self, property):
-+        if property.name == "active-engine":
-+            i = self.get_active()
-+            if i == 0 or i == -1:
-+                return None
-+            iter = self.get_active_iter()
-+            return self.get_model()[iter][0]
++    def __button_system_keyboard_layout_reset_cb(self, button):
++        engine = self.__get_default_xkb_engine()
++        self.__treeview_system_keyboard_layout.set_engines([engine])
++        button.set_sensitive(False)
++
++    def __button_config_layouts_cb(self, button):
++        self.__dialog_config_layouts.run()
++        self.__dialog_config_layouts.hide()
++
++    def __button_config_layouts_cancel_cb(self, button):
++        self.__dialog_config_layouts.hide()
++
++    def __button_config_layouts_ok_cb(self, button):
++        self.__dialog_config_layouts.hide()
++        engine_list = []
++        for expander in self.__vbox_all_keyboard_layouts.get_children():
++            align = expander.get_children()[0]
++            vbox = align.get_children()[0]
++            for checkbutton in vbox.get_children():
++                if checkbutton.get_active():
++                    engine_list.append(checkbutton.get_data("layout"))
++        if len(engine_list) == 0:
++            return
++        engine_list.sort()
++        self.__xkblayoutconfig.save_preload_layouts(engine_list)
++        message = _("Please restart IBus to reload your configuration.")
++        dlg = gtk.MessageDialog(type = gtk.MESSAGE_INFO,
++                                buttons = gtk.BUTTONS_OK,
++                                message_format = message)
++        dlg.run()
++        dlg.destroy()
++
++    def __button_system_keyboard_layout_cb(self, button):
++        self.__dialog_system_keyboard_layout.run()
++        self.__dialog_system_keyboard_layout.hide()
++
++    def __button_system_keyboard_layout_cancel_cb(self, button):
++        self.__dialog_system_keyboard_layout.hide()
++
++    def __button_system_keyboard_layout_ok_cb(self, button):
++        self.__dialog_system_keyboard_layout.hide()
++        layout = "default"
++        for engine in self.__treeview_system_keyboard_layout.get_engines():
++            if layout == "default":
++                layout = engine.layout
++            else:
++                layout = "%s,%s" % (layout, engine.layout)
++        if layout == None or layout == "":
++            layout = "default"
++        org_layout = str(self.__config.get_value("general", "system_keyboard_layout", None))
++        if layout != org_layout:
++            self.__config.set_value("general", "system_keyboard_layout", layout)
++        if layout == "default":
++            layout = _("Default")
++        self.__button_system_keyboard_layout.set_label(layout)
++        option = "default"
++        if not self.__checkbutton_use_system_keyboard_option.get_active():
++            for expander in self.__vbox_system_keyboard_options.get_children():
++                align = expander.get_children()[0]
++                vbox = align.get_children()[0]
++                for checkbutton in vbox.get_children():
++                    if checkbutton.get_active():
++                        data = checkbutton.get_data("option")
++                        if option == "default":
++                            option = data
++                        else:
++                            option = "%s,%s" % (option, data)
++        if option == None or option == "":
++            option = "default"
++        if option != "default" and option.find(':') < 0:
++            message = _("The keyboard option cannot be chosen.")
++            dlg = gtk.MessageDialog(type = gtk.MESSAGE_INFO,
++                                    buttons = gtk.BUTTONS_OK,
++                                    message_format = message)
++            dlg.run()
++            dlg.destroy()
++            return
++        org_option = str(self.__config.get_value("general", "system_keyboard_option", None))
++        if option != org_option:
++            self.__config.set_value("general", "system_keyboard_option", option)
++        message = _("Please restart IBus to reload your configuration.")
++        dlg = gtk.MessageDialog(type = gtk.MESSAGE_INFO,
++                                buttons = gtk.BUTTONS_OK,
++                                message_format = message)
++        dlg.run()
++        dlg.destroy()
++
++    def __button_system_keyboard_option_cb(self, button):
++        self.__dialog_system_keyboard_option.run()
++        self.__dialog_system_keyboard_option.hide()
++
++    def __checkbutton_system_keyboard_option_toggled_cb(self, button, user_data):
++        expander = user_data
++        checked = expander.get_data("checked")
++        label = expander.get_label_widget()
++        if button.get_active():
++            checked = checked + 1
++            label.set_markup("<b>" + label.get_text() + "</b>")
 +        else:
-+            raise AttributeError, 'unknown property %s' % property.name
-+
-+    def get_active_xkb(self):
-+        return self.get_property("active-engine")
++            checked = checked - 1
++            if checked <= 0:
++                label.set_text(label.get_text())
++        expander.set_data("checked", checked)
 +
 diff --git a/src/ibusfactory.c b/src/ibusfactory.c
 index 0a95108..3acd6a6 100644
@@ -2056,10 +2334,11 @@ index 0000000..49b82eb
 +endif
 diff --git a/xkb/ibus-engine-xkb-main.c b/xkb/ibus-engine-xkb-main.c
 new file mode 100644
-index 0000000..7fd6a7f
+index 0000000..e1861e8
 --- /dev/null
 +++ b/xkb/ibus-engine-xkb-main.c
-@@ -0,0 +1,396 @@
+@@ -0,0 +1,397 @@
++/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
 +/* vim:set et sts=4: */
 +/* bus - The Input Bus
 + * Copyright (C) 2010 Takao Fujiwara <takao.fujiwara1@gmail.com>
@@ -2458,10 +2737,11 @@ index 0000000..7fd6a7f
 +}
 diff --git a/xkb/ibus-engine-xkb-main.h b/xkb/ibus-engine-xkb-main.h
 new file mode 100644
-index 0000000..db31de9
+index 0000000..8007631
 --- /dev/null
 +++ b/xkb/ibus-engine-xkb-main.h
-@@ -0,0 +1,45 @@
+@@ -0,0 +1,46 @@
++/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
 +/* vim:set et sts=4: */
 +/* bus - The Input Bus
 + * Copyright (C) 2010 Takao Fujiwara <takao.fujiwara1@gmail.com>
@@ -2509,10 +2789,11 @@ index 0000000..db31de9
 +#endif
 diff --git a/xkb/ibus-xkb-main.c b/xkb/ibus-xkb-main.c
 new file mode 100644
-index 0000000..b8165a9
+index 0000000..0919913
 --- /dev/null
 +++ b/xkb/ibus-xkb-main.c
-@@ -0,0 +1,100 @@
+@@ -0,0 +1,101 @@
++/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
 +/* vim:set et sts=4: */
 +/* bus - The Input Bus
 + * Copyright (C) 2010 Takao Fujiwara <takao.fujiwara1@gmail.com>
@@ -2649,10 +2930,11 @@ index 0000000..b1212d1
 +</xkblayout>
 diff --git a/xkb/xkblib.c b/xkb/xkblib.c
 new file mode 100644
-index 0000000..1fe9ebf
+index 0000000..1f6f8d7
 --- /dev/null
 +++ b/xkb/xkblib.c
-@@ -0,0 +1,296 @@
+@@ -0,0 +1,297 @@
++/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
 +/* vim:set et sts=4: */
 +/* bus - The Input Bus
 + * Copyright (C) 2010 Takao Fujiwara <takao.fujiwara1@gmail.com>
@@ -2951,10 +3233,11 @@ index 0000000..1fe9ebf
 +}
 diff --git a/xkb/xkblib.h b/xkb/xkblib.h
 new file mode 100644
-index 0000000..e6404e9
+index 0000000..09d506d
 --- /dev/null
 +++ b/xkb/xkblib.h
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,40 @@
++/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
 +/* vim:set et sts=4: */
 +/* bus - The Input Bus
 + * Copyright (C) 2010 Takao Fujiwara <takao.fujiwara1@gmail.com>
@@ -2996,10 +3279,11 @@ index 0000000..e6404e9
 +#endif
 diff --git a/xkb/xkbxml.c b/xkb/xkbxml.c
 new file mode 100644
-index 0000000..ab53ae1
+index 0000000..ed60c8a
 --- /dev/null
 +++ b/xkb/xkbxml.c
-@@ -0,0 +1,695 @@
+@@ -0,0 +1,696 @@
++/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
 +/* vim:set et sts=4: */
 +/* bus - The Input Bus
 + * Copyright (C) 2010 Takao Fujiwara <takao.fujiwara1@gmail.com>
@@ -3697,10 +3981,11 @@ index 0000000..ab53ae1
 +}
 diff --git a/xkb/xkbxml.h b/xkb/xkbxml.h
 new file mode 100644
-index 0000000..0ba04d1
+index 0000000..1138b9b
 --- /dev/null
 +++ b/xkb/xkbxml.h
-@@ -0,0 +1,188 @@
+@@ -0,0 +1,189 @@
++/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
 +/* vim:set et sts=4: */
 +/* bus - The Input Bus
 + * Copyright (C) 2010 Takao Fujiwara <takao.fujiwara1@gmail.com>

@@ -11,7 +11,7 @@
 
 Name:       ibus
 Version:    1.3.7
-Release:    8%{?dist}
+Release:    9%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -283,10 +283,12 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Wed Sep 29 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.7-8
+* Wed Sep 29 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.7-9
 - Added ibus-xx-g-ir-compiler.patch to fix g-ir-compiler error.
 - Updated ibus-435880-surrounding-text.patch
   Fixes Bug 634829 - ibus_im_context_set_surrounding() to get strings.
+- Updated ibus-541492-xkb.patch
+  Fixed a bug when changed the system layout "jp(kana)" to "jp".
 
 * Tue Sep 14 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.7-5
 - Added ibus-621795-engineproxy-segv.patch
