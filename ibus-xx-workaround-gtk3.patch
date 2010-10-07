@@ -1,0 +1,30 @@
+--- ibus-1.3.7/client/gtk3/ibusim.c.orig	2010-10-07 15:26:58.572225337 +0900
++++ ibus-1.3.7/client/gtk3/ibusim.c	2010-10-07 15:33:04.881225883 +0900
+@@ -20,6 +20,12 @@
+  */
+ 
+ #include <glib/gprintf.h>
++#define WORKAROUND_GTK3_BUILD_FAILURE 1
++#ifdef WORKAROUND_GTK3_BUILD_FAILURE
++#include <glib-object.h>
++typedef struct _GObject GApplication;
++typedef struct _GObjectClass GApplicationClass;
++#endif
+ #include <gtk/gtk.h>
+ #include <gtk/gtkimmodule.h>
+ #include <ibus.h>
+--- ibus-1.3.7/client/gtk3/ibusimcontext.c.gtk3	2010-10-07 15:33:47.128225657 +0900
++++ ibus-1.3.7/client/gtk3/ibusimcontext.c	2010-10-07 15:35:00.708225606 +0900
+@@ -23,6 +23,12 @@
+ #  include <config.h>
+ #endif
+ 
++#define WORKAROUND_GTK3_BUILD_FAILURE 1
++#ifdef WORKAROUND_GTK3_BUILD_FAILURE
++#include <glib-object.h>
++typedef struct _GObject GApplication;
++typedef struct _GObjectClass GApplicationClass;
++#endif
+ #include <gtk/gtk.h>
+ #include <gdk/gdkkeysyms.h>
+ #include <gdk/gdkx.h>

@@ -11,7 +11,7 @@
 
 Name:       ibus
 Version:    1.3.7
-Release:    9%{?dist}
+Release:    10%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -26,6 +26,8 @@ Patch3:     ibus-xx-g-ir-compiler.patch
 # Patch5:     ibus-530711-preload-sys.patch
 Patch6:     ibus-541492-xkb.patch
 Patch7:     ibus-435880-surrounding-text.patch
+# WORKAROUND_GTK3_BUILD_FAILURE @ fedora14
+Patch99:    ibus-xx-workaround-gtk3.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -141,6 +143,22 @@ The ibus-devel-docs package contains developer documentation for ibus
 %patch6 -p1 -b .xkb
 %endif
 %patch7 -p1 -b .surrounding
+
+#### start WORKAROUND_GTK3_BUILD_FAILURE
+WORKAROUND_GTK3_BUILD_FAILURE=0
+pkg-config --print-requires gtk+-3.0 | grep -q gio-2.0
+if test $? -eq 0; then
+    if test -f /usr/include/gtk-3.0/gtk/gtkapplication.h -a \
+       ! -f /usr/include/glib-2.0/gio/gapplication.h ; then
+        WORKAROUND_GTK3_BUILD_FAILURE=1
+    fi
+fi
+if test $WORKAROUND_GTK3_BUILD_FAILURE -eq 1 ; then
+  printf "#### ERROR: glib2 is old against gtk3\n"
+  printf "####        Applying a workaround\n"
+  %patch99 -p1 -b .ugly-hack
+fi
+#### end WORKAROUND_GTK3_BUILD_FAILURE
 
 %build
 %if %have_libxkbfile
@@ -283,12 +301,14 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Wed Sep 29 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.7-9
+* Thu Oct 07 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.7-10
 - Added ibus-xx-g-ir-compiler.patch to fix g-ir-compiler error.
 - Updated ibus-435880-surrounding-text.patch
   Fixes Bug 634829 - ibus_im_context_set_surrounding() to get strings.
 - Updated ibus-541492-xkb.patch
   Fixed a bug when changed the system layout "jp(kana)" to "jp".
+- Added ibus-xx-workaround-gtk3.patch
+  Workaround for f14 http://koji.fedoraproject.org/koji/taskinfo?taskID=2516604
 
 * Tue Sep 14 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.7-5
 - Added ibus-621795-engineproxy-segv.patch
