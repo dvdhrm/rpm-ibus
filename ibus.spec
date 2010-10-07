@@ -11,7 +11,7 @@
 
 Name:       ibus
 Version:    1.3.7
-Release:    10%{?dist}
+Release:    11%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -156,7 +156,7 @@ fi
 if test $WORKAROUND_GTK3_BUILD_FAILURE -eq 1 ; then
   printf "#### ERROR: glib2 is old against gtk3\n"
   printf "####        Applying a workaround\n"
-  %patch99 -p1 -b .ugly-hack
+%patch99 -p1 -b .ugly-hack
 fi
 #### end WORKAROUND_GTK3_BUILD_FAILURE
 
@@ -301,7 +301,7 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Thu Oct 07 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.7-10
+* Thu Oct 07 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.7-11
 - Added ibus-xx-g-ir-compiler.patch to fix g-ir-compiler error.
 - Updated ibus-435880-surrounding-text.patch
   Fixes Bug 634829 - ibus_im_context_set_surrounding() to get strings.
