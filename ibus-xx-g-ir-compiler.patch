@@ -1,16 +1,61 @@
 From 9a6f41415b774541c69cb45cec96839b7228fe70 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Fri, 1 Oct 2010 12:13:14 +0900
+Date: Wed, 13 Oct 2010 14:05:02 +0900
 Subject: [PATCH] Fix a build error with GTK3 gdkkeysyms.h
 
-Fix a build error with DBus-1.0.gir in gobject-introspection 0.9.6
+Fix a build error of IBus-1.0.gir with gobject-introspection 0.9.6
 
 ---
- configure.ac                |   21 +++++++++++++++++++++
- client/gtk2/ibusimcontext.c |   47 +++++++++++++++++++++++++++++++++++++++++++
- src/Makefile.am             |    4 ++--
- 3 files changed, 70 insertions(+), 2 deletions(-)
+ bus/connection.c             |    1 +
+ bus/main.c                   |    1 +
+ bus/server.c                 |    1 +
+ client/gtk2/ibusimcontext.c  |   47 +++++++++++++++++++++++++++++++++++++++++++
+ configure.ac                 |   13 +++++++++++++
+ src/Makefile.am              |    2 +-
+ src/ibusdbus.h               |   39 +++++++++++++++++++++++++++++++++++----
+ src/ibusenumtypes.c.template |    1 +
+ src/ibuserror.c              |    2 +-
+ src/ibuserror.h              |   12 +-----------
+ src/ibusmessage.h            |   14 --------------
+ src/ibuspendingcall.h        |    7 -------
+ 12 files changed, 102 insertions(+), 38 deletions(-)
 
+diff --git a/bus/connection.c b/bus/connection.c
+index 5a84c2e..c2730bb 100644
+--- a/bus/connection.c
++++ b/bus/connection.c
+@@ -20,6 +20,7 @@
+  * Boston, MA 02111-1307, USA.
+  */
+ 
++#include <dbus/dbus.h>
+ #include <unistd.h>
+ #include "connection.h"
+ #include "matchrule.h"
+diff --git a/bus/main.c b/bus/main.c
+index 852f6aa..c9821b8 100644
+--- a/bus/main.c
++++ b/bus/main.c
+@@ -20,6 +20,7 @@
+  * Boston, MA 02111-1307, USA.
+  */
+ #include <config.h>
++#include <dbus/dbus.h>
+ #include <unistd.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+diff --git a/bus/server.c b/bus/server.c
+index b611738..5af6dbf 100644
+--- a/bus/server.c
++++ b/bus/server.c
+@@ -19,6 +19,7 @@
+  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+  * Boston, MA 02111-1307, USA.
+  */
++#include <dbus/dbus.h>
+ #include <unistd.h>
+ #include <sys/stat.h>
+ #include <sys/types.h>
 diff --git a/client/gtk3/ibusimcontext.c b/client/gtk3/ibusimcontext.c
 index c104f38..a7a2c59 100644
 --- a/client/gtk3/ibusimcontext.c
@@ -112,15 +157,14 @@ index c104f38..a7a2c59 100644
          event->string = g_strdup ("\r");
      }
 diff --git a/configure.ac b/configure.ac
-index 3346d0c..9cd60a3 100644
+index 3346d0c..3d87484 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -171,6 +171,25 @@ fi
+@@ -171,6 +171,18 @@ fi
  # GObject introspection
  GOBJECT_INTROSPECTION_CHECK([0.6.8])
  
 +IBUS_GIR_SCANNERFLAGS=
-+IBUS_GIR_INCLUDES=
 +if test x"$found_introspection" = x"yes" ; then
 +    IBUS_GIR_SCANNERFLAGS="--identifier-prefix=IBus --symbol-prefix=ibus"
 +    PKG_CHECK_EXISTS([gobject-introspection-1.0 >= 0.9.6],
@@ -129,42 +173,182 @@ index 3346d0c..9cd60a3 100644
 +    if test x"$gir_symbol_prefix" = x"no" ; then
 +        IBUS_GIR_SCANNERFLAGS="--strip-prefix=IBus"
 +    fi
-+
-+    DBUS_GIR_NAME=DBus-1.0
-+    if test -f ${INTROSPECTION_GIRDIR}/${DBUS_GIR_NAME}.gir ; then
-+        IBUS_GIR_INCLUDES="${IBUS_GIR_INCLUDES} ${DBUS_GIR_NAME}"
-+    fi
 +fi
 +AC_SUBST(IBUS_GIR_SCANNERFLAGS)
-+AC_SUBST(IBUS_GIR_INCLUDES)
 +
  # check for gtk-doc
  GTK_DOC_CHECK(1.9)
  if test x"$enable_gtk_doc" = x"no"; then
-@@ -386,6 +405,8 @@ Build options:
+@@ -386,6 +398,7 @@ Build options:
    Build gconf modules       $enable_gconf
    Build memconf modules     $enable_memconf
    Build introspection       $found_introspection
 +  IBus-1.0.gir scannerflags "$IBUS_GIR_SCANNERFLAGS"
-+  IBus-1.0.gir includes     "$IBUS_GIR_INCLUDES"
    Build vala binding        $enable_vala
    Build document            $enable_gtk_doc
    Enable key snooper        $enable_key_snooper
 diff --git a/src/Makefile.am b/src/Makefile.am
-index cdd3d7c..9519d5a 100644
+index 5fb24a4..c45a588 100644
 --- a/src/Makefile.am
 +++ b/src/Makefile.am
-@@ -138,8 +138,8 @@ introspection_files = \
+@@ -138,7 +138,7 @@ introspection_files = \
          ibusenumtypes.h \
  		$(NULL)
  IBus-1.0.gir: $(ibustargetlib) Makefile
 -IBus_1_0_gir_SCANNERFLAGS = --strip-prefix=IBus --pkg=dbus-1,glib-2.0
--IBus_1_0_gir_INCLUDES = GLib-2.0 GObject-2.0
-+IBus_1_0_gir_SCANNERFLAGS = --pkg=dbus-1,glib-2.0 $(IBUS_GIR_SCANNERFLAGS)
-+IBus_1_0_gir_INCLUDES = GLib-2.0 GObject-2.0 $(IBUS_GIR_INCLUDES)
++IBus_1_0_gir_SCANNERFLAGS = --pkg=glib-2.0 $(IBUS_GIR_SCANNERFLAGS)
+ IBus_1_0_gir_INCLUDES = GLib-2.0 GObject-2.0
  IBus_1_0_gir_LIBS = $(ibustargetlib)
  IBus_1_0_gir_FILES = $(addprefix $(srcdir)/,$(introspection_files))
- IBus_1_0_gir_CFLAGS = $(INCLUDES)
+diff --git a/src/ibusdbus.h b/src/ibusdbus.h
+index 3cf99a2..88aa791 100644
+--- a/src/ibusdbus.h
++++ b/src/ibusdbus.h
+@@ -32,13 +32,44 @@
+ G_BEGIN_DECLS
+ 
+ #ifndef DBUS_H
+-typedef struct DBusError DBusError;
+-typedef struct DBusMessage DBusMessage;
+-typedef struct DBusMessageIter DBusMessageIter;
+-typedef struct DBusPendingCall DBusPendingCall;
++typedef struct IBusError IBusError;
++typedef struct IBusMessage IBusMessage;
++typedef struct IBusMessageIter IBusMessageIter;
++typedef struct IBusPendingCall IBusPendingCall;
+ typedef struct DBusServer DBusServer;
+ typedef struct DBusConnection DBusConnection;
+ #else
++/**
++ * IBusError:
++ *
++ * A data type representing an IBusError.
++ * An IBusError is actually a #DBusError.
++ *
++ * @see_also: #DBusError for detail structure definition.
++ */
++typedef DBusError IBusError;
++
++/**
++ * IBusMessage:
++ *
++ * An opaque data structure that represents IBusMessage.
++ */
++typedef DBusMessage IBusMessage;
++
++/**
++ * IBusMessageIter:
++ *
++ * An opaque data structure that represents IBusMessageIter.
++ */
++typedef DBusMessageIter IBusMessageIter;
++
++/**
++ * IBusPendingCall:
++ *
++ * An opaque data structure that represents IBusPendingCall.
++ */
++typedef DBusPendingCall IBusPendingCall;
++
+ #endif
+ 
+ G_END_DECLS
+diff --git a/src/ibusenumtypes.c.template b/src/ibusenumtypes.c.template
+index 9f607a0..a526bd1 100644
+--- a/src/ibusenumtypes.c.template
++++ b/src/ibusenumtypes.c.template
+@@ -1,4 +1,5 @@
+ /*** BEGIN file-header ***/
++#include <dbus/dbus.h>
+ #include "ibus.h"
+ 
+ /*** END file-header ***/
+diff --git a/src/ibuserror.c b/src/ibuserror.c
+index a721a47..e701a17 100644
+--- a/src/ibuserror.c
++++ b/src/ibuserror.c
+@@ -63,7 +63,7 @@ ibus_error_new_from_printf (const gchar *name,
+ }
+ 
+ IBusError *
+-ibus_error_new_from_message (DBusMessage *message)
++ibus_error_new_from_message (IBusMessage *message)
+ {
+     g_assert (message != NULL);
+ 
+diff --git a/src/ibuserror.h b/src/ibuserror.h
+index a3f75f2..8de6ae0 100644
+--- a/src/ibuserror.h
++++ b/src/ibuserror.h
+@@ -36,16 +36,6 @@
+ G_BEGIN_DECLS
+ 
+ /**
+- * IBusError:
+- *
+- * A data type representing an IBusError.
+- * An IBusError is actually a #DBusError.
+- *
+- * @see_also: #DBusError for detail structure definition.
+- */
+-typedef DBusError IBusError;
+-
+-/**
+  * ibus_error_new:
+  * @returns: A newly allocated IBusError.
+  *
+@@ -85,7 +75,7 @@ IBusError       *ibus_error_new_from_printf (const gchar    *name,
+  * New an IBusError from a #IBusMessage.
+  */
+ IBusError       *ibus_error_new_from_message
+-                                            (DBusMessage    *message);
++                                            (IBusMessage    *message);
+ 
+ /**
+  * ibus_error_free:
+diff --git a/src/ibusmessage.h b/src/ibusmessage.h
+index 584d497..f4bdb3a 100644
+--- a/src/ibusmessage.h
++++ b/src/ibusmessage.h
+@@ -77,20 +77,6 @@
+ G_BEGIN_DECLS
+ 
+ /**
+- * IBusMessage:
+- *
+- * An opaque data structure that represents IBusMessage.
+- */
+-typedef DBusMessage IBusMessage;
+-
+-/**
+- * IBusMessageIter:
+- *
+- * An opaque data structure that represents IBusMessageIter.
+- */
+-typedef DBusMessageIter IBusMessageIter;
+-
+-/**
+  * ibus_type_get_object_path:
+  * @returns: Type of object path.
+  *
+diff --git a/src/ibuspendingcall.h b/src/ibuspendingcall.h
+index d74c921..650ba4f 100644
+--- a/src/ibuspendingcall.h
++++ b/src/ibuspendingcall.h
+@@ -41,13 +41,6 @@
+ G_BEGIN_DECLS
+ 
+ /**
+- * IBusPendingCall:
+- *
+- * An opaque data structure that represents IBusPendingCall.
+- */
+-typedef DBusPendingCall IBusPendingCall;
+-
+-/**
+  * IBusPendingCallNotifyFunction:
+  * @pending: An IBusPendingCall.
+  * @user_data: User data for the callback function.
 -- 
 1.7.2.1
 
