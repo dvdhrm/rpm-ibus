@@ -6,8 +6,10 @@ Subject: [PATCH] Fix a build error with GTK3 gdkkeysyms.h
 Fix a build error of IBus-1.0.gir with gobject-introspection 0.9.6
 
 ---
- bus/connection.c             |    1 +
+ bus/dbusimpl.h               |    4 ++--
  bus/main.c                   |    1 +
+ bus/matchrule.c              |    6 +++---
+ bus/matchrule.h              |    4 ++--
  bus/server.c                 |    1 +
  client/gtk2/ibusimcontext.c  |   47 +++++++++++++++++++++++++++++++++++++++++++
  configure.ac                 |   13 +++++++++++++
@@ -18,20 +20,25 @@ Fix a build error of IBus-1.0.gir with gobject-introspection 0.9.6
  src/ibuserror.h              |   12 +-----------
  src/ibusmessage.h            |   14 --------------
  src/ibuspendingcall.h        |    7 -------
- 12 files changed, 102 insertions(+), 38 deletions(-)
+ 14 files changed, 108 insertions(+), 45 deletions(-)
 
-diff --git a/bus/connection.c b/bus/connection.c
-index 5a84c2e..c2730bb 100644
---- a/bus/connection.c
-+++ b/bus/connection.c
-@@ -20,6 +20,7 @@
-  * Boston, MA 02111-1307, USA.
-  */
- 
-+#include <dbus/dbus.h>
- #include <unistd.h>
- #include "connection.h"
- #include "matchrule.h"
+diff --git a/bus/dbusimpl.h b/bus/dbusimpl.h
+index d3409fa..da332d0 100644
+--- a/bus/dbusimpl.h
++++ b/bus/dbusimpl.h
+@@ -80,10 +80,10 @@ BusConnection   *bus_dbus_impl_get_connection_by_name
+                                                 (BusDBusImpl    *dbus,
+                                                  const gchar    *name);
+ void             bus_dbus_impl_dispatch_message (BusDBusImpl    *dbus,
+-                                                 DBusMessage    *message);
++                                                 IBusMessage    *message);
+ void             bus_dbus_impl_dispatch_message_by_rule
+                                                 (BusDBusImpl    *dbus,
+-                                                 DBusMessage    *message,
++                                                 IBusMessage    *message,
+                                                  BusConnection  *skip_connection);
+ gboolean         bus_dbus_impl_register_object  (BusDBusImpl    *dbus,
+                                                  IBusService    *object);
 diff --git a/bus/main.c b/bus/main.c
 index 852f6aa..c9821b8 100644
 --- a/bus/main.c
@@ -44,6 +51,59 @@ index 852f6aa..c9821b8 100644
  #include <unistd.h>
  #include <sys/types.h>
  #include <sys/stat.h>
+diff --git a/bus/matchrule.c b/bus/matchrule.c
+index 1c0205d..eb51323 100644
+--- a/bus/matchrule.c
++++ b/bus/matchrule.c
+@@ -414,7 +414,7 @@ bus_match_rule_set_arg (BusMatchRule   *rule,
+ 
+ gboolean
+ bus_match_rule_match (BusMatchRule   *rule,
+-                      DBusMessage    *message)
++                      IBusMessage    *message)
+ {
+     g_assert (rule != NULL);
+     g_assert (message != NULL);
+@@ -451,7 +451,7 @@ bus_match_rule_match (BusMatchRule   *rule,
+ 
+     if (rule->flags & MATCH_ARGS) {
+         guint i;
+-        DBusMessageIter iter;
++        IBusMessageIter iter;
+ 
+         ibus_message_iter_init (message, &iter);
+ 
+@@ -626,7 +626,7 @@ bus_match_rule_remove_recipient (BusMatchRule   *rule,
+ 
+ GList *
+ bus_match_rule_get_recipients (BusMatchRule   *rule,
+-                               DBusMessage    *message)
++                               IBusMessage    *message)
+ {
+     g_assert (BUS_IS_MATCH_RULE (rule));
+     g_assert (message != NULL);
+diff --git a/bus/matchrule.h b/bus/matchrule.h
+index ddaa7de..4743b81 100644
+--- a/bus/matchrule.h
++++ b/bus/matchrule.h
+@@ -107,7 +107,7 @@ gboolean         bus_match_rule_set_arg     (BusMatchRule   *rule,
+                                              guint           arg_i,
+                                              const gchar    *arg);
+ gboolean         bus_match_rule_match       (BusMatchRule   *rule,
+-                                             DBusMessage    *message);
++                                             IBusMessage    *message);
+ gboolean         bus_match_rule_is_equal    (BusMatchRule   *a,
+                                              BusMatchRule   *b);
+ void             bus_match_rule_add_recipient
+@@ -118,7 +118,7 @@ void             bus_match_rule_remove_recipient
+                                              BusConnection  *connection);
+ GList           *bus_match_rule_get_recipients
+                                             (BusMatchRule   *rule,
+-                                             DBusMessage    *message);
++                                             IBusMessage    *message);
+ 
+ G_END_DECLS
+ #endif
 diff --git a/bus/server.c b/bus/server.c
 index b611738..5af6dbf 100644
 --- a/bus/server.c
