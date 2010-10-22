@@ -1,6 +1,6 @@
-From d4b10b2e9aec0e1fb0674bab70c439ccc91ea07b Mon Sep 17 00:00:00 2001
+From de91361ea502c63e54ceb23389b3c88b234f40a0 Mon Sep 17 00:00:00 2001
 From: Daiki Ueno <ueno@unixuser.org>
-Date: Wed, 29 Sep 2010 13:40:58 +0900
+Date: Thu, 21 Oct 2010 18:48:51 +0900
 Subject: [PATCH] Support surrounding-text retrieval.
 
 This change adds a new API function ibus_engine_get_surrounding_text().
@@ -207,10 +207,10 @@ index b5ab201..1aa9f21 100644
  
      ibus_message_set_sender (message, bus_connection_get_unique_name (connection));
 diff --git a/client/gtk2/ibusimcontext.c b/client/gtk2/ibusimcontext.c
-index c104f38..86350f5 100644
+index 0bb71b5..eaa4a54 100644
 --- a/client/gtk2/ibusimcontext.c
 +++ b/client/gtk2/ibusimcontext.c
-@@ -107,6 +107,12 @@ static void     ibus_im_context_set_cursor_location
+@@ -113,6 +113,12 @@ static void     ibus_im_context_set_cursor_location
  static void     ibus_im_context_set_use_preedit
                                              (GtkIMContext           *context,
                                               gboolean               use_preedit);
@@ -223,7 +223,7 @@ index c104f38..86350f5 100644
  
  /* static methods*/
  static void     _create_input_context       (IBusIMContext      *context);
-@@ -125,15 +131,16 @@ static void     _slave_preedit_start_cb     (GtkIMContext       *slave,
+@@ -131,15 +137,16 @@ static void     _slave_preedit_start_cb     (GtkIMContext       *slave,
                                               IBusIMContext       *context);
  static void     _slave_preedit_end_cb       (GtkIMContext       *slave,
                                               IBusIMContext       *context);
@@ -242,7 +242,7 @@ index c104f38..86350f5 100644
  
  
  
-@@ -200,6 +207,16 @@ ibus_im_context_new (void)
+@@ -206,6 +213,16 @@ ibus_im_context_new (void)
      return IBUS_IM_CONTEXT (obj);
  }
  
@@ -259,7 +259,7 @@ index c104f38..86350f5 100644
  static gint
  _key_snooper_cb (GtkWidget   *widget,
                   GdkEventKey *event,
-@@ -239,6 +256,8 @@ _key_snooper_cb (GtkWidget   *widget,
+@@ -245,6 +262,8 @@ _key_snooper_cb (GtkWidget   *widget,
          _input_window = event->window;
      }
  
@@ -268,7 +268,7 @@ index c104f38..86350f5 100644
      switch (event->type) {
      case GDK_KEY_RELEASE:
          retval = ibus_input_context_process_key_event (ibuscontext,
-@@ -285,6 +304,7 @@ ibus_im_context_class_init     (IBusIMContextClass *klass)
+@@ -291,6 +310,7 @@ ibus_im_context_class_init     (IBusIMContextClass *klass)
      im_context_class->set_client_window = ibus_im_context_set_client_window;
      im_context_class->set_cursor_location = ibus_im_context_set_cursor_location;
      im_context_class->set_use_preedit = ibus_im_context_set_use_preedit;
@@ -276,7 +276,7 @@ index c104f38..86350f5 100644
      gobject_class->finalize = ibus_im_context_finalize;
  
      _signal_commit_id =
-@@ -477,6 +497,8 @@ ibus_im_context_filter_keypress (GtkIMContext *context,
+@@ -488,6 +508,8 @@ ibus_im_context_filter_keypress (GtkIMContext *context,
          if (ibusimcontext->client_window == NULL && event->window != NULL)
              gtk_im_context_set_client_window ((GtkIMContext *)ibusimcontext, event->window);
  
@@ -285,7 +285,7 @@ index c104f38..86350f5 100644
          switch (event->type) {
          case GDK_KEY_RELEASE:
              retval = ibus_input_context_process_key_event (ibusimcontext->ibuscontext,
-@@ -541,6 +563,8 @@ ibus_im_context_focus_in (GtkIMContext *context)
+@@ -552,6 +574,8 @@ ibus_im_context_focus_in (GtkIMContext *context)
          g_object_weak_ref ((GObject *) context, _weak_notify_cb, NULL);
          _focus_im_context = context;
      }
@@ -294,7 +294,7 @@ index c104f38..86350f5 100644
  }
  
  static void
-@@ -706,6 +730,39 @@ ibus_im_context_set_use_preedit (GtkIMContext *context, gboolean use_preedit)
+@@ -723,6 +747,39 @@ ibus_im_context_set_use_preedit (GtkIMContext *context, gboolean use_preedit)
  }
  
  static void
@@ -334,7 +334,7 @@ index c104f38..86350f5 100644
  _bus_connected_cb (IBusBus          *bus,
                     IBusIMContext    *ibusimcontext)
  {
-@@ -724,6 +781,8 @@ _ibus_context_commit_text_cb (IBusInputContext *ibuscontext,
+@@ -741,6 +798,8 @@ _ibus_context_commit_text_cb (IBusInputContext *ibuscontext,
      IDEBUG ("%s", __FUNCTION__);
  
      g_signal_emit (ibusimcontext, _signal_commit_id, 0, text->text);
@@ -343,7 +343,7 @@ index c104f38..86350f5 100644
  }
  
  static gboolean
-@@ -954,6 +1013,8 @@ _ibus_context_show_preedit_text_cb (IBusInputContext   *ibuscontext,
+@@ -1013,6 +1072,8 @@ _ibus_context_show_preedit_text_cb (IBusInputContext   *ibuscontext,
      ibusimcontext->preedit_visible = TRUE;
      g_signal_emit (ibusimcontext, _signal_preedit_start_id, 0);
      g_signal_emit (ibusimcontext, _signal_preedit_changed_id, 0);
@@ -352,7 +352,7 @@ index c104f38..86350f5 100644
  }
  
  static void
-@@ -1118,17 +1179,21 @@ _slave_preedit_end_cb (GtkIMContext  *slave,
+@@ -1177,17 +1238,21 @@ _slave_preedit_end_cb (GtkIMContext  *slave,
      g_signal_emit (ibusimcontext, _signal_preedit_end_id, 0);
  }
  
@@ -378,7 +378,7 @@ index c104f38..86350f5 100644
  _slave_delete_surrounding_cb (GtkIMContext  *slave,
                                gint           offset_from_cursor,
                                guint          nchars,
-@@ -1137,9 +1202,10 @@ _slave_delete_surrounding_cb (GtkIMContext  *slave,
+@@ -1196,9 +1261,10 @@ _slave_delete_surrounding_cb (GtkIMContext  *slave,
      gboolean return_value;
  
      if (ibusimcontext->enable && ibusimcontext->ibuscontext) {

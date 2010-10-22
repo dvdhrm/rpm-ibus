@@ -1,6 +1,6 @@
-From 27d62755adfa03c11380414b63d8daa239dda905 Mon Sep 17 00:00:00 2001
+From d969e258fc925d16799e34f5b959a15c4c3cb7c3 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Tue, 5 Oct 2010 19:24:46 +0900
+Date: Thu, 21 Oct 2010 18:48:45 +0900
 Subject: [PATCH] Add XKB layouts
 
 ---
@@ -16,11 +16,11 @@ Subject: [PATCH] Add XKB layouts
  setup/Makefile.am          |    1 +
  setup/enginecombobox.py    |    7 +-
  setup/main.py              |    3 +
- setup/setup.ui             |  611 ++++++++++++++++++++++++++++++++++++++-
+ setup/setup.ui             |  609 ++++++++++++++++++++++++++++++++++++++-
  setup/xkbsetup.py          |  451 ++++++++++++++++++++++++++++
  src/ibusfactory.c          |   17 +-
  src/ibusfactory.h          |    5 +-
- ui/gtk/panel.py            |   38 +++
+ ui/gtk/panel.py            |   39 +++
  xkb/Makefile.am            |  104 +++++++
  xkb/ibus-engine-xkb-main.c |  397 +++++++++++++++++++++++++
  xkb/ibus-engine-xkb-main.h |   46 +++
@@ -31,7 +31,7 @@ Subject: [PATCH] Add XKB layouts
  xkb/xkblib.h               |   40 +++
  xkb/xkbxml.c               |  696 ++++++++++++++++++++++++++++++++++++++++++++
  xkb/xkbxml.h               |  189 ++++++++++++
- 27 files changed, 3746 insertions(+), 6 deletions(-)
+ 27 files changed, 3745 insertions(+), 6 deletions(-)
  create mode 100644 ibus/xkblayout.py.in
  create mode 100644 ibus/xkbxml.py.in
  create mode 100644 setup/xkbsetup.py
@@ -72,7 +72,7 @@ index 7895940..9f534a4 100644
  
  ACLOCAL_AMFLAGS = -I m4
 diff --git a/configure.ac b/configure.ac
-index 9cd60a3..b20c5ee 100644
+index 03b7c03..94e6eab 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -168,6 +168,57 @@ else
@@ -133,7 +133,7 @@ index 9cd60a3..b20c5ee 100644
  # GObject introspection
  GOBJECT_INTROSPECTION_CHECK([0.6.8])
  
-@@ -387,6 +438,7 @@ gconf/Makefile
+@@ -380,6 +431,7 @@ gconf/Makefile
  gconf/gconf.xml.in
  bindings/Makefile
  bindings/vala/Makefile
@@ -141,7 +141,7 @@ index 9cd60a3..b20c5ee 100644
  ])
  
  AC_OUTPUT
-@@ -401,6 +453,7 @@ Build options:
+@@ -394,6 +446,7 @@ Build options:
    Build gtk2 immodule       $enable_gtk2
    Build gtk3 immodule       $enable_gtk3
    Build XIM agent server    $enable_xim
@@ -150,7 +150,7 @@ index 9cd60a3..b20c5ee 100644
    Build gconf modules       $enable_gconf
    Build memconf modules     $enable_memconf
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index fae710a..af0cfad 100644
+index 9e92181..26ee970 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
 @@ -194,6 +194,42 @@
@@ -952,7 +952,7 @@ index c6612d2..228b030 100644
          engine = self.__combobox.get_active_engine()
          button = self.__builder.get_object("button_engine_add")
 diff --git a/setup/setup.ui b/setup/setup.ui
-index 703b4d8..b08a3e2 100644
+index 703b4d8..a758bc7 100644
 --- a/setup/setup.ui
 +++ b/setup/setup.ui
 @@ -129,7 +129,6 @@
@@ -1045,7 +1045,7 @@ index 703b4d8..b08a3e2 100644
                                    </object>
                                  </child>
                                </object>
-@@ -958,4 +1007,560 @@ Homepage: http://code.google.com/p/ibus
+@@ -958,4 +1007,558 @@ Homepage: http://code.google.com/p/ibus
        </object>
      </child>
    </object>
@@ -1053,7 +1053,6 @@ index 703b4d8..b08a3e2 100644
 +    <property name="title" translatable="yes">Add or Remove Layouts</property>
 +    <property name="icon_name">ibus-setup</property>
 +    <child internal-child="vbox">
-+
 +      <object class="GtkVBox" id="vbox101">
 +        <property name="orientation">vertical</property>
 +        <property name="visible">True</property>
@@ -1221,7 +1220,6 @@ index 703b4d8..b08a3e2 100644
 +                                    <property name="vscrollbar_policy">automatic</property>
 +                                    <property name="shadow_type">in</property>
 +                                    <child>
-+    
 +                                      <object class="EngineTreeView" id="treeview_system_keyboard_layout_engines">
 +                                        <property name="visible">True</property>
 +                                        <property name="can_focus">True</property>
@@ -2132,10 +2130,10 @@ index 515083d..42c29b9 100644
  
  /**
 diff --git a/ui/gtk/panel.py b/ui/gtk/panel.py
-index 0efc85b..3f1e814 100644
+index e1efd54..159e8aa 100644
 --- a/ui/gtk/panel.py
 +++ b/ui/gtk/panel.py
-@@ -121,6 +121,22 @@ class Panel(ibus.PanelBase):
+@@ -120,6 +120,22 @@ class Panel(ibus.PanelBase):
          self.__config_load_show_im_name()
          # self.__bus.request_name(ibus.panel.IBUS_SERVICE_PANEL, 0)
  
@@ -2156,9 +2154,9 @@ index 0efc85b..3f1e814 100644
 +            self.__xkblayout.set_default_option(value)
 +
      def set_cursor_location(self, x, y, w, h):
-         self.__candidate_panel.set_cursor_location(x + w, y + h)
+         self.__candidate_panel.set_cursor_location(x, y, w, h)
  
-@@ -205,14 +221,20 @@ class Panel(ibus.PanelBase):
+@@ -204,14 +220,20 @@ class Panel(ibus.PanelBase):
          if not enabled:
              self.__set_im_icon(ICON_KEYBOARD)
              self.__set_im_name(None)
@@ -2179,7 +2177,7 @@ index 0efc85b..3f1e814 100644
          self.__language_bar.focus_in()
  
      def focus_out(self, ic):
-@@ -222,6 +244,8 @@ class Panel(ibus.PanelBase):
+@@ -221,6 +243,8 @@ class Panel(ibus.PanelBase):
          self.__language_bar.focus_out()
          self.__set_im_icon(ICON_KEYBOARD)
          self.__set_im_name(None)
@@ -2188,7 +2186,7 @@ index 0efc85b..3f1e814 100644
  
      def state_changed(self):
          if not self.__focus_ic:
-@@ -234,14 +258,20 @@ class Panel(ibus.PanelBase):
+@@ -233,14 +257,20 @@ class Panel(ibus.PanelBase):
              self.reset()
              self.__set_im_icon(ICON_KEYBOARD)
              self.__set_im_name(None)
@@ -2209,10 +2207,10 @@ index 0efc85b..3f1e814 100644
  
  
      def reset(self):
-@@ -517,4 +547,12 @@ class Panel(ibus.PanelBase):
-                 return
-             self.__setup_pid = 0
-         self.__setup_pid = os.spawnl(os.P_NOWAIT, self.__setup_cmd, "ibus-setup")
+@@ -516,2 +546,11 @@ class Panel(ibus.PanelBase):
+         self.__setup_pid = pid
+         glib.child_watch_add(self.__setup_pid, self.__child_watch_cb)
++
 +    def __engine_get_layout_wrapper(self, engine):
 +        # This code is for the back compatibility.
 +        # Should we remove the codes after all IM engines are changed
@@ -2221,7 +2219,6 @@ index 0efc85b..3f1e814 100644
 +            return engine.layout
 +        else:
 +            return "default"
- 
 diff --git a/xkb/Makefile.am b/xkb/Makefile.am
 new file mode 100644
 index 0000000..49b82eb

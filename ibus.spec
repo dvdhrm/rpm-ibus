@@ -10,8 +10,8 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.3.7
-Release:    11%{?dist}
+Version:    1.3.8
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -19,13 +19,10 @@ URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
 # Patch0:     ibus-HEAD.patch
-Patch1:     ibus-621795-engineproxy-segv.patch
-Patch2:     ibus-626652-leak.patch
-Patch3:     ibus-xx-g-ir-compiler.patch
-# Patch4:     ibus-xx-va_list.patch
-# Patch5:     ibus-530711-preload-sys.patch
-Patch6:     ibus-541492-xkb.patch
-Patch7:     ibus-435880-surrounding-text.patch
+# Patch1:     ibus-xx-va_list.patch
+# Patch2:     ibus-530711-preload-sys.patch
+Patch3:     ibus-541492-xkb.patch
+Patch4:     ibus-435880-surrounding-text.patch
 # WORKAROUND_GTK3_BUILD_FAILURE @ fedora14
 Patch99:    ibus-xx-workaround-gtk3.patch
 
@@ -134,15 +131,12 @@ The ibus-devel-docs package contains developer documentation for ibus
 %prep
 %setup -q
 # %patch0 -p1
-%patch1 -p1 -b .segv
-%patch2 -p1 -b .leak
-%patch3 -p1 -b .gir
-# %patch4 -p1 -b .valist
-# %patch5 -p1 -b .preload-sys
+# %patch1 -p1 -b .valist
+# %patch2 -p1 -b .preload-sys
 %if %have_libxkbfile
-%patch6 -p1 -b .xkb
+%patch3 -p1 -b .xkb
 %endif
-%patch7 -p1 -b .surrounding
+%patch4 -p1 -b .surrounding
 
 #### start WORKAROUND_GTK3_BUILD_FAILURE
 WORKAROUND_GTK3_BUILD_FAILURE=0
@@ -301,27 +295,17 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Thu Oct 07 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.7-11
-- Added ibus-xx-g-ir-compiler.patch to fix g-ir-compiler error.
-- Updated ibus-435880-surrounding-text.patch
-  Fixes Bug 634829 - ibus_im_context_set_surrounding() to get strings.
-- Updated ibus-541492-xkb.patch
-  Fixed a bug when changed the system layout "jp(kana)" to "jp".
-- Added ibus-xx-workaround-gtk3.patch
-  Workaround for f14 http://koji.fedoraproject.org/koji/taskinfo?taskID=2516604
-
-* Tue Sep 14 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.7-5
-- Added ibus-621795-engineproxy-segv.patch
-  Fixes crash in ibus_object_destroy
-- Added ibus-626652-leak.patch
-  Fixes Bug 626652 - ibus memory leak with ibus_input_context_process_key_event
+* Fri Oct 22 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.8-1
+- Updated to 1.3.8
 - Added ibus-541492-xkb.patch
   Fixes Bug 541492 - ibus needs to support some xkb layout switching
 - Added ibus-435880-surrounding-text.patch
   Fixes Bug 435880 - ibus-gtk requires surrounding-text support
+- Added ibus-xx-workaround-gtk3.patch
+  Workaround for f14 http://koji.fedoraproject.org/koji/taskinfo?taskID=2516604
 
 * Mon Aug 23 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.7-1
-- Update to 1.3.7
+- Updated to 1.3.7
 
 * Wed Jul 28 2010 Mamoru Tasaka <mtasaka@ioa.s.u-tokyo.ac.jp> - 1.3.6-5
 - Rebuild against python 2.7
