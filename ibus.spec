@@ -11,14 +11,14 @@
 
 Name:       ibus
 Version:    1.3.8
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
 URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
-# Patch0:     ibus-HEAD.patch
+Patch0:     ibus-HEAD.patch
 # Patch1:     ibus-xx-va_list.patch
 # Patch2:     ibus-530711-preload-sys.patch
 Patch3:     ibus-541492-xkb.patch
@@ -130,7 +130,7 @@ The ibus-devel-docs package contains developer documentation for ibus
 
 %prep
 %setup -q
-# %patch0 -p1
+%patch0 -p1
 # %patch1 -p1 -b .valist
 # %patch2 -p1 -b .preload-sys
 %if %have_libxkbfile
@@ -295,6 +295,10 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Tue Nov 02 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.8-2
+- Added ibus-HEAD.patch.
+  Fix Bug 640038 - unresolved reference to symbol gdk_drawable_get_size
+
 * Fri Oct 22 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.8-1
 - Updated to 1.3.8
 - Added ibus-541492-xkb.patch
