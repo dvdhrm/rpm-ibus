@@ -11,7 +11,7 @@
 
 Name:       ibus
 Version:    1.3.8
-Release:    2%{?dist}
+Release:    3%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -23,6 +23,10 @@ Patch0:     ibus-HEAD.patch
 # Patch2:     ibus-530711-preload-sys.patch
 Patch3:     ibus-541492-xkb.patch
 Patch4:     ibus-435880-surrounding-text.patch
+
+# https://bugzilla.redhat.com/show_bug.cgi?id=649058
+Patch5: notify.patch
+
 # WORKAROUND_GTK3_BUILD_FAILURE @ fedora14
 Patch99:    ibus-xx-workaround-gtk3.patch
 
@@ -137,6 +141,7 @@ The ibus-devel-docs package contains developer documentation for ibus
 %patch3 -p1 -b .xkb
 %endif
 %patch4 -p1 -b .surrounding
+%patch5 -p1 -b .notify
 
 #### start WORKAROUND_GTK3_BUILD_FAILURE
 WORKAROUND_GTK3_BUILD_FAILURE=0
@@ -295,6 +300,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Nov  3 2010 Matthias Clasen <mclasen@redhat.com> - 1.3.8-3
+- Rebuild against libnotify 0.7.0
+
 * Tue Nov 02 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.8-2
 - Added ibus-HEAD.patch.
   Fix Bug 640038 - unresolved reference to symbol gdk_drawable_get_size

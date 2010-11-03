@@ -1,0 +1,11 @@
+diff -up ibus-1.3.8/ui/gtk/main.py.notify ibus-1.3.8/ui/gtk/main.py
+--- ibus-1.3.8/ui/gtk/main.py.notify	2010-11-02 16:35:17.339180001 -0400
++++ ibus-1.3.8/ui/gtk/main.py	2010-11-02 16:35:26.780180001 -0400
+@@ -58,7 +58,6 @@ class UIApplication:
+                             "Please restart ibus input platform."), \
+                             "ibus")
+         self.__notify.set_timeout(10 * 1000)
+-        self.__notify.attach_to_status_icon (self.__panel.get_status_icon())
+         self.__notify.add_action("restart", _("Restart Now"), self.__restart_cb, None)
+         self.__notify.add_action("ignore", _("Later"), lambda *args: None, None)
+ 
