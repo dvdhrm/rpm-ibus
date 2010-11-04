@@ -3,6 +3,7 @@
 %{!?gtk3_binary_version: %define gtk3_binary_version %(pkg-config  --variable=gtk_binary_version gtk+-3.0)}
 
 %define have_libxkbfile 1
+%define ibus_api_version 1.0
 
 %define glib_ver %([ -a %{_libdir}/pkgconfig/glib-2.0.pc ] && pkg-config --modversion glib-2.0 | cut -d. -f 1,2 || echo -n "999")
 %define gconf2_version 2.12.0
@@ -10,8 +11,8 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.3.8
-Release:    3%{?dist}
+Version:    1.3.99.20101028
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -19,14 +20,9 @@ URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
 Patch0:     ibus-HEAD.patch
-# Patch1:     ibus-xx-va_list.patch
-# Patch2:     ibus-530711-preload-sys.patch
-Patch3:     ibus-541492-xkb.patch
-Patch4:     ibus-435880-surrounding-text.patch
-
-# https://bugzilla.redhat.com/show_bug.cgi?id=649058
-Patch5: notify.patch
-
+# Patch1:     ibus-530711-preload-sys.patch
+Patch2:     ibus-541492-xkb.patch
+Patch3:     ibus-435880-surrounding-text.patch
 # WORKAROUND_GTK3_BUILD_FAILURE @ fedora14
 Patch99:    ibus-xx-workaround-gtk3.patch
 
@@ -135,13 +131,11 @@ The ibus-devel-docs package contains developer documentation for ibus
 %prep
 %setup -q
 %patch0 -p1
-# %patch1 -p1 -b .valist
-# %patch2 -p1 -b .preload-sys
+# %patch1 -p1 -b .preload-sys
 %if %have_libxkbfile
-%patch3 -p1 -b .xkb
+%patch2 -p1 -b .xkb
 %endif
-%patch4 -p1 -b .surrounding
-%patch5 -p1 -b .notify
+%patch3 -p1 -b .surrounding
 
 #### start WORKAROUND_GTK3_BUILD_FAILURE
 WORKAROUND_GTK3_BUILD_FAILURE=0
@@ -180,7 +174,7 @@ make %{?_smp_mflags}
 %install
 rm -rf $RPM_BUILD_ROOT
 make DESTDIR=$RPM_BUILD_ROOT install
-rm -f $RPM_BUILD_ROOT%{_libdir}/libibus.la
+rm -f $RPM_BUILD_ROOT%{_libdir}/libibus-%{ibus_api_version}.la
 rm -f $RPM_BUILD_ROOT%{_libdir}/gtk-2.0/%{gtk2_binary_version}/immodules/im-ibus.la
 rm -f $RPM_BUILD_ROOT%{_libdir}/gtk-3.0/%{gtk3_binary_version}/immodules/im-ibus.la
 
@@ -188,15 +182,26 @@ rm -f $RPM_BUILD_ROOT%{_libdir}/gtk-3.0/%{gtk3_binary_version}/immodules/im-ibus
 install -pm 644 -D %{SOURCE1} $RPM_BUILD_ROOT%{_xinputconf}
 
 # install .desktop files
-echo "NoDisplay=true" >> $RPM_BUILD_ROOT%{_datadir}/applications/ibus.desktop
+# correct location in upstream.
+if test ! -f $RPM_BUILD_ROOT%{_sysconfdir}/xdg/autostart/ibus.desktop -a \
+          -f $RPM_BUILD_ROOT%{_datadir}/applications/ibus.desktop ; then
+  mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/xdg/autostart
+  mv $RPM_BUILD_ROOT%{_datadir}/applications/ibus.desktop \
+     $RPM_BUILD_ROOT%{_sysconfdir}/xdg/autostart/ibus.desktop
+fi
 echo "NoDisplay=true" >> $RPM_BUILD_ROOT%{_datadir}/applications/ibus-setup.desktop
 echo "X-GNOME-Autostart-enabled=false" >> $RPM_BUILD_ROOT%{_sysconfdir}/xdg/autostart/ibus.desktop
 rm -rf $RPM_BUILD_ROOT%{_sysconfdir}/xdg/autostart/ibus.desktop
+rm -rf $RPM_BUILD_ROOT%{_datadir}/applications/ibus.desktop
+# workaround for desktop-file-install
+sed -i -e 's|Comment\[ja\]=IBus |& |' \
+  $RPM_BUILD_ROOT%{_datadir}/applications/ibus-setup.desktop
 desktop-file-install --delete-original          \
   --dir $RPM_BUILD_ROOT%{_datadir}/applications \
   $RPM_BUILD_ROOT%{_datadir}/applications/*
 
-%find_lang %{name}
+# FIXME: no version number
+%find_lang %{name}10
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -252,7 +257,8 @@ fi
 %postun gtk3
 %{_bindir}/gtk-query-immodules-3.0-%{__isa_bits} --update-cache
 
-%files -f %{name}.lang
+# FIXME: no version number
+%files -f %{name}10.lang
 %defattr(-,root,root,-)
 %doc AUTHORS COPYING README
 %dir %{python_sitelib}/ibus
@@ -276,7 +282,7 @@ fi
 
 %files libs
 %defattr(-,root,root,-)
-%{_libdir}/libibus.so.*
+%{_libdir}/libibus-%{ibus_api_version}.so.*
 %{_libdir}/girepository-1.0/IBus-1.0.typelib
 
 %files gtk2
@@ -294,18 +300,17 @@ fi
 %{_includedir}/*
 %{_datadir}/gir-1.0/IBus-1.0.gir
 %{_datadir}/vala/vapi/ibus-1.0.vapi
+%{_datadir}/vala/vapi/ibus-1.0.deps
 
 %files devel-docs
 %defattr(-,root,root,-)
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Wed Nov  3 2010 Matthias Clasen <mclasen@redhat.com> - 1.3.8-3
-- Rebuild against libnotify 0.7.0
-
-* Tue Nov 02 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.8-2
-- Added ibus-HEAD.patch.
-  Fix Bug 640038 - unresolved reference to symbol gdk_drawable_get_size
+* Fri Oct 29 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20101028-1
+- Updated to 1.3.99.20101028
+- Integrated gdbus
+- Merged notify.patch into ibus-HEAD.patch
 
 * Fri Oct 22 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.8-1
 - Updated to 1.3.8

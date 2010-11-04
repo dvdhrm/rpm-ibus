@@ -1,6 +1,6 @@
-From de91361ea502c63e54ceb23389b3c88b234f40a0 Mon Sep 17 00:00:00 2001
+From 2a368335194eccd22d605d93532ce6e914089599 Mon Sep 17 00:00:00 2001
 From: Daiki Ueno <ueno@unixuser.org>
-Date: Thu, 21 Oct 2010 18:48:51 +0900
+Date: Thu, 4 Nov 2010 17:40:35 +0900
 Subject: [PATCH] Support surrounding-text retrieval.
 
 This change adds a new API function ibus_engine_get_surrounding_text().
@@ -22,34 +22,45 @@ Also,
 - destroy
 resets the current surrounding-text.
 ---
- bus/engineproxy.c               |   34 +++++++++++
- bus/engineproxy.h               |    7 ++
- bus/inputcontext.c              |   48 ++++++++++++++++
- client/gtk2/ibusimcontext.c     |   80 ++++++++++++++++++++++++--
+ bus/engineproxy.c               |   42 +++++++++++++++
+ bus/engineproxy.h               |    4 ++
+ bus/inputcontext.c              |   32 +++++++++++
+ client/gtk2/ibusimcontext.c     |   80 ++++++++++++++++++++++++++---
  ibus/engine.py                  |    6 ++
  ibus/interface/iengine.py       |    3 +
  ibus/interface/iinputcontext.py |    3 +
- src/ibusengine.c                |  119 +++++++++++++++++++++++++++++++++++++++
+ src/ibusengine.c                |  110 +++++++++++++++++++++++++++++++++++++++
  src/ibusengine.h                |   21 +++++++-
- src/ibusinputcontext.c          |   43 ++++++++++++++
+ src/ibusinputcontext.c          |   61 +++++++++++++++++++++
  src/ibusinputcontext.h          |   11 ++++
  src/ibusmarshalers.list         |    1 +
- 12 files changed, 368 insertions(+), 8 deletions(-)
+ 12 files changed, 366 insertions(+), 8 deletions(-)
 
 diff --git a/bus/engineproxy.c b/bus/engineproxy.c
-index 03592d7..915f999 100644
+index f0ddd28..e04661a 100644
 --- a/bus/engineproxy.c
 +++ b/bus/engineproxy.c
-@@ -52,6 +52,8 @@ enum {
+@@ -42,6 +42,10 @@ struct _BusEngineProxy {
+     IBusPropList *prop_list;
+ 
+     /* private member */
++
++    /* surrounding text */
++    IBusText *surrounding_text;
++    guint     surrounding_cursor_pos;
+ };
+ 
+ struct _BusEngineProxyClass {
+@@ -74,6 +78,8 @@ enum {
  static guint    engine_signals[LAST_SIGNAL] = { 0 };
  // static guint            engine_signals[LAST_SIGNAL] = { 0 };
  
 +static IBusText *text_empty = NULL;
 +
  /* functions prototype */
- static void     bus_engine_proxy_real_destroy   (BusEngineProxy         *engine);
+ static void     bus_engine_proxy_real_destroy   (IBusProxy          *proxy);
  
-@@ -302,6 +304,8 @@ bus_engine_proxy_class_init (BusEngineProxyClass *klass)
+@@ -287,11 +293,15 @@ bus_engine_proxy_class_init (BusEngineProxyClass *class)
              1,
              IBUS_TYPE_PROPERTY);
  
@@ -58,16 +69,14 @@ index 03592d7..915f999 100644
  }
  
  static void
-@@ -316,6 +320,8 @@ bus_engine_proxy_init (BusEngineProxy *engine)
-     engine->enabled = FALSE;
-     engine->desc = NULL;
-     engine->keymap = NULL;
+ bus_engine_proxy_init (BusEngineProxy *engine)
+ {
 +    engine->surrounding_text = g_object_ref_sink (text_empty);
 +    engine->surrounding_cursor_pos = 0;
  }
  
  static void
-@@ -337,6 +343,11 @@ bus_engine_proxy_real_destroy (BusEngineProxy *engine)
+@@ -318,6 +328,11 @@ bus_engine_proxy_real_destroy (IBusProxy *proxy)
          engine->keymap = NULL;
      }
  
@@ -76,11 +85,11 @@ index 03592d7..915f999 100644
 +        engine->surrounding_text = NULL;
 +    }
 +
-     IBUS_OBJECT_CLASS(bus_engine_proxy_parent_class)->destroy (IBUS_OBJECT (engine));
+     IBUS_PROXY_CLASS(bus_engine_proxy_parent_class)->destroy ((IBusProxy *)engine);
  }
  
-@@ -733,6 +744,29 @@ void bus_engine_proxy_property_hide (BusEngineProxy *engine,
-                      G_TYPE_INVALID);
+@@ -641,6 +656,33 @@ void bus_engine_proxy_property_hide (BusEngineProxy *engine,
+                        NULL);
  }
  
 +void bus_engine_proxy_set_surrounding_text (BusEngineProxy *engine,
@@ -93,16 +102,20 @@ index 03592d7..915f999 100644
 +    if (!engine->surrounding_text ||
 +        g_strcmp0 (text->text, engine->surrounding_text->text) != 0 ||
 +        cursor_pos != engine->surrounding_cursor_pos) {
++        GVariant *variant = ibus_serializable_serialize ((IBusSerializable *)text);
 +        if (engine->surrounding_text)
 +            g_object_unref (engine->surrounding_text);
 +        engine->surrounding_text = (IBusText *) g_object_ref_sink (text);
 +        engine->surrounding_cursor_pos = cursor_pos;
 +
-+        ibus_proxy_call ((IBusProxy *) engine,
-+                         "SetSurroundingText",
-+                         IBUS_TYPE_TEXT, &text,
-+                         G_TYPE_UINT, &cursor_pos,
-+                         G_TYPE_INVALID);
++        g_dbus_proxy_call ((GDBusProxy *)engine,
++                           "SetSurroundingText",
++                           g_variant_new ("(vu)", variant, cursor_pos),
++                           G_DBUS_CALL_FLAGS_NONE,
++                           -1,
++                           NULL,
++                           NULL,
++                           NULL);
 +    }
 +}
 +
@@ -110,20 +123,10 @@ index 03592d7..915f999 100644
      void                                                    \
      bus_engine_proxy_##name (BusEngineProxy *engine)        \
 diff --git a/bus/engineproxy.h b/bus/engineproxy.h
-index 254b00c..b0e211d 100644
+index 83c72da..da887eb 100644
 --- a/bus/engineproxy.h
 +++ b/bus/engineproxy.h
-@@ -59,6 +59,9 @@ struct _BusEngineProxy {
-     gint y;
-     gint w;
-     gint h;
-+    /* surrounding text */
-+    IBusText *surrounding_text;
-+    guint     surrounding_cursor_pos;
- 
-     IBusEngineDesc *desc;
-     IBusKeymap     *keymap;
-@@ -112,5 +115,9 @@ void             bus_engine_proxy_property_show     (BusEngineProxy *engine,
+@@ -89,5 +89,9 @@ void             bus_engine_proxy_property_show     (BusEngineProxy        *engi
  void             bus_engine_proxy_property_hide     (BusEngineProxy *engine,
                                                       const gchar    *prop_name);
  gboolean         bus_engine_proxy_is_enabled        (BusEngineProxy *engine);
@@ -134,55 +137,39 @@ index 254b00c..b0e211d 100644
  G_END_DECLS
  #endif
 diff --git a/bus/inputcontext.c b/bus/inputcontext.c
-index b5ab201..1aa9f21 100644
+index 56fc27f..09cc2ba 100644
 --- a/bus/inputcontext.c
 +++ b/bus/inputcontext.c
-@@ -569,6 +569,10 @@ _ibus_introspect (BusInputContext   *context,
-         "      <arg name=\"desc\" direction=\"out\" type=\"v\"/>\n"
-         "    </method>\n"
-         "    <method name=\"Destroy\"/>\n"
-+        "    <method name=\"SetSurroundingText\">\n"
-+        "      <arg name=\"text\" direction=\"in\" type=\"v\"/>\n"
-+        "      <arg name=\"cursor_pos\" direction=\"in\" type=\"u\"/>\n"
-+        "    </method>\n"
- 
-         /* signals */
-         "    <signal name=\"CommitText\">\n"
-@@ -1098,6 +1102,49 @@ _ic_destroy (BusInputContext  *context,
-     return NULL;
+@@ -235,6 +235,11 @@ static const gchar introspection_xml[] =
+     "    <method name='GetEngine'>"
+     "      <arg direction='out' type='v' name='desc' />"
+     "    </method>"
++    "    <method name='SetSurroundingText'>"
++    "      <arg direction='in' type='v' name='text' />"
++    "      <arg direction='in' type='u' name='cursor_pos' />"
++    "    </method>"
++
+     /* signals */
+     "    <signal name='CommitText'>"
+     "      <arg type='v' name='text' />"
+@@ -906,6 +911,32 @@ _ic_get_engine (BusInputContext       *context,
  }
  
-+static IBusMessage *
-+_ic_set_surrounding_text (BusInputContext  *context,
-+                          IBusMessage      *message,
-+                          BusConnection    *connection)
+ static void
++_ic_set_surrounding_text (BusInputContext       *context,
++                          GVariant              *parameters,
++                          GDBusMethodInvocation *invocation)
 +{
-+    g_assert (BUS_IS_INPUT_CONTEXT (context));
-+    g_assert (message != NULL);
-+    g_assert (BUS_IS_CONNECTION (connection));
-+
-+    IBusMessage *reply;
++    GVariant *variant = NULL;
 +    IBusText *text;
 +    guint cursor_pos = 0;
-+    gboolean retval;
-+    IBusError *error;
 +
-+    retval = ibus_message_get_args (message,
-+                                    &error,
-+                                    IBUS_TYPE_TEXT, &text,
-+                                    G_TYPE_UINT, &cursor_pos,
-+                                    G_TYPE_INVALID);
-+
-+    if (!retval) {
-+        reply = ibus_message_new_error (message,
-+                                        error->name,
-+                                        error->message);
-+        ibus_error_free (error);
-+        return reply;
-+    }
++    g_variant_get (parameters, "(vu)", &variant, &cursor_pos);
++    text = IBUS_TEXT (ibus_serializable_deserialize (variant));
++    g_variant_unref (variant);
 +
 +    if ((context->capabilities & IBUS_CAP_SURROUNDING_TEXT) &&
-+        context->has_focus && context->enabled && context->engine) {
++         context->has_focus && context->enabled && context->engine) {
 +        bus_engine_proxy_set_surrounding_text (context->engine,
 +                                               text,
 +                                               cursor_pos);
@@ -191,23 +178,23 @@ index b5ab201..1aa9f21 100644
 +    if (g_object_is_floating (text))
 +        g_object_unref (text);
 +
-+    reply = ibus_message_new_method_return (message);
-+    return reply;
++    g_dbus_method_invocation_return_value (invocation, NULL);
 +}
 +
- static gboolean
- bus_input_context_ibus_message (BusInputContext *context,
-                                 BusConnection   *connection,
-@@ -1132,6 +1179,7 @@ bus_input_context_ibus_message (BusInputContext *context,
-         { IBUS_INTERFACE_INPUT_CONTEXT, "SetEngine",         _ic_set_engine },
-         { IBUS_INTERFACE_INPUT_CONTEXT, "GetEngine",         _ic_get_engine },
-         { IBUS_INTERFACE_INPUT_CONTEXT, "Destroy",           _ic_destroy },
-+        { IBUS_INTERFACE_INPUT_CONTEXT, "SetSurroundingText",_ic_set_surrounding_text },
++static void
+ bus_input_context_service_method_call (IBusService            *service,
+                                        GDBusConnection        *connection,
+                                        const gchar            *sender,
+@@ -944,6 +975,7 @@ bus_input_context_service_method_call (IBusService            *service,
+         { "IsEnabled",         _ic_is_enabled },
+         { "SetEngine",         _ic_set_engine },
+         { "GetEngine",         _ic_get_engine },
++        { "SetSurroundingText", _ic_set_surrounding_text},
      };
  
-     ibus_message_set_sender (message, bus_connection_get_unique_name (connection));
+     gint i;
 diff --git a/client/gtk2/ibusimcontext.c b/client/gtk2/ibusimcontext.c
-index 0bb71b5..eaa4a54 100644
+index 6570473..ca8db35 100644
 --- a/client/gtk2/ibusimcontext.c
 +++ b/client/gtk2/ibusimcontext.c
 @@ -113,6 +113,12 @@ static void     ibus_im_context_set_cursor_location
@@ -268,7 +255,7 @@ index 0bb71b5..eaa4a54 100644
      switch (event->type) {
      case GDK_KEY_RELEASE:
          retval = ibus_input_context_process_key_event (ibuscontext,
-@@ -291,6 +310,7 @@ ibus_im_context_class_init     (IBusIMContextClass *klass)
+@@ -291,6 +310,7 @@ ibus_im_context_class_init     (IBusIMContextClass *class)
      im_context_class->set_client_window = ibus_im_context_set_client_window;
      im_context_class->set_cursor_location = ibus_im_context_set_cursor_location;
      im_context_class->set_use_preedit = ibus_im_context_set_use_preedit;
@@ -294,7 +281,7 @@ index 0bb71b5..eaa4a54 100644
  }
  
  static void
-@@ -723,6 +747,39 @@ ibus_im_context_set_use_preedit (GtkIMContext *context, gboolean use_preedit)
+@@ -728,6 +752,39 @@ ibus_im_context_set_use_preedit (GtkIMContext *context, gboolean use_preedit)
  }
  
  static void
@@ -334,7 +321,7 @@ index 0bb71b5..eaa4a54 100644
  _bus_connected_cb (IBusBus          *bus,
                     IBusIMContext    *ibusimcontext)
  {
-@@ -741,6 +798,8 @@ _ibus_context_commit_text_cb (IBusInputContext *ibuscontext,
+@@ -746,6 +803,8 @@ _ibus_context_commit_text_cb (IBusInputContext *ibuscontext,
      IDEBUG ("%s", __FUNCTION__);
  
      g_signal_emit (ibusimcontext, _signal_commit_id, 0, text->text);
@@ -343,7 +330,7 @@ index 0bb71b5..eaa4a54 100644
  }
  
  static gboolean
-@@ -1013,6 +1072,8 @@ _ibus_context_show_preedit_text_cb (IBusInputContext   *ibuscontext,
+@@ -1018,6 +1077,8 @@ _ibus_context_show_preedit_text_cb (IBusInputContext   *ibuscontext,
      ibusimcontext->preedit_visible = TRUE;
      g_signal_emit (ibusimcontext, _signal_preedit_start_id, 0);
      g_signal_emit (ibusimcontext, _signal_preedit_changed_id, 0);
@@ -352,7 +339,7 @@ index 0bb71b5..eaa4a54 100644
  }
  
  static void
-@@ -1177,17 +1238,21 @@ _slave_preedit_end_cb (GtkIMContext  *slave,
+@@ -1183,17 +1244,21 @@ _slave_preedit_end_cb (GtkIMContext  *slave,
      g_signal_emit (ibusimcontext, _signal_preedit_end_id, 0);
  }
  
@@ -378,7 +365,7 @@ index 0bb71b5..eaa4a54 100644
  _slave_delete_surrounding_cb (GtkIMContext  *slave,
                                gint           offset_from_cursor,
                                guint          nchars,
-@@ -1196,9 +1261,10 @@ _slave_delete_surrounding_cb (GtkIMContext  *slave,
+@@ -1202,9 +1267,10 @@ _slave_delete_surrounding_cb (GtkIMContext  *slave,
      gboolean return_value;
  
      if (ibusimcontext->enable && ibusimcontext->ibuscontext) {
@@ -415,7 +402,7 @@ index b1df2fe..ec42fa4 100644
          return self.__engine.set_capabilities(caps)
  
 diff --git a/ibus/interface/iengine.py b/ibus/interface/iengine.py
-index 4d42c2d..ee23efe 100644
+index 2386c0f..5db2012 100644
 --- a/ibus/interface/iengine.py
 +++ b/ibus/interface/iengine.py
 @@ -50,6 +50,9 @@ class IEngine(dbus.service.Object):
@@ -443,7 +430,7 @@ index 89f6dbd..2db1c9b 100644
      def FocusIn(self): pass
  
 diff --git a/src/ibusengine.c b/src/ibusengine.c
-index b5f53d4..da1e643 100644
+index ae07393..87ea7c2 100644
 --- a/src/ibusengine.c
 +++ b/src/ibusengine.c
 @@ -45,6 +45,7 @@ enum {
@@ -454,46 +441,46 @@ index b5f53d4..da1e643 100644
      LAST_SIGNAL,
  };
  
-@@ -59,11 +60,16 @@ enum {
+@@ -58,10 +59,15 @@ enum {
  struct _IBusEnginePrivate {
-     gchar *name;
-     IBusConnection *connection;
+     gchar *engine_name;
+     GDBusConnection *connection;
 +
 +    IBusText *surrounding_text;
 +    guint surrounding_cursor_pos;
  };
- typedef struct _IBusEnginePrivate IBusEnginePrivate;
  
  static guint            engine_signals[LAST_SIGNAL] = { 0 };
  
 +static IBusText *text_empty = NULL;
 +
  /* functions prototype */
- static void     ibus_engine_destroy         (IBusEngine         *engine);
- static void     ibus_engine_set_property    (IBusEngine         *engine,
-@@ -113,6 +119,10 @@ static void     ibus_engine_property_show   (IBusEngine         *engine,
-                                              const gchar        *prop_name);
- static void     ibus_engine_property_hide   (IBusEngine         *engine,
-                                              const gchar        *prop_name);
-+static void     ibus_engine_set_surrounding_text
+ static void      ibus_engine_destroy         (IBusEngine         *engine);
+ static void      ibus_engine_set_property    (IBusEngine         *engine,
+@@ -135,6 +141,10 @@ static void      ibus_engine_property_show   (IBusEngine         *engine,
+                                               const gchar        *prop_name);
+ static void      ibus_engine_property_hide   (IBusEngine         *engine,
+                                               const gchar        *prop_name);
++static void      ibus_engine_set_surrounding_text
 +                                            (IBusEngine         *engine,
 +                                             IBusText           *text,
 +                                             guint               cursor_pos);
- 
- 
- G_DEFINE_TYPE (IBusEngine, ibus_engine, IBUS_TYPE_SERVICE)
-@@ -167,6 +177,7 @@ ibus_engine_class_init (IBusEngineClass *klass)
-     klass->property_hide        = ibus_engine_property_hide;
-     klass->set_cursor_location  = ibus_engine_set_cursor_location;
-     klass->set_capabilities     = ibus_engine_set_capabilities;
-+    klass->set_surrounding_text = ibus_engine_set_surrounding_text;
- 
+ static void      ibus_engine_emit_signal     (IBusEngine         *engine,
+                                               const gchar        *signal_name,
+                                               GVariant           *parameters);
+@@ -245,6 +255,7 @@ ibus_engine_class_init (IBusEngineClass *class)
+     class->property_hide        = ibus_engine_property_hide;
+     class->set_cursor_location  = ibus_engine_set_cursor_location;
+     class->set_capabilities     = ibus_engine_set_capabilities;
++    class->set_surrounding_text = ibus_engine_set_surrounding_text;
  
      /* install properties */
-@@ -544,6 +555,29 @@ ibus_engine_class_init (IBusEngineClass *klass)
-             1,
+     /**
+@@ -611,12 +622,39 @@ ibus_engine_class_init (IBusEngineClass *class)
              G_TYPE_STRING);
  
+     g_type_class_add_private (class, sizeof (IBusEnginePrivate));
++
 +    /**
 +     * IBusEngine::set-surrounding-text:
 +     * @engine: An IBusEngine.
@@ -509,7 +496,7 @@ index b5f53d4..da1e643 100644
 +            G_SIGNAL_RUN_LAST,
 +            G_STRUCT_OFFSET (IBusEngineClass, set_surrounding_text),
 +            NULL, NULL,
-+            ibus_marshal_VOID__OBJECT_UINT,
++            _ibus_marshal_VOID__OBJECT_UINT,
 +            G_TYPE_NONE,
 +            2,
 +            G_TYPE_OBJECT,
@@ -520,63 +507,54 @@ index b5f53d4..da1e643 100644
  }
  
  static void
-@@ -554,6 +588,9 @@ ibus_engine_init (IBusEngine *engine)
- 
-     priv->name = NULL;
-     priv->connection = NULL;
+ ibus_engine_init (IBusEngine *engine)
+ {
+     engine->priv = IBUS_ENGINE_GET_PRIVATE (engine);
 +
-+    priv->surrounding_text = g_object_ref_sink (text_empty);
-+    priv->surrounding_cursor_pos = 0;
++    engine->priv->surrounding_text = g_object_ref_sink (text_empty);
++    engine->priv->surrounding_cursor_pos = 0;
  }
  
  static void
-@@ -569,6 +606,11 @@ ibus_engine_destroy (IBusEngine *engine)
-         priv->connection = NULL;
-     }
+@@ -625,6 +663,11 @@ ibus_engine_destroy (IBusEngine *engine)
+     g_free (engine->priv->engine_name);
+     engine->priv->engine_name = NULL;
  
-+    if (priv->surrounding_text) {
-+        g_object_unref (priv->surrounding_text);
-+        priv->surrounding_text = NULL;
++    if (engine->priv->surrounding_text) {
++        g_object_unref (engine->priv->surrounding_text);
++        engine->priv->surrounding_text = NULL;
 +    }
 +
      IBUS_OBJECT_CLASS(ibus_engine_parent_class)->destroy (IBUS_OBJECT (engine));
  }
  
-@@ -879,6 +921,33 @@ ibus_engine_ibus_message (IBusEngine     *engine,
-             ibus_object_destroy ((IBusObject *) engine);
-             return TRUE;
-         }
-+        else if (g_strcmp0 (name, "SetSurroundingText") == 0) {
-+            IBusText *text;
-+            guint cursor_pos;
+@@ -796,6 +839,25 @@ ibus_engine_service_method_call (IBusService           *service,
+         return;
+     }
+ 
++    if (g_strcmp0 (method_name, "SetSurroundingText") == 0) {
++        GVariant *variant = NULL;
++        IBusText *text;
++        guint cursor_pos;
 +
-+            retval = ibus_message_get_args (message,
-+                                            &error,
-+                                            IBUS_TYPE_TEXT, &text,
-+                                            G_TYPE_UINT, &cursor_pos,
-+                                            G_TYPE_INVALID);
++        g_variant_get (parameters, "(vu)", &variant, &cursor_pos);
++        text = IBUS_TEXT (ibus_serializable_deserialize (variant));
++        g_variant_unref (variant);
 +
-+            if (!retval) {
-+                reply = ibus_message_new_error_printf (message,
-+                            DBUS_ERROR_INVALID_ARGS,
-+                            "%s.%s: Can not match signature (u) of method",
-+                            IBUS_INTERFACE_ENGINE, "SetSurroundingText");
-+                ibus_error_free (error);
-+            }
-+            else {
-+                g_signal_emit (engine, engine_signals[SET_SURROUNDING_TEXT], 0,
-+                               text,
-+                               cursor_pos);
-+                if (g_object_is_floating (text)) {
-+                    g_object_unref (text);
-+                }
-+                reply = ibus_message_new_method_return (message);
-+            }
++        g_signal_emit (engine, engine_signals[SET_SURROUNDING_TEXT], 0,
++                       text,
++                       cursor_pos);
++        if (g_object_is_floating (text)) {
++            g_object_unref (text);
 +        }
-         else {
-             reply = ibus_message_new_error_printf (message,
-                         DBUS_ERROR_UNKNOWN_METHOD,
-@@ -1003,6 +1072,26 @@ ibus_engine_property_hide (IBusEngine *engine, const gchar *prop_name)
++        g_dbus_method_invocation_return_value (invocation, NULL);
++        return;
++    }
++
+     /* should not be reached */
+     g_return_if_reached ();
+ }
+@@ -950,6 +1012,26 @@ ibus_engine_property_hide (IBusEngine *engine, const gchar *prop_name)
  }
  
  static void
@@ -600,17 +578,17 @@ index b5f53d4..da1e643 100644
 +}
 +
 +static void
- _send_signal (IBusEngine  *engine,
-               const gchar *name,
-               GType        first_arg_type,
-@@ -1203,6 +1292,19 @@ void ibus_engine_delete_surrounding_text (IBusEngine      *engine,
+ ibus_engine_emit_signal (IBusEngine  *engine,
+                          const gchar *signal_name,
+                          GVariant    *parameters)
+@@ -1133,14 +1215,42 @@ void ibus_engine_delete_surrounding_text (IBusEngine      *engine,
                                            gint             offset_from_cursor,
                                            guint            nchars)
  {
-+    g_assert (IBUS_IS_ENGINE (engine));
-+
 +    IBusEnginePrivate *priv;
 +
+     g_return_if_fail (IBUS_IS_ENGINE (engine));
+ 
 +    priv = IBUS_ENGINE_GET_PRIVATE (engine);
 +
 +    /* Clear the current surrounding-text buffer. */
@@ -620,10 +598,9 @@ index b5f53d4..da1e643 100644
 +        priv->surrounding_cursor_pos = 0;
 +    }
 +
-     _send_signal (engine,
-                   "DeleteSurroundingText",
-                   G_TYPE_INT,  &offset_from_cursor,
-@@ -1211,6 +1313,23 @@ void ibus_engine_delete_surrounding_text (IBusEngine      *engine,
+     ibus_engine_emit_signal (engine,
+                              "DeleteSurroundingText",
+                              g_variant_new ("(iu)", offset_from_cursor, nchars));
  }
  
  void
@@ -648,10 +625,10 @@ index b5f53d4..da1e643 100644
                                   IBusPropList *prop_list)
  {
 diff --git a/src/ibusengine.h b/src/ibusengine.h
-index 95be408..2c6e1d3 100644
+index 46d0a04..a5f5aea 100644
 --- a/src/ibusengine.h
 +++ b/src/ibusengine.h
-@@ -124,10 +124,14 @@ struct _IBusEngineClass {
+@@ -136,10 +136,14 @@ struct _IBusEngineClass {
                                       guint           index,
                                       guint           button,
                                       guint           state);
@@ -667,7 +644,7 @@ index 95be408..2c6e1d3 100644
  };
  
  GType        ibus_engine_get_type       (void);
-@@ -367,6 +371,21 @@ void ibus_engine_delete_surrounding_text(IBusEngine         *engine,
+@@ -394,6 +398,21 @@ void ibus_engine_delete_surrounding_text(IBusEngine         *engine,
                                           guint               nchars);
  
  /**
@@ -690,10 +667,10 @@ index 95be408..2c6e1d3 100644
   * @engine: An IBusEngine.
   * @returns: Name of IBusEngine.
 diff --git a/src/ibusinputcontext.c b/src/ibusinputcontext.c
-index b00ad3b..158979e 100644
+index f2977fc..55de905 100644
 --- a/src/ibusinputcontext.c
 +++ b/src/ibusinputcontext.c
-@@ -58,12 +58,18 @@ enum {
+@@ -59,13 +59,20 @@ enum {
  /* BusInputContextPriv */
  struct _IBusInputContextPrivate {
      gboolean own;
@@ -710,9 +687,25 @@ index b00ad3b..158979e 100644
 +static IBusText *text_empty = NULL;
 +
  /* functions prototype */
- static void     ibus_input_context_real_destroy (IBusInputContext       *context);
- static gboolean ibus_input_context_ibus_signal  (IBusProxy              *proxy,
-@@ -474,6 +480,9 @@ ibus_input_context_class_init (IBusInputContextClass *klass)
++static void     ibus_input_context_real_destroy (IBusProxy              *context);
+ static void     ibus_input_context_g_signal     (GDBusProxy             *proxy,
+                                                  const gchar            *sender_name,
+                                                  const gchar            *signal_name,
+@@ -76,10 +83,13 @@ G_DEFINE_TYPE (IBusInputContext, ibus_input_context, IBUS_TYPE_PROXY)
+ static void
+ ibus_input_context_class_init (IBusInputContextClass *class)
+ {
++    IBusProxyClass *ibus_proxy_class = IBUS_PROXY_CLASS (class);
+     GDBusProxyClass *g_dbus_proxy_class = G_DBUS_PROXY_CLASS (class);
+ 
+     g_type_class_add_private (class, sizeof (IBusInputContextPrivate));
+ 
++    ibus_proxy_class->destroy = ibus_input_context_real_destroy;
++
+     g_dbus_proxy_class->g_signal = ibus_input_context_g_signal;
+ 
+     /* install signals */
+@@ -442,6 +452,9 @@ ibus_input_context_class_init (IBusInputContextClass *class)
              G_TYPE_NONE,
              1,
              IBUS_TYPE_PROPERTY);
@@ -722,29 +715,31 @@ index b00ad3b..158979e 100644
  }
  
  static void
-@@ -482,6 +491,8 @@ ibus_input_context_init (IBusInputContext *context)
+@@ -450,6 +463,22 @@ ibus_input_context_init (IBusInputContext *context)
      IBusInputContextPrivate *priv;
      priv = IBUS_INPUT_CONTEXT_GET_PRIVATE (context);
      priv->own = TRUE;
 +    priv->surrounding_text = g_object_ref_sink (text_empty);
 +    priv->surrounding_cursor_pos = 0;
- }
- 
- static void
-@@ -496,6 +507,11 @@ ibus_input_context_real_destroy (IBusInputContext *context)
-                          G_TYPE_INVALID);
-     }
- 
++}
++
++static void
++ibus_input_context_real_destroy (IBusProxy *context)
++{
++    IBusInputContextPrivate *priv;
++    priv = IBUS_INPUT_CONTEXT_GET_PRIVATE (IBUS_INPUT_CONTEXT (context));
++
 +    if (priv->surrounding_text) {
 +        g_object_unref (priv->surrounding_text);
 +        priv->surrounding_text = NULL;
 +    }
 +
-     IBUS_OBJECT_CLASS(ibus_input_context_parent_class)->destroy (IBUS_OBJECT (context));
++    IBUS_PROXY_CLASS(ibus_input_context_parent_class)->destroy (context);
  }
  
-@@ -914,6 +930,33 @@ ibus_input_context_property_hide (IBusInputContext *context,
-                      G_TYPE_INVALID);
+ static void
+@@ -821,6 +850,38 @@ ibus_input_context_property_hide (IBusInputContext *context,
+                        );
  }
  
 +void
@@ -761,16 +756,21 @@ index b00ad3b..158979e 100644
 +    if (priv->surrounding_text == NULL ||
 +        g_strcmp0 (text->text, priv->surrounding_text->text) != 0 ||
 +        cursor_pos != priv->surrounding_cursor_pos) {
++        GVariant *variant = ibus_serializable_serialize ((IBusSerializable *)text);
 +        if (priv->surrounding_text)
 +            g_object_unref (priv->surrounding_text);
 +        priv->surrounding_text = (IBusText *) g_object_ref_sink (text);
 +        priv->surrounding_cursor_pos = cursor_pos;
 +
-+        ibus_proxy_call ((IBusProxy *) context,
-+                         "SetSurroundingText",
-+                         IBUS_TYPE_TEXT, &text,
-+                         G_TYPE_UINT, &cursor_pos,
-+                         G_TYPE_INVALID);
++        g_dbus_proxy_call ((GDBusProxy *) context,
++                         "SetSurroundingText",              /* method_name */
++                         g_variant_new ("(vu)", variant, cursor_pos), /* parameters */
++                         G_DBUS_CALL_FLAGS_NONE,            /* flags */
++                         -1,                                /* timeout */
++                         NULL,                              /* cancellable */
++                         NULL,                              /* callback */
++                         NULL                               /* user_data */
++                         );
 +    }
 +}
 +
@@ -778,10 +778,10 @@ index b00ad3b..158979e 100644
  ibus_input_context_is_enabled (IBusInputContext *context)
  {
 diff --git a/src/ibusinputcontext.h b/src/ibusinputcontext.h
-index 0d508a1..7f3d3f6 100644
+index 671b7ce..8f20e2d 100644
 --- a/src/ibusinputcontext.h
 +++ b/src/ibusinputcontext.h
-@@ -36,6 +36,7 @@
+@@ -41,6 +41,7 @@
  
  #include "ibusproxy.h"
  #include "ibusenginedesc.h"
@@ -789,7 +789,7 @@ index 0d508a1..7f3d3f6 100644
  
  /*
   * Type macros.
-@@ -267,6 +268,16 @@ IBusEngineDesc
+@@ -277,6 +278,16 @@ IBusEngineDesc
  void         ibus_input_context_set_engine  (IBusInputContext   *context,
                                               const gchar        *name);
  
@@ -807,7 +807,7 @@ index 0d508a1..7f3d3f6 100644
  G_END_DECLS
  #endif
 diff --git a/src/ibusmarshalers.list b/src/ibusmarshalers.list
-index 4473dab..6f80970 100644
+index 5184278..5dc7fc2 100644
 --- a/src/ibusmarshalers.list
 +++ b/src/ibusmarshalers.list
 @@ -13,6 +13,7 @@ VOID:INT,INT,INT,INT

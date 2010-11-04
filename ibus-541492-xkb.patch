@@ -1,6 +1,6 @@
-From d969e258fc925d16799e34f5b959a15c4c3cb7c3 Mon Sep 17 00:00:00 2001
+From cfe234ad9bd771efaa1ba5a52e31a68b3d25e477 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Thu, 21 Oct 2010 18:48:45 +0900
+Date: Thu, 4 Nov 2010 17:40:30 +0900
 Subject: [PATCH] Add XKB layouts
 
 ---
@@ -18,7 +18,7 @@ Subject: [PATCH] Add XKB layouts
  setup/main.py              |    3 +
  setup/setup.ui             |  609 ++++++++++++++++++++++++++++++++++++++-
  setup/xkbsetup.py          |  451 ++++++++++++++++++++++++++++
- src/ibusfactory.c          |   17 +-
+ src/ibusfactory.c          |   21 ++-
  src/ibusfactory.h          |    5 +-
  ui/gtk/panel.py            |   39 +++
  xkb/Makefile.am            |  104 +++++++
@@ -31,7 +31,7 @@ Subject: [PATCH] Add XKB layouts
  xkb/xkblib.h               |   40 +++
  xkb/xkbxml.c               |  696 ++++++++++++++++++++++++++++++++++++++++++++
  xkb/xkbxml.h               |  189 ++++++++++++
- 27 files changed, 3745 insertions(+), 6 deletions(-)
+ 27 files changed, 3749 insertions(+), 6 deletions(-)
  create mode 100644 ibus/xkblayout.py.in
  create mode 100644 ibus/xkbxml.py.in
  create mode 100644 setup/xkbsetup.py
@@ -47,35 +47,35 @@ Subject: [PATCH] Add XKB layouts
  create mode 100644 xkb/xkbxml.h
 
 diff --git a/Makefile.am b/Makefile.am
-index 7895940..9f534a4 100644
+index 02b7163..6cbe82a 100644
 --- a/Makefile.am
 +++ b/Makefile.am
-@@ -39,6 +39,12 @@ MEMCONF_DIRS = \
+@@ -42,6 +42,12 @@ DAEMON_DIRS =       \
  	$(NULL)
  endif
  
 +if ENABLE_XKB
-+XKB_DIRS = \
-+	xkb \
++XKB_DIRS =          \
++	xkb             \
 +	$(NULL)
 +endif
 +
- SUBDIRS = \
- 	src \
- 	bus \
-@@ -53,6 +59,7 @@ SUBDIRS = \
- 	$(PYTHON_DIRS) \
- 	$(GCONF_DIRS) \
+ if ENABLE_MEMCONF
+ MEMCONF_DIRS = \
+ 	memconf \
+@@ -60,6 +66,7 @@ SUBDIRS =           \
+ 	$(DAEMON_DIRS)  \
+ 	$(PYTHON_DIRS)  \
+ 	$(GCONF_DIRS)   \
++	$(XKB_DIRS)     \
  	$(MEMCONF_DIRS) \
-+	$(XKB_DIRS) \
  	$(NULL)
  
- ACLOCAL_AMFLAGS = -I m4
 diff --git a/configure.ac b/configure.ac
-index 03b7c03..94e6eab 100644
+index 2c330fa..181490c 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -168,6 +168,57 @@ else
+@@ -185,6 +185,57 @@ else
      enable_xim="no (disabled, use --enable-xim to enable)"
  fi
  
@@ -133,7 +133,7 @@ index 03b7c03..94e6eab 100644
  # GObject introspection
  GOBJECT_INTROSPECTION_CHECK([0.6.8])
  
-@@ -380,6 +431,7 @@ gconf/Makefile
+@@ -400,6 +451,7 @@ gconf/Makefile
  gconf/gconf.xml.in
  bindings/Makefile
  bindings/vala/Makefile
@@ -141,7 +141,7 @@ index 03b7c03..94e6eab 100644
  ])
  
  AC_OUTPUT
-@@ -394,6 +446,7 @@ Build options:
+@@ -415,6 +467,7 @@ Build options:
    Build gtk2 immodule       $enable_gtk2
    Build gtk3 immodule       $enable_gtk3
    Build XIM agent server    $enable_xim
@@ -150,10 +150,10 @@ index 03b7c03..94e6eab 100644
    Build gconf modules       $enable_gconf
    Build memconf modules     $enable_memconf
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 9e92181..26ee970 100644
+index f818635..f3f567b 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
-@@ -194,6 +194,42 @@
+@@ -184,6 +184,42 @@
        </locale>
      </schema>
      <schema>
@@ -888,10 +888,10 @@ index 0000000..5f0a3ea
 +    test()
 +    test2()
 diff --git a/setup/Makefile.am b/setup/Makefile.am
-index 0b81bf3..ade2791 100644
+index 1730ec0..249856d 100644
 --- a/setup/Makefile.am
 +++ b/setup/Makefile.am
-@@ -27,6 +27,7 @@ ibussetup_PYTHON = \
+@@ -28,6 +28,7 @@ ibussetup_PYTHON = \
  	enginetreeview.py \
  	engineabout.py \
  	keyboardshortcut.py \
@@ -900,10 +900,10 @@ index 0b81bf3..ade2791 100644
  
  ibussetup_DATA = \
 diff --git a/setup/enginecombobox.py b/setup/enginecombobox.py
-index 90b6f6c..6822c04 100644
+index 2fd8876..7383177 100644
 --- a/setup/enginecombobox.py
 +++ b/setup/enginecombobox.py
-@@ -44,6 +44,7 @@ class EngineComboBox(gtk.ComboBox):
+@@ -43,6 +43,7 @@ class EngineComboBox(gtk.ComboBox):
          self.connect("notify::active", self.__notify_active_cb)
  
          self.__model = None
@@ -931,18 +931,18 @@ index 90b6f6c..6822c04 100644
 +        self.__title = title
  
 diff --git a/setup/main.py b/setup/main.py
-index c6612d2..228b030 100644
+index 8191282..afc4ca1 100644
 --- a/setup/main.py
 +++ b/setup/main.py
-@@ -36,6 +36,7 @@ from gtk import gdk
+@@ -37,6 +37,7 @@ from gtk import gdk
  from enginecombobox import EngineComboBox
  from enginetreeview import EngineTreeView
  from engineabout import EngineAbout
 +from xkbsetup import XKBSetup
+ from i18n import _, N_, init
  
- _  = lambda a : gettext.dgettext("ibus", a)
- N_ = lambda a : a
-@@ -233,6 +234,8 @@ class Setup(object):
+ (
+@@ -224,6 +225,8 @@ class Setup(object):
          self.__combobox.connect("notify::active-engine", self.__combobox_notify_active_engine_cb)
          self.__treeview.connect("notify", self.__treeview_notify_cb)
  
@@ -952,7 +952,7 @@ index c6612d2..228b030 100644
          engine = self.__combobox.get_active_engine()
          button = self.__builder.get_object("button_engine_add")
 diff --git a/setup/setup.ui b/setup/setup.ui
-index 703b4d8..a758bc7 100644
+index 82a2101..19f36c8 100644
 --- a/setup/setup.ui
 +++ b/setup/setup.ui
 @@ -129,7 +129,6 @@
@@ -979,7 +979,7 @@ index 703b4d8..a758bc7 100644
                                          <property name="can_focus">True</property>
                                          <property name="receives_default">False</property>
                                          <property name="use_underline">True</property>
-@@ -745,6 +742,7 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
+@@ -780,6 +777,7 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
                                      <property name="visible">True</property>
                                      <property name="orientation">vertical</property>
                                      <property name="spacing">6</property>
@@ -987,7 +987,7 @@ index 703b4d8..a758bc7 100644
                                      <child>
                                        <object class="GtkCheckButton" id="checkbutton_use_sys_layout">
                                          <property name="label" translatable="yes">Use system keyboard layout</property>
-@@ -760,6 +758,57 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
+@@ -795,6 +793,57 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
                                          <property name="position">0</property>
                                        </packing>
                                      </child>
@@ -1045,7 +1045,7 @@ index 703b4d8..a758bc7 100644
                                    </object>
                                  </child>
                                </object>
-@@ -958,4 +1007,558 @@ Homepage: http://code.google.com/p/ibus
+@@ -993,4 +1042,558 @@ Homepage: http://code.google.com/p/ibus
        </object>
      </child>
    </object>
@@ -2062,10 +2062,18 @@ index 0000000..0d57a1a
 +        expander.set_data("checked", checked)
 +
 diff --git a/src/ibusfactory.c b/src/ibusfactory.c
-index 0a95108..3acd6a6 100644
+index 11d9a6d..7770216 100644
 --- a/src/ibusfactory.c
 +++ b/src/ibusfactory.c
-@@ -29,6 +29,7 @@
+@@ -21,6 +21,7 @@
+  */
+ #include "ibusfactory.h"
+ #include "ibusengine.h"
++#include "ibusmarshalers.h"
+ #include "ibusshare.h"
+ #include "ibusinternal.h"
+ 
+@@ -28,6 +29,7 @@
     (G_TYPE_INSTANCE_GET_PRIVATE ((o), IBUS_TYPE_FACTORY, IBusFactoryPrivate))
  
  enum {
@@ -2073,48 +2081,52 @@ index 0a95108..3acd6a6 100644
      LAST_SIGNAL,
  };
  
-@@ -46,6 +47,8 @@ struct _IBusFactoryPrivate {
+@@ -42,6 +44,8 @@ struct _IBusFactoryPrivate {
+     GHashTable     *engine_table;
  };
- typedef struct _IBusFactoryPrivate IBusFactoryPrivate;
  
 +static guint            factory_signals[LAST_SIGNAL] = { 0 };
 +
  /* functions prototype */
- static void     ibus_factory_destroy        (IBusFactory        *factory);
- static void     ibus_factory_set_property   (IBusFactory        *engine,
-@@ -112,7 +115,16 @@ ibus_factory_class_init (IBusFactoryClass *klass)
-                 IBUS_TYPE_CONNECTION,
-                 G_PARAM_READWRITE |  G_PARAM_CONSTRUCT_ONLY));
+ static void      ibus_factory_destroy        (IBusFactory        *factory);
+ static void      ibus_factory_set_property   (IBusFactory        *engine,
+@@ -113,6 +117,17 @@ ibus_factory_class_init (IBusFactoryClass *class)
+     ibus_service_class_add_interfaces (IBUS_SERVICE_CLASS (class), introspection_xml);
  
--
+     g_type_class_add_private (class, sizeof (IBusFactoryPrivate));
++
 +    factory_signals[LOOKUP_ENGINE_NAME] =
 +        g_signal_new (I_("lookup-engine-name"),
 +            G_TYPE_FROM_CLASS (gobject_class),
 +            G_SIGNAL_RUN_LAST,
 +            G_STRUCT_OFFSET (IBusFactoryClass, lookup_engine_name),
 +            NULL, NULL,
-+            ibus_marshal_VOID__STRING,
++            _ibus_marshal_VOID__STRING,
 +            G_TYPE_NONE,
 +            1,
 +            G_TYPE_STRING);
  }
  
  static void
-@@ -246,6 +258,9 @@ ibus_factory_ibus_message (IBusFactory    *factory,
-             return TRUE;
-         }
+@@ -190,8 +205,12 @@ ibus_factory_service_method_call (IBusService           *service,
  
+     if (g_strcmp0 (method_name, "CreateEngine") == 0) {
+         gchar *engine_name = NULL;
++        GType engine_type;
++
+         g_variant_get (parameters, "(&s)", &engine_name);
+-        GType engine_type = (GType )g_hash_table_lookup (factory->priv->engine_table, engine_name);
 +        g_signal_emit (factory, factory_signals[LOOKUP_ENGINE_NAME],
 +                       0, engine_name);
-+
-         engine_type = (GType )g_hash_table_lookup (priv->engine_table, engine_name);
++        engine_type = (GType) g_hash_table_lookup (factory->priv->engine_table, engine_name);
  
          if (engine_type == G_TYPE_INVALID) {
+             gchar *error_message = g_strdup_printf ("Can not fond engine %s", engine_name);
 diff --git a/src/ibusfactory.h b/src/ibusfactory.h
-index 515083d..42c29b9 100644
+index 47c06e0..102081c 100644
 --- a/src/ibusfactory.h
 +++ b/src/ibusfactory.h
-@@ -118,10 +118,13 @@ struct _IBusFactoryClass {
+@@ -127,10 +127,13 @@ struct _IBusFactoryClass {
      IBusServiceClass parent;
  
      /* signals */
@@ -2130,10 +2142,10 @@ index 515083d..42c29b9 100644
  
  /**
 diff --git a/ui/gtk/panel.py b/ui/gtk/panel.py
-index e1efd54..159e8aa 100644
+index 07b0fa2..d058b4e 100644
 --- a/ui/gtk/panel.py
 +++ b/ui/gtk/panel.py
-@@ -120,6 +120,22 @@ class Panel(ibus.PanelBase):
+@@ -117,6 +117,22 @@ class Panel(ibus.PanelBase):
          self.__config_load_show_im_name()
          # self.__bus.request_name(ibus.panel.IBUS_SERVICE_PANEL, 0)
  
@@ -2156,7 +2168,7 @@ index e1efd54..159e8aa 100644
      def set_cursor_location(self, x, y, w, h):
          self.__candidate_panel.set_cursor_location(x, y, w, h)
  
-@@ -204,14 +220,20 @@ class Panel(ibus.PanelBase):
+@@ -201,14 +217,20 @@ class Panel(ibus.PanelBase):
          if not enabled:
              self.__set_im_icon(ICON_KEYBOARD)
              self.__set_im_name(None)
@@ -2177,7 +2189,7 @@ index e1efd54..159e8aa 100644
          self.__language_bar.focus_in()
  
      def focus_out(self, ic):
-@@ -221,6 +243,8 @@ class Panel(ibus.PanelBase):
+@@ -218,6 +240,8 @@ class Panel(ibus.PanelBase):
          self.__language_bar.focus_out()
          self.__set_im_icon(ICON_KEYBOARD)
          self.__set_im_name(None)
@@ -2186,7 +2198,7 @@ index e1efd54..159e8aa 100644
  
      def state_changed(self):
          if not self.__focus_ic:
-@@ -233,14 +257,20 @@ class Panel(ibus.PanelBase):
+@@ -230,14 +254,20 @@ class Panel(ibus.PanelBase):
              self.reset()
              self.__set_im_icon(ICON_KEYBOARD)
              self.__set_im_name(None)
@@ -2207,7 +2219,8 @@ index e1efd54..159e8aa 100644
  
  
      def reset(self):
-@@ -516,2 +546,11 @@ class Panel(ibus.PanelBase):
+@@ -517,3 +547,12 @@ class Panel(ibus.PanelBase):
+                                flags=glib.SPAWN_DO_NOT_REAP_CHILD)[0]
          self.__setup_pid = pid
          glib.child_watch_add(self.__setup_pid, self.__child_watch_cb)
 +
@@ -2221,7 +2234,7 @@ index e1efd54..159e8aa 100644
 +            return "default"
 diff --git a/xkb/Makefile.am b/xkb/Makefile.am
 new file mode 100644
-index 0000000..49b82eb
+index 0000000..64b1fc8
 --- /dev/null
 +++ b/xkb/Makefile.am
 @@ -0,0 +1,104 @@
@@ -2248,7 +2261,7 @@ index 0000000..49b82eb
 +# Free Software Foundation, Inc., 59 Temple Place, Suite 330,
 +# Boston, MA  02111-1307  USA
 +
-+libibus = $(top_builddir)/src/libibus.la
++libibus = $(top_builddir)/src/libibus-@IBUS_API_VERSION@.la
 +
 +INCLUDES = \
 +        -I$(top_srcdir) \
@@ -3276,7 +3289,7 @@ index 0000000..09d506d
 +#endif
 diff --git a/xkb/xkbxml.c b/xkb/xkbxml.c
 new file mode 100644
-index 0000000..ed60c8a
+index 0000000..5e9885c
 --- /dev/null
 +++ b/xkb/xkbxml.c
 @@ -0,0 +1,696 @@
@@ -3309,7 +3322,7 @@ index 0000000..ed60c8a
 +#include <glib.h>
 +
 +#include "xkbxml.h"
-+#include "ibuscomponent.h"
++#include "ibus.h"
 +
 +#ifndef XKB_RULES_XML_FILE
 +#define XKB_RULES_XML_FILE "/usr/share/X11/xkb/rules/evdev.xml"
@@ -3978,7 +3991,7 @@ index 0000000..ed60c8a
 +}
 diff --git a/xkb/xkbxml.h b/xkb/xkbxml.h
 new file mode 100644
-index 0000000..1138b9b
+index 0000000..f4858fa
 --- /dev/null
 +++ b/xkb/xkbxml.h
 @@ -0,0 +1,189 @@
@@ -4007,7 +4020,7 @@ index 0000000..1138b9b
 +#ifndef __IBUS_XKB_H_
 +#define __IBUS_XKB_H_
 +
-+#include "ibuscomponent.h"
++#include "ibus.h"
 +
 +/*
 + * Type macros.
