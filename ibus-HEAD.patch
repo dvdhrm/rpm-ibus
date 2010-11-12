@@ -337,3 +337,42 @@ index 0bb71b5..c06faaa 100644
      }
  
      gdk_window_get_origin (ibusimcontext->client_window, &x, &y);
+diff --git a/configure.ac b/configure.ac
+index 2c330fa..a9cd908 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -21,10 +21,6 @@
+ # Boston, MA  02111-1307  USA
+ AC_PREFEQ([2.62])
+ 
+-AC_INIT([ibus], [ibus_version],
+-        [http://code.google.com/p/ibus/issues/entry],
+-        [ibus])
+-
+ AC_CONFIG_HEADERS([config.h])
+ AC_CONFIG_MACRO_DIR([m4])
+ 
+@@ -46,6 +42,10 @@ m4_define([ibus_api_version], [1.0])
+ m4_define([glib_required_version], [2.26.0])
+ 
+ 
++AC_INIT([ibus], [ibus_version],
++        [http://code.google.com/p/ibus/issues/entry],
++        [ibus])
++
+ # Init automake
+ AM_INIT_AUTOMAKE([1.10])
+ AM_MAINTAINER_MODE([enable])
+diff --git a/setup/main.py b/setup/main.py
+index 978b467..98fa1d1 100644
+--- a/setup/main.py
++++ b/setup/main.py
+@@ -69,7 +69,7 @@ class Setup(object):
+         super(Setup, self).__init__()
+         gtk_builder_file = path.join(path.dirname(__file__), "./setup.ui")
+         self.__builder = gtk.Builder()
+-        self.__builder.set_translation_domain("ibus")
++        self.__builder.set_translation_domain("ibus10")
+         self.__builder.add_from_file(gtk_builder_file);
+         self.__bus = None
+         self.__init_bus()

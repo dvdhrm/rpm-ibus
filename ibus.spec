@@ -12,7 +12,7 @@
 
 Name:       ibus
 Version:    1.3.99.20101028
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -20,9 +20,10 @@ URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
 Patch0:     ibus-HEAD.patch
-# Patch1:     ibus-530711-preload-sys.patch
-Patch2:     ibus-541492-xkb.patch
-Patch3:     ibus-435880-surrounding-text.patch
+Patch1:     ibus-652157-x11-ppc64.patch
+Patch2:     ibus-530711-preload-sys.patch
+Patch3:     ibus-541492-xkb.patch
+Patch4:     ibus-435880-surrounding-text.patch
 # WORKAROUND_GTK3_BUILD_FAILURE @ fedora14
 Patch99:    ibus-xx-workaround-gtk3.patch
 
@@ -131,11 +132,12 @@ The ibus-devel-docs package contains developer documentation for ibus
 %prep
 %setup -q
 %patch0 -p1
-# %patch1 -p1 -b .preload-sys
+%patch1 -p1 -b .ppc64
+%patch2 -p1 -b .preload-sys
 %if %have_libxkbfile
-%patch2 -p1 -b .xkb
+%patch3 -p1 -b .xkb
 %endif
-%patch3 -p1 -b .surrounding
+%patch4 -p1 -b .surrounding
 
 #### start WORKAROUND_GTK3_BUILD_FAILURE
 WORKAROUND_GTK3_BUILD_FAILURE=0
@@ -166,6 +168,7 @@ automake -a -c -f
     --enable-gtk3 \
     --enable-xim \
     --disable-gtk-doc \
+    --with-no-snooper-apps='gnome-do,Do.*,firefox.*,.*chrome.*,.*chromium.*' \
     --enable-introspection
 
 # make -C po update-gmo
@@ -307,6 +310,15 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Oct 29 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20101028-2
+- Added ibus-652157-x11-ppc64.patch
+  Fixes Bug 652157 - Window position of ibus-x11 in ppc64
+- Added ibus-530711-preload-sys.patch
+  Fixes Bug 530711 - Reload preloaded engines by login
+- Updated ibus-HEAD.patch
+  Fixes ibus.get_version & gettext domain for gtkbuilder
+- Applied no-snooper for 'gnome-do,Do.*,firefox.*,.*chrome.*,.*chromium.*'
+
 * Fri Oct 29 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20101028-1
 - Updated to 1.3.99.20101028
 - Integrated gdbus
