@@ -12,7 +12,7 @@
 
 Name:       ibus
 Version:    1.3.99.20101028
-Release:    2%{?dist}
+Release:    3%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -310,13 +310,15 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Fri Oct 29 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20101028-2
+* Thu Nov 18 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20101028-3
 - Added ibus-652157-x11-ppc64.patch
-  Fixes Bug 652157 - Window position of ibus-x11 in ppc64
+  Fixed Bug 652157 - Window position of ibus-x11 in ppc64
 - Added ibus-530711-preload-sys.patch
-  Fixes Bug 530711 - Reload preloaded engines by login
+  Fixed Bug 530711 - Reload preloaded engines by login
 - Updated ibus-HEAD.patch
-  Fixes ibus.get_version & gettext domain for gtkbuilder
+  Fixed ibus.get_version & gettext domain for gtkbuilder
+  Fixed undefined '_' in EngineAbout
+  Fixed Bug 654260 - NULL of focused input context
 - Applied no-snooper for 'gnome-do,Do.*,firefox.*,.*chrome.*,.*chromium.*'
 
 * Fri Oct 29 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20101028-1
