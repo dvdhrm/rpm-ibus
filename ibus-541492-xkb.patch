@@ -283,7 +283,7 @@ new file mode 100644
 index 0000000..0503f35
 --- /dev/null
 +++ b/ibus/xkblayout.py.in
-@@ -0,0 +1,185 @@
+@@ -0,0 +1,190 @@
 +# vim:set et sts=4 sw=4:
 +#
 +# ibus - The Input Bus
@@ -395,6 +395,11 @@ index 0000000..0503f35
 +        if not self.__use_xkb:
 +            return
 +        if layout == None:
++            return
++        if self.__default_layout == None:
++            # Maybe opening display was failed in constructor.
++            self.reload_default_layout()
++        if self.__default_layout == None:
 +            return
 +        layout = str(layout)
 +        if layout == "default":
@@ -2802,7 +2807,7 @@ new file mode 100644
 index 0000000..0919913
 --- /dev/null
 +++ b/xkb/ibus-xkb-main.c
-@@ -0,0 +1,101 @@
+@@ -0,0 +1,105 @@
 +/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
 +/* vim:set et sts=4: */
 +/* bus - The Input Bus
@@ -2880,6 +2885,10 @@ index 0000000..0919913
 +    }
 +
 +    xdisplay = XOpenDisplay (NULL);
++    if (xdisplay == NULL) {
++        g_warning ("Could not open display");
++        return -1;
++    }
 +    ibus_xkb_init (xdisplay);
 +
 +    if (layout) {

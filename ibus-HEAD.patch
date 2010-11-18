@@ -376,6 +376,17 @@ index 978b467..98fa1d1 100644
          self.__builder.add_from_file(gtk_builder_file);
          self.__bus = None
          self.__init_bus()
+--- ibus/setup/engineabout.py.orig	2010-11-16 17:53:20.970390287 +0900
++++ ibus/setup/engineabout.py	2010-11-16 17:53:44.781344317 +0900
+@@ -25,7 +25,7 @@ from gtk import gdk
+ import pango
+ import ibus
+ 
+-from i18n import *
++from i18n import _, N_
+ 
+ class EngineAbout(gtk.Dialog):
+     def __init__(self, enginedesc):
 diff --git a/ui/gtk/engineabout.py b/ui/gtk/engineabout.py
 index 3ac853a..a34e930 100644
 --- a/ui/gtk/engineabout.py
