@@ -12,7 +12,7 @@
 
 Name:       ibus
 Version:    1.3.99.20101028
-Release:    3%{?dist}
+Release:    4%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -310,7 +310,7 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Thu Nov 18 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20101028-3
+* Thu Nov 18 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20101028-4
 - Added ibus-652157-x11-ppc64.patch
   Fixed Bug 652157 - Window position of ibus-x11 in ppc64
 - Added ibus-530711-preload-sys.patch

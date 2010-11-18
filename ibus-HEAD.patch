@@ -390,15 +390,15 @@ index 3ac853a..a34e930 100644
  class EngineAbout(gtk.Dialog):
      def __init__(self, enginedesc):
 diff --git a/bus/inputcontext.c b/bus/inputcontext.c
-index ec72dd1..8af3ccb 100644
+index ec72dd1..87fa162 100644
 --- a/bus/inputcontext.c
 +++ b/bus/inputcontext.c
-@@ -699,7 +699,7 @@ _ic_process_key_event  (BusInputContext       *context,
+@@ -698,7 +698,7 @@ _ic_process_key_event  (BusInputContext       *context,
+     if (G_UNLIKELY (!context->has_focus)) {
          /* workaround: set focus if context does not have focus */
          BusInputContext *focused_context = bus_ibus_impl_get_focused_input_context (BUS_DEFAULT_IBUS);
-         if (context == NULL ||
--            focused_context->fake == TRUE ||
-+            (focused_context != NULL && focused_context->fake == TRUE) ||
+-        if (context == NULL ||
++        if (focused_context == NULL ||
+             focused_context->fake == TRUE ||
              context->fake == FALSE) {
              /* grab focus, if context is a real IC or current focused IC is fake */
-             bus_input_context_focus_in (context);
