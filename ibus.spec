@@ -11,21 +11,18 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.3.99.20101028
-Release:    6%{?dist}
+Version:    1.3.99.20101118
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
 URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
-Patch0:     ibus-HEAD.patch
-Patch1:     ibus-652157-x11-ppc64.patch
-Patch2:     ibus-530711-preload-sys.patch
-Patch3:     ibus-541492-xkb.patch
-Patch4:     ibus-435880-surrounding-text.patch
-# WORKAROUND_GTK3_BUILD_FAILURE @ fedora14
-Patch99:    ibus-xx-workaround-gtk3.patch
+# Patch0:     ibus-HEAD.patch
+Patch1:     ibus-530711-preload-sys.patch
+Patch2:     ibus-541492-xkb.patch
+Patch3:     ibus-435880-surrounding-text.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -131,29 +128,12 @@ The ibus-devel-docs package contains developer documentation for ibus
 
 %prep
 %setup -q
-%patch0 -p1
-%patch1 -p1 -b .ppc64
-%patch2 -p1 -b .preload-sys
+# %patch0 -p1
+%patch1 -p1 -b .preload-sys
 %if %have_libxkbfile
-%patch3 -p1 -b .xkb
+%patch2 -p1 -b .xkb
 %endif
-%patch4 -p1 -b .surrounding
-
-#### start WORKAROUND_GTK3_BUILD_FAILURE
-WORKAROUND_GTK3_BUILD_FAILURE=0
-pkg-config --print-requires gtk+-3.0 | grep -q gio-2.0
-if test $? -eq 0; then
-    if test -f /usr/include/gtk-3.0/gtk/gtkapplication.h -a \
-       ! -f /usr/include/glib-2.0/gio/gapplication.h ; then
-        WORKAROUND_GTK3_BUILD_FAILURE=1
-    fi
-fi
-if test $WORKAROUND_GTK3_BUILD_FAILURE -eq 1 ; then
-  printf "#### ERROR: glib2 is old against gtk3\n"
-  printf "####        Applying a workaround\n"
-%patch99 -p1 -b .ugly-hack
-fi
-#### end WORKAROUND_GTK3_BUILD_FAILURE
+%patch3 -p1 -b .surrounding
 
 %build
 %if %have_libxkbfile
@@ -311,20 +291,10 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Mon Nov 22 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20101028-6
-- Added ibus-652157-x11-ppc64.patch
-  Fixed Bug 652157 - Window position of ibus-x11 in ppc64
+* Fri Nov 26 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20101118-1
+- Updated to 1.3.99.20101118
 - Added ibus-530711-preload-sys.patch
   Fixed Bug 530711 - Reload preloaded engines by login
-- Updated ibus-HEAD.patch
-  Fixed ibus.get_version & gettext domain for gtkbuilder
-  Fixed undefined '_' in EngineAbout
-  Fixed Bug 654260 - NULL of focused input context
-- Applied no-snooper for 'gnome-do,Do.*,firefox.*,.*chrome.*,.*chromium.*'
-- Updated ibus-541492-xkb.patch
-  Fixed Bug 653806 - ibus-xkb SEGV
-- Updated ibus-435880-surrounding-text.patch
-  Fixed Bug 639253 - ibus_engine_delete_surrounding_text with offset.
 
 * Fri Oct 29 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20101028-1
 - Updated to 1.3.99.20101028

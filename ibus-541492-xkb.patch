@@ -1,6 +1,6 @@
-From cfe234ad9bd771efaa1ba5a52e31a68b3d25e477 Mon Sep 17 00:00:00 2001
+From 4bac7696cf277414eba7b166fcd8dbfabe8f9e6f Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Thu, 4 Nov 2010 17:40:30 +0900
+Date: Mon, 22 Nov 2010 11:39:27 +0900
 Subject: [PATCH] Add XKB layouts
 
 ---
@@ -11,7 +11,7 @@ Subject: [PATCH] Add XKB layouts
  ibus/__init__.py           |    2 +
  ibus/bus.py                |    3 +
  ibus/interface/iibus.py    |    3 +
- ibus/xkblayout.py.in       |  185 ++++++++++++
+ ibus/xkblayout.py.in       |  190 ++++++++++++
  ibus/xkbxml.py.in          |  412 ++++++++++++++++++++++++++
  setup/Makefile.am          |    1 +
  setup/enginecombobox.py    |    7 +-
@@ -24,14 +24,14 @@ Subject: [PATCH] Add XKB layouts
  xkb/Makefile.am            |  104 +++++++
  xkb/ibus-engine-xkb-main.c |  397 +++++++++++++++++++++++++
  xkb/ibus-engine-xkb-main.h |   46 +++
- xkb/ibus-xkb-main.c        |  101 +++++++
+ xkb/ibus-xkb-main.c        |  105 +++++++
  xkb/xkblayout.xml.in       |   16 +
  xkb/xkblayoutconfig.xml.in |    6 +
  xkb/xkblib.c               |  297 +++++++++++++++++++
  xkb/xkblib.h               |   40 +++
  xkb/xkbxml.c               |  696 ++++++++++++++++++++++++++++++++++++++++++++
  xkb/xkbxml.h               |  189 ++++++++++++
- 27 files changed, 3749 insertions(+), 6 deletions(-)
+ 27 files changed, 3758 insertions(+), 6 deletions(-)
  create mode 100644 ibus/xkblayout.py.in
  create mode 100644 ibus/xkbxml.py.in
  create mode 100644 setup/xkbsetup.py
@@ -72,7 +72,7 @@ index 02b7163..6cbe82a 100644
  	$(NULL)
  
 diff --git a/configure.ac b/configure.ac
-index 2c330fa..181490c 100644
+index 1a1e663..ea0d32b 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -185,6 +185,57 @@ else
@@ -150,10 +150,10 @@ index 2c330fa..181490c 100644
    Build gconf modules       $enable_gconf
    Build memconf modules     $enable_memconf
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index f818635..f3f567b 100644
+index 5956171..322f831 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
-@@ -184,6 +184,42 @@
+@@ -180,6 +180,42 @@
        </locale>
      </schema>
      <schema>
@@ -280,7 +280,7 @@ index e63caa3..8b7b6f7 100644
  
 diff --git a/ibus/xkblayout.py.in b/ibus/xkblayout.py.in
 new file mode 100644
-index 0000000..0503f35
+index 0000000..63d4327
 --- /dev/null
 +++ b/ibus/xkblayout.py.in
 @@ -0,0 +1,190 @@
@@ -936,7 +936,7 @@ index 2fd8876..7383177 100644
 +        self.__title = title
  
 diff --git a/setup/main.py b/setup/main.py
-index 8191282..afc4ca1 100644
+index 92a2398..1912e20 100644
 --- a/setup/main.py
 +++ b/setup/main.py
 @@ -37,6 +37,7 @@ from gtk import gdk
@@ -944,10 +944,10 @@ index 8191282..afc4ca1 100644
  from enginetreeview import EngineTreeView
  from engineabout import EngineAbout
 +from xkbsetup import XKBSetup
- from i18n import _, N_, init
+ from i18n import DOMAINNAME, _, N_, init as i18n_init
  
  (
-@@ -224,6 +225,8 @@ class Setup(object):
+@@ -229,6 +230,8 @@ class Setup(object):
          self.__combobox.connect("notify::active-engine", self.__combobox_notify_active_engine_cb)
          self.__treeview.connect("notify", self.__treeview_notify_cb)
  
@@ -957,7 +957,7 @@ index 8191282..afc4ca1 100644
          engine = self.__combobox.get_active_engine()
          button = self.__builder.get_object("button_engine_add")
 diff --git a/setup/setup.ui b/setup/setup.ui
-index 82a2101..19f36c8 100644
+index ef841a0..71f723d 100644
 --- a/setup/setup.ui
 +++ b/setup/setup.ui
 @@ -129,7 +129,6 @@
@@ -984,7 +984,7 @@ index 82a2101..19f36c8 100644
                                          <property name="can_focus">True</property>
                                          <property name="receives_default">False</property>
                                          <property name="use_underline">True</property>
-@@ -780,6 +777,7 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
+@@ -744,6 +741,7 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
                                      <property name="visible">True</property>
                                      <property name="orientation">vertical</property>
                                      <property name="spacing">6</property>
@@ -992,7 +992,7 @@ index 82a2101..19f36c8 100644
                                      <child>
                                        <object class="GtkCheckButton" id="checkbutton_use_sys_layout">
                                          <property name="label" translatable="yes">Use system keyboard layout</property>
-@@ -795,6 +793,57 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
+@@ -812,6 +810,57 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
                                          <property name="position">0</property>
                                        </packing>
                                      </child>
@@ -1050,7 +1050,7 @@ index 82a2101..19f36c8 100644
                                    </object>
                                  </child>
                                </object>
-@@ -993,4 +1042,558 @@ Homepage: http://code.google.com/p/ibus
+@@ -957,4 +1006,558 @@ Homepage: http://code.google.com/p/ibus
        </object>
      </child>
    </object>
@@ -2804,7 +2804,7 @@ index 0000000..8007631
 +#endif
 diff --git a/xkb/ibus-xkb-main.c b/xkb/ibus-xkb-main.c
 new file mode 100644
-index 0000000..0919913
+index 0000000..9db7d0a
 --- /dev/null
 +++ b/xkb/ibus-xkb-main.c
 @@ -0,0 +1,105 @@
