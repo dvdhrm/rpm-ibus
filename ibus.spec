@@ -11,15 +11,15 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.3.99.20101118
-Release:    2%{?dist}
+Version:    1.3.99.20101202
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
 URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
-# Patch0:     ibus-HEAD.patch
+Patch0:     ibus-HEAD.patch
 Patch1:     ibus-530711-preload-sys.patch
 Patch2:     ibus-541492-xkb.patch
 Patch3:     ibus-435880-surrounding-text.patch
@@ -89,6 +89,7 @@ This package contains the libraries for IBus
 Summary:    IBus im module for gtk2
 Group:      System Environment/Libraries
 Requires:   %{name} = %{version}-%{release}
+Requires:   %{name}-libs = %{version}-%{release}
 Requires(post): glib2 >= %{glib_ver}
 # Added for F14: need to keep bumping for backports
 Obsoletes:  ibus-gtk < %{version}-%{release}
@@ -101,6 +102,7 @@ This package contains ibus im module for gtk2
 Summary:    IBus im module for gtk3
 Group:      System Environment/Libraries
 Requires:   %{name} = %{version}-%{release}
+Requires:   %{name}-libs = %{version}-%{release}
 Requires(post): glib2 >= %{glib_ver}
 
 %description gtk3
@@ -110,6 +112,7 @@ This package contains ibus im module for gtk3
 Summary:    Development tools for ibus
 Group:      Development/Libraries
 Requires:   %{name} = %{version}-%{release}
+Requires:   %{name}-libs = %{version}-%{release}
 Requires:   glib2-devel
 Requires:   dbus-devel
 
@@ -128,7 +131,7 @@ The ibus-devel-docs package contains developer documentation for ibus
 
 %prep
 %setup -q
-# %patch0 -p1
+%patch0 -p1
 %patch1 -p1 -b .preload-sys
 %if %have_libxkbfile
 %patch2 -p1 -b .xkb
@@ -230,16 +233,16 @@ fi
 %postun libs -p /sbin/ldconfig
 
 %post gtk2
-%{_bindir}/update-gtk-immodules %{_host}
+%{_bindir}/update-gtk-immodules %{_host} || :
 
 %postun gtk2
-%{_bindir}/update-gtk-immodules %{_host}
+%{_bindir}/update-gtk-immodules %{_host} || :
 
 %post gtk3
-%{_bindir}/gtk-query-immodules-3.0-%{__isa_bits} --update-cache
+%{_bindir}/gtk-query-immodules-3.0-%{__isa_bits} --update-cache || :
 
 %postun gtk3
-%{_bindir}/gtk-query-immodules-3.0-%{__isa_bits} --update-cache
+%{_bindir}/gtk-query-immodules-3.0-%{__isa_bits} --update-cache || :
 
 # FIXME: no version number
 %files -f %{name}10.lang
@@ -291,11 +294,8 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Fri Dec  3 2010 Matthias Clasen <mclasen@redhat.com> - 1.3.99.20101118-2
-- Rebuild against newer gtk3
-
-* Fri Nov 26 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20101118-1
-- Updated to 1.3.99.20101118
+* Thu Dec 09 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20101202-1
+- Updated to 1.3.99.20101202
 - Added ibus-530711-preload-sys.patch
   Fixed Bug 530711 - Reload preloaded engines by login
 

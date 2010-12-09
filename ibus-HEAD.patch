@@ -1,1 +1,47 @@
+From 98419a4133f6358ec2e8ad56c62aacf3e3754c3e Mon Sep 17 00:00:00 2001
+From: Peng Huang <shawn.p.huang@gmail.com>
+Date: Wed, 8 Dec 2010 16:37:42 +0800
+Subject: [PATCH] Fix GI transfer mode annotation in ibus_bus_list_*engines() comment.
+
+See https://bugzilla.gnome.org/show_bug.cgi?id=635248.  Also, do not mark those
+functions as "not implemented", since they are apparently implemented.
+
+BUG=none
+TEST=manual
+
+Review URL: http://codereview.appspot.com/3274044
+---
+ src/ibusbus.h |    7 ++-----
+ 1 files changed, 2 insertions(+), 5 deletions(-)
+
+diff --git a/src/ibusbus.h b/src/ibusbus.h
+index 2e288f5..fb56b76 100644
+--- a/src/ibusbus.h
++++ b/src/ibusbus.h
+@@ -246,21 +246,18 @@ gboolean     ibus_bus_register_component(IBusBus        *bus,
+ /**
+  * ibus_bus_list_engines:
+  * @bus: An IBusBus.
+- * @returns: (transfer full) (element-type IBusEngineDesc): A List of engines.
++ * @returns: (transfer container) (element-type IBusEngineDesc): A List of engines.
+  *
+  * List engines.
+- * Note that this function is not yet implemented.
+  */
+ GList       *ibus_bus_list_engines      (IBusBus        *bus);
+ 
+ /**
+  * ibus_bus_list_active_engines:
+  * @bus: An IBusBus.
+- * @returns: (transfer full) (element-type IBusEngineDesc): A List of active engines.
++ * @returns: (transfer container) (element-type IBusEngineDesc): A List of active engines.
+  *
+  * List active engines.
+- * Note that this function is not yet implemented.
+- * <note><para>Not yet implemented.</para></note>
+  */
+ GList       *ibus_bus_list_active_engines
+                                         (IBusBus        *bus);
+-- 
+1.7.3.2
 

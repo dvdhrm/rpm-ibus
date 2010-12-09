@@ -1,6 +1,6 @@
-From 4bac7696cf277414eba7b166fcd8dbfabe8f9e6f Mon Sep 17 00:00:00 2001
+From 715f102611ac16ebc8f66f4fc3b4547c983105ea Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Mon, 22 Nov 2010 11:39:27 +0900
+Date: Thu, 9 Dec 2010 15:03:14 +0900
 Subject: [PATCH] Add XKB layouts
 
 ---
@@ -11,7 +11,7 @@ Subject: [PATCH] Add XKB layouts
  ibus/__init__.py           |    2 +
  ibus/bus.py                |    3 +
  ibus/interface/iibus.py    |    3 +
- ibus/xkblayout.py.in       |  190 ++++++++++++
+ ibus/xkblayout.py.in       |  225 ++++++++++++++
  ibus/xkbxml.py.in          |  412 ++++++++++++++++++++++++++
  setup/Makefile.am          |    1 +
  setup/enginecombobox.py    |    7 +-
@@ -31,7 +31,7 @@ Subject: [PATCH] Add XKB layouts
  xkb/xkblib.h               |   40 +++
  xkb/xkbxml.c               |  696 ++++++++++++++++++++++++++++++++++++++++++++
  xkb/xkbxml.h               |  189 ++++++++++++
- 27 files changed, 3758 insertions(+), 6 deletions(-)
+ 27 files changed, 3793 insertions(+), 6 deletions(-)
  create mode 100644 ibus/xkblayout.py.in
  create mode 100644 ibus/xkbxml.py.in
  create mode 100644 setup/xkbsetup.py
@@ -150,7 +150,7 @@ index 1a1e663..ea0d32b 100644
    Build gconf modules       $enable_gconf
    Build memconf modules     $enable_memconf
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 5956171..322f831 100644
+index 9b82857..3007e08 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
 @@ -180,6 +180,42 @@
@@ -197,7 +197,7 @@ index 5956171..322f831 100644
        <applyto>/desktop/ibus/panel/use_custom_font</applyto>
        <owner>ibus</owner>
 diff --git a/ibus/Makefile.am b/ibus/Makefile.am
-index d1cd750..783b4dc 100644
+index d1cd750..7f8590c 100644
 --- a/ibus/Makefile.am
 +++ b/ibus/Makefile.am
 @@ -58,12 +58,38 @@ nodist_ibus_PYTHON = \
@@ -214,7 +214,7 @@ index d1cd750..783b4dc 100644
 +ibus_PYTHON += $(xkblayout_py_DATA)
 +
 +if ENABLE_XKB
-+XKB_COMMAND=\\\""$(libexecdir)/ibus-xkb"\\\"
++XKB_COMMAND=\\\"$(libexecdir)/ibus-xkb\\\"
 +HAVE_XKB=True
 +else
 +XKB_COMMAND="None"
@@ -280,10 +280,10 @@ index e63caa3..8b7b6f7 100644
  
 diff --git a/ibus/xkblayout.py.in b/ibus/xkblayout.py.in
 new file mode 100644
-index 0000000..63d4327
+index 0000000..7685776
 --- /dev/null
 +++ b/ibus/xkblayout.py.in
-@@ -0,0 +1,190 @@
+@@ -0,0 +1,225 @@
 +# vim:set et sts=4 sw=4:
 +#
 +# ibus - The Input Bus
@@ -311,9 +311,10 @@ index 0000000..63d4327
 +        "XKBLayout",
 +    )
 +
-+import os
++import os, sys, time
 +
 +XKB_COMMAND = @XKB_COMMAND@
++XKB_SESSION_TIME_OUT = 30.0
 +
 +class XKBLayout():
 +    def __init__(self, config = None, command=XKB_COMMAND):
@@ -325,6 +326,9 @@ index 0000000..63d4327
 +        self.__default_layout = self.get_layout()
 +        self.__default_model = self.get_model()
 +        self.__default_option = self.get_option()
++        self.__time_lag_session_xkb_layout = True
++        self.__time_lag_session_xkb_option = True
++        self.__time_lag_session_xkb_timer = time.time()
 +        self.__xkb_latin_layouts = []
 +        if config != None:
 +            self.__xkb_latin_layouts = list(self.__config.get_value("general",
@@ -402,18 +406,38 @@ index 0000000..63d4327
 +        if self.__default_layout == None:
 +            return
 +        layout = str(layout)
++        # if set_default_layout() is not default, the default layout is
++        # pulled from the current XKB. But it's possible gnome-settings-daemon
++        # does not run yet. I added XKB_SESSION_TIME_OUT for the timer.
++        if self.__time_lag_session_xkb_layout == True:
++            self.__default_layout = self.get_layout()
++            self.__default_model = self.get_model()
++        if self.__time_lag_session_xkb_option == True:
++            self.__default_option = self.get_option()
++        if (self.__time_lag_session_xkb_layout == True or \
++            self.__time_lag_session_xkb_option == True ) and \
++           (self.__time_lag_session_xkb_timer - time.time() \
++            > XKB_SESSION_TIME_OUT):
++            self.__time_lag_session_xkb_layout = False
++            self.__time_lag_session_xkb_option = False
 +        if layout == "default":
 +            layout = self.__default_layout
++        else:
++            self.__time_lag_session_xkb_layout = False
 +        if model != None:
 +            model = str(model)
 +            if model == "default":
 +                (layout, model) = self.__get_model_from_layout(layout)
 +            if model == "default":
 +                model = self.__default_model
++            else:
++                self.__time_lag_session_xkb_layout = False
 +        if option != None:
 +            option = str(option)
 +            if option == "default":
 +                option = self.__default_option
++            else:
++                self.__time_lag_session_xkb_option = False
 +        need_us_layout = False
 +        for latin_layout in self.__xkb_latin_layouts:
 +            latin_layout = str(latin_layout)
@@ -448,6 +472,12 @@ index 0000000..63d4327
 +    def set_default_layout(self, layout="default", model="default"):
 +        if not self.__use_xkb:
 +            return
++        if layout == None:
++            print >> sys.stderr, "ibus.xkblayout: None layout"
++            return
++        if model == None:
++            print >> sys.stderr, "ibus.xkblayout: None model"
++            return
 +        if layout == 'default':
 +            self.__default_layout = self.get_layout()
 +            self.__default_model = self.get_model()
@@ -455,6 +485,7 @@ index 0000000..63d4327
 +            if model == 'default':
 +                (layout, model) = self.__get_model_from_layout(layout)
 +            self.__default_layout = layout
++            self.__time_lag_session_xkb_layout = False
 +            if model == 'default':
 +                self.__default_model = None
 +            else:
@@ -463,10 +494,14 @@ index 0000000..63d4327
 +    def set_default_option(self, option="default"):
 +        if not self.__use_xkb:
 +            return
++        if option == None:
++            print >> sys.stderr, "ibus.xkblayout: None option"
++            return
 +        if option == 'default':
 +            self.__default_option = self.get_option()
 +        else:
 +            self.__default_option = option
++            self.__time_lag_session_xkb_option = False
 +
 +    def reload_default_layout(self):
 +        if not self.__use_xkb:
@@ -936,7 +971,7 @@ index 2fd8876..7383177 100644
 +        self.__title = title
  
 diff --git a/setup/main.py b/setup/main.py
-index 92a2398..1912e20 100644
+index 215670d..c855b86 100644
 --- a/setup/main.py
 +++ b/setup/main.py
 @@ -37,6 +37,7 @@ from gtk import gdk
@@ -947,7 +982,7 @@ index 92a2398..1912e20 100644
  from i18n import DOMAINNAME, _, N_, init as i18n_init
  
  (
-@@ -229,6 +230,8 @@ class Setup(object):
+@@ -226,6 +227,8 @@ class Setup(object):
          self.__combobox.connect("notify::active-engine", self.__combobox_notify_active_engine_cb)
          self.__treeview.connect("notify", self.__treeview_notify_cb)
  
@@ -4194,5 +4229,5 @@ index 0000000..f4858fa
 +G_END_DECLS
 +#endif
 -- 
-1.7.2.1
+1.7.3.2
 

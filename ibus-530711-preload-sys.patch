@@ -1,6 +1,6 @@
-From 154582485a21da5c8ecf09ca500fc58f7400c7d4 Mon Sep 17 00:00:00 2001
+From 6819ae6b980d0c22e498aa367b8d9c0791acf9be Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Fri, 26 Nov 2010 14:13:17 +0900
+Date: Thu, 9 Dec 2010 15:03:08 +0900
 Subject: [PATCH] Reload preload engines until users customize the list.
 
 The idea is, if users don't customize the preload_engines with ibus-setup,
@@ -18,16 +18,16 @@ IBUS_PRELOAD_ENGINE_MODE_USER and users can customize the value
 Loading system default may spend the startup time. If you mind it,
 your dist may like to put TRUE in 'use_local_preload_engines' value.
 ---
- bus/ibusimpl.c       |  228 +++++++++++++++++++++++++++++++++++---------------
+ bus/ibusimpl.c       |  229 +++++++++++++++++++++++++++++++++++--------------
  data/ibus.schemas.in |   13 +++
  ibus/common.py       |    6 ++
  setup/main.py        |   37 +++++++-
  setup/setup.ui       |   21 ++++-
  src/ibustypes.h      |   10 ++
- 6 files changed, 241 insertions(+), 74 deletions(-)
+ 6 files changed, 242 insertions(+), 74 deletions(-)
 
 diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
-index b045d7f..eb353c2 100644
+index d7e496d..6f39fac 100644
 --- a/bus/ibusimpl.c
 +++ b/bus/ibusimpl.c
 @@ -144,6 +144,9 @@ static void     bus_ibus_impl_set_previous_engine
@@ -40,7 +40,7 @@ index b045d7f..eb353c2 100644
  static void     bus_ibus_impl_set_use_sys_layout
                                                  (BusIBusImpl        *ibus,
                                                   GVariant           *value);
-@@ -264,6 +267,122 @@ _panel_destroy_cb (BusPanelProxy *panel,
+@@ -264,6 +267,123 @@ _panel_destroy_cb (BusPanelProxy *panel,
      g_object_unref (panel);
  }
  
@@ -99,6 +99,7 @@ index b045d7f..eb353c2 100644
 +        }
 +
 +        if (engine_list != NULL &&
++            ibus->config != NULL &&
 +            ibus_config_get_value (ibus->config, "general",
 +                                   "preload_engines") == NULL) {
 +            ibus_config_set_value (ibus->config, "general",
@@ -163,7 +164,7 @@ index b045d7f..eb353c2 100644
  static void
  bus_ibus_impl_set_hotkey (BusIBusImpl *ibus,
                            GQuark       hotkey,
-@@ -347,34 +466,32 @@ static void
+@@ -347,34 +467,32 @@ static void
  bus_ibus_impl_set_preload_engines (BusIBusImpl *ibus,
                                     GVariant    *value)
  {
@@ -217,7 +218,7 @@ index b045d7f..eb353c2 100644
  }
  
  /**
-@@ -452,69 +569,47 @@ bus_ibus_impl_set_use_global_engine (BusIBusImpl *ibus,
+@@ -452,69 +570,47 @@ bus_ibus_impl_set_use_global_engine (BusIBusImpl *ibus,
      }
  }
  
@@ -310,7 +311,7 @@ index b045d7f..eb353c2 100644
  }
  
  /* The list of config entries that are related to ibus-daemon. */
-@@ -527,6 +622,7 @@ const static struct {
+@@ -527,6 +623,7 @@ const static struct {
      { "general/hotkey", "next_engine_in_menu",  bus_ibus_impl_set_next_engine_in_menu },
      { "general/hotkey", "previous_engine",      bus_ibus_impl_set_previous_engine },
      { "general", "preload_engines",             bus_ibus_impl_set_preload_engines },
@@ -500,5 +501,5 @@ index 035d124..0a9d7b2 100644
   * @x: x coordinate.
   * @y: y coordinate.
 -- 
-1.7.2.1
+1.7.3.2
 
