@@ -6,7 +6,7 @@ Subject: [PATCH] Reload preload engines until users customize the list.
 The idea is, if users don't customize the preload_engines with ibus-setup,
 users would prefer to load the system default engines again by login.
 The gconf value 'preload_engine_mode' is
-IBUS_PRELOAD_ENGINE_MODE_USER by default.
+IBUS_PRELOAD_ENGINE_MODE_LANG_RELATIVE by default.
 If preload_engine_mode is IBUS_PRELOAD_ENGINE_MODE_LANG_RELATIVE,
 ibus-daemon loads the system preload engines by langs.
 If preload_engine_mode is IBUS_PRELOAD_ENGINE_MODE_USER,
@@ -56,7 +56,7 @@ index d7e496d..6f39fac 100644
 +_get_config_preload_engine_mode (BusIBusImpl *ibus)
 +{
 +    GVariant *variant = NULL;
-+    gint preload_engine_mode = IBUS_PRELOAD_ENGINE_MODE_USER;
++    gint preload_engine_mode = IBUS_PRELOAD_ENGINE_MODE_LANG_RELATIVE;
 +
 +    g_assert (BUS_IS_IBUS_IMPL (ibus));
 +
@@ -198,7 +198,7 @@ index d7e496d..6f39fac 100644
 +bus_ibus_impl_set_preload_engine_mode (BusIBusImpl *ibus,
 +                                       GVariant    *value)
 +{
-+    gint preload_engine_mode = IBUS_PRELOAD_ENGINE_MODE_USER;
++    gint preload_engine_mode = IBUS_PRELOAD_ENGINE_MODE_LANG_RELATIVE;
  
 -    if (ibus->engine_list) {
 -        BusComponent *component = bus_component_from_engine_desc ((IBusEngineDesc *) ibus->engine_list->data);
@@ -257,7 +257,7 @@ index d7e496d..6f39fac 100644
 -    g_assert (BUS_IS_IBUS_IMPL (ibus));
 -
      static gboolean done = FALSE;
-+    gint preload_engine_mode = IBUS_PRELOAD_ENGINE_MODE_USER;
++    gint preload_engine_mode = IBUS_PRELOAD_ENGINE_MODE_LANG_RELATIVE;
 +
 +    g_assert (BUS_IS_IBUS_IMPL (ibus));
  
@@ -331,7 +331,7 @@ index aa66aa5..9b82857 100644
 +      <applyto>/desktop/ibus/general/preload_engine_mode</applyto>
 +      <owner>ibus</owner>
 +      <type>int</type>
-+      <default>0</default>
++      <default>1</default>
 +      <locale name="C">
 +        <short>Preload engine mode</short>
 +           <long>Preload engines are loaded with this mode.

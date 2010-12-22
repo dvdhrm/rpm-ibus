@@ -12,7 +12,7 @@
 
 Name:       ibus
 Version:    1.3.99.20101202
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -20,9 +20,9 @@ URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
 Patch0:     ibus-HEAD.patch
-Patch1:     ibus-530711-preload-sys.patch
+Patch1:     ibus-435880-surrounding-text.patch
 Patch2:     ibus-541492-xkb.patch
-Patch3:     ibus-435880-surrounding-text.patch
+Patch3:     ibus-530711-preload-sys.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -132,11 +132,11 @@ The ibus-devel-docs package contains developer documentation for ibus
 %prep
 %setup -q
 %patch0 -p1
-%patch1 -p1 -b .preload-sys
+%patch1 -p1 -b .surrounding
 %if %have_libxkbfile
 %patch2 -p1 -b .xkb
 %endif
-%patch3 -p1 -b .surrounding
+%patch3 -p1 -b .preload-sys
 
 %build
 %if %have_libxkbfile
@@ -294,6 +294,10 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Dec 22 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20101202-2
+- Updated ibus-435880-surrounding-text.patch to support the xml setting.
+- Updated ibus-530711-preload-sys.patch to set the default lang base.
+
 * Thu Dec 09 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20101202-1
 - Updated to 1.3.99.20101202
 - Added ibus-530711-preload-sys.patch

@@ -34,8 +34,10 @@ resets the current surrounding-text.
  src/ibusengine.h                |   21 ++++++-
  src/ibusinputcontext.c          |   61 ++++++++++++++++++
  src/ibusinputcontext.h          |   11 +++
+ src/ibusenginedesc.c            |   91 +++++++++++++++++++++++++
+ src/ibusenginedesc.h            |   11 +++
  src/ibusmarshalers.list         |    1 +
- 13 files changed, 421 insertions(+), 12 deletions(-)
+ 15 files changed, 421 insertions(+), 12 deletions(-)
 
 diff --git a/bus/engineproxy.c b/bus/engineproxy.c
 index 59d495d..01116c2 100644
@@ -161,7 +163,7 @@ index 7e522f3..de9f31f 100644
      /* signals */
      "    <signal name='CommitText'>"
      "      <arg type='v' name='text' />"
-@@ -961,6 +966,32 @@ _ic_get_engine (BusInputContext       *context,
+@@ -961,6 +966,32 @@ _ic_get_engine (BusInputContext       *c
   * Handle a D-Bus method call whose destination and interface name are both "org.freedesktop.IBus.InputContext"
   */
  static void
@@ -194,7 +196,7 @@ index 7e522f3..de9f31f 100644
  bus_input_context_service_method_call (IBusService            *service,
                                         GDBusConnection        *connection,
                                         const gchar            *sender,
-@@ -999,6 +1030,7 @@ bus_input_context_service_method_call (IBusService            *service,
+@@ -999,6 +1030,7 @@ bus_input_context_service_method_call (I
          { "IsEnabled",         _ic_is_enabled },
          { "SetEngine",         _ic_set_engine },
          { "GetEngine",         _ic_get_engine },
@@ -202,11 +204,33 @@ index 7e522f3..de9f31f 100644
      };
  
      gint i;
+@@ -2059,6 +2091,10 @@ bus_input_context_set_engine (BusInputCo
+             bus_engine_proxy_set_cursor_location (context->engine, context->x, context->y, context->w, context->h);
+         }
+     }
++    bus_input_context_emit_signal (context,
++                                   "EngineChanged",
++                                   NULL,
++                                   NULL);
+     g_signal_emit (context,
+                    context_signals[ENGINE_CHANGED],
+                    0);
 diff --git a/client/gtk2/ibusimcontext.c b/client/gtk2/ibusimcontext.c
 index a6a11b4..0c15df9 100644
 --- a/client/gtk2/ibusimcontext.c
 +++ b/client/gtk2/ibusimcontext.c
-@@ -106,6 +106,12 @@ static void     ibus_im_context_set_cursor_location
+@@ -59,8 +59,8 @@ struct _IBusIMContext {
+     GdkRectangle     cursor_area;
+     gboolean         has_focus;
+ 
+-    gint             caps;
+-
++    guint            supported_caps;
++    guint            caps;
+ };
+ 
+ struct _IBusIMContextClass {
+@@ -106,11 +106,18 @@ static void     ibus_im_context_set_curs
  static void     ibus_im_context_set_use_preedit
                                              (GtkIMContext           *context,
                                               gboolean               use_preedit);
@@ -219,7 +243,13 @@ index a6a11b4..0c15df9 100644
  
  /* static methods*/
  static void     _create_input_context       (IBusIMContext      *context);
-@@ -124,14 +130,15 @@ static void     _slave_preedit_start_cb     (GtkIMContext       *slave,
+ static void     _set_cursor_location_internal
+                                             (GtkIMContext       *context);
++static void     _negotiate_capabilities     (IBusIMContext      *context);
+ 
+ static void     _bus_connected_cb           (IBusBus            *bus,
+                                              IBusIMContext      *context);
+@@ -124,14 +131,15 @@ static void     _slave_preedit_start_cb 
                                               IBusIMContext       *context);
  static void     _slave_preedit_end_cb       (GtkIMContext       *slave,
                                               IBusIMContext       *context);
@@ -241,7 +271,7 @@ index a6a11b4..0c15df9 100644
  
  static GType                _ibus_type_im_context = 0;
  static GtkIMContextClass    *parent_class = NULL;
-@@ -196,6 +203,17 @@ ibus_im_context_new (void)
+@@ -196,6 +204,17 @@ ibus_im_context_new (void)
      return IBUS_IM_CONTEXT (obj);
  }
  
@@ -259,7 +289,7 @@ index a6a11b4..0c15df9 100644
  static gint
  _key_snooper_cb (GtkWidget   *widget,
                   GdkEventKey *event,
-@@ -223,6 +241,8 @@ _key_snooper_cb (GtkWidget   *widget,
+@@ -223,6 +242,8 @@ _key_snooper_cb (GtkWidget   *widget,
      if (G_UNLIKELY (event->state & IBUS_IGNORED_MASK))
          return FALSE;
  
@@ -268,7 +298,7 @@ index a6a11b4..0c15df9 100644
      switch (event->type) {
      case GDK_KEY_RELEASE:
          retval = ibus_input_context_process_key_event (ibuscontext,
-@@ -269,6 +289,7 @@ ibus_im_context_class_init     (IBusIMContextClass *class)
+@@ -269,6 +290,7 @@ ibus_im_context_class_init     (IBusIMCo
      im_context_class->set_client_window = ibus_im_context_set_client_window;
      im_context_class->set_cursor_location = ibus_im_context_set_cursor_location;
      im_context_class->set_use_preedit = ibus_im_context_set_use_preedit;
@@ -276,19 +306,21 @@ index a6a11b4..0c15df9 100644
      gobject_class->finalize = ibus_im_context_finalize;
  
      _signal_commit_id =
-@@ -367,7 +388,11 @@ ibus_im_context_init (GObject *obj)
+@@ -367,7 +389,12 @@ ibus_im_context_init (GObject *obj)
  
      ibusimcontext->ibuscontext = NULL;
      ibusimcontext->has_focus = FALSE;
+-    ibusimcontext->caps = IBUS_CAP_PREEDIT_TEXT | IBUS_CAP_FOCUS | IBUS_CAP_SURROUNDING_TEXT;
 +#ifdef ENABLE_SURROUNDING
-     ibusimcontext->caps = IBUS_CAP_PREEDIT_TEXT | IBUS_CAP_FOCUS | IBUS_CAP_SURROUNDING_TEXT;
++    ibusimcontext->supported_caps = IBUS_CAP_PREEDIT_TEXT | IBUS_CAP_FOCUS | IBUS_CAP_SURROUNDING_TEXT;
 +#else
-+    ibusimcontext->caps = IBUS_CAP_PREEDIT_TEXT | IBUS_CAP_FOCUS;
++    ibusimcontext->supported_caps = IBUS_CAP_PREEDIT_TEXT | IBUS_CAP_FOCUS;
 +#endif
++    ibusimcontext->caps = ibusimcontext->supported_caps;
  
  
      // Create slave im context
-@@ -459,6 +484,8 @@ ibus_im_context_filter_keypress (GtkIMContext *context,
+@@ -459,6 +486,8 @@ ibus_im_context_filter_keypress (GtkIMCo
          if (ibusimcontext->client_window == NULL && event->window != NULL)
              gtk_im_context_set_client_window ((GtkIMContext *)ibusimcontext, event->window);
  
@@ -297,7 +329,7 @@ index a6a11b4..0c15df9 100644
          switch (event->type) {
          case GDK_KEY_RELEASE:
              retval = ibus_input_context_process_key_event (ibusimcontext->ibuscontext,
-@@ -516,6 +543,8 @@ ibus_im_context_focus_in (GtkIMContext *context)
+@@ -516,6 +545,8 @@ ibus_im_context_focus_in (GtkIMContext *
                                     (gpointer *) &_focus_im_context);
          _focus_im_context = context;
      }
@@ -306,7 +338,47 @@ index a6a11b4..0c15df9 100644
  }
  
  static void
-@@ -689,6 +718,39 @@ ibus_im_context_set_use_preedit (GtkIMContext *context, gboolean use_preedit)
+@@ -670,6 +701,25 @@ ibus_im_context_set_cursor_location (Gtk
+ }
+ 
+ static void
++_negotiate_capabilities (IBusIMContext *context)
++{
++    IBusEngineDesc *engine;
++
++    engine = ibus_input_context_get_engine (context->ibuscontext);
++    if (engine) {
++        context->caps = context->supported_caps &
++            ibus_engine_desc_get_requires (engine);
++        ibus_input_context_set_capabilities (context->ibuscontext,
++                                             context->caps);
++        IDEBUG ("engine %s: supported caps = %u, engine wants = %u, caps = %u",
++                ibus_engine_desc_get_name (engine)
++                context->supported_caps,
++                ibus_engine_desc_get_requires (engine),
++                context->caps);
++    }
++}
++
++static void
+ ibus_im_context_set_use_preedit (GtkIMContext *context, gboolean use_preedit)
+ {
+     IDEBUG ("%s", __FUNCTION__);
+@@ -678,17 +728,50 @@ ibus_im_context_set_use_preedit (GtkIMCo
+ 
+     if(ibusimcontext->ibuscontext) {
+         if (use_preedit) {
+-            ibusimcontext->caps |= IBUS_CAP_PREEDIT_TEXT;
++            ibusimcontext->supported_caps |= IBUS_CAP_PREEDIT_TEXT;
+         }
+         else {
+-            ibusimcontext->caps &= ~IBUS_CAP_PREEDIT_TEXT;
++            ibusimcontext->supported_caps &= ~IBUS_CAP_PREEDIT_TEXT;
+         }
+-        ibus_input_context_set_capabilities (ibusimcontext->ibuscontext, ibusimcontext->caps);
++        _negotiate_capabilities (ibusimcontext);
+     }
+     gtk_im_context_set_use_preedit (ibusimcontext->slave, use_preedit);
  }
  
  static void
@@ -346,7 +418,7 @@ index a6a11b4..0c15df9 100644
  _bus_connected_cb (IBusBus          *bus,
                     IBusIMContext    *ibusimcontext)
  {
-@@ -704,6 +766,8 @@ _ibus_context_commit_text_cb (IBusInputContext *ibuscontext,
+@@ -704,6 +787,8 @@ _ibus_context_commit_text_cb (IBusInputC
      IDEBUG ("%s", __FUNCTION__);
  
      g_signal_emit (ibusimcontext, _signal_commit_id, 0, text->text);
@@ -355,7 +427,7 @@ index a6a11b4..0c15df9 100644
  }
  
  static gboolean
-@@ -976,6 +1040,8 @@ _ibus_context_show_preedit_text_cb (IBusInputContext   *ibuscontext,
+@@ -976,6 +1061,8 @@ _ibus_context_show_preedit_text_cb (IBus
      ibusimcontext->preedit_visible = TRUE;
      g_signal_emit (ibusimcontext, _signal_preedit_start_id, 0);
      g_signal_emit (ibusimcontext, _signal_preedit_changed_id, 0);
@@ -364,7 +436,33 @@ index a6a11b4..0c15df9 100644
  }
  
  static void
-@@ -1139,17 +1205,21 @@ _slave_preedit_end_cb (GtkIMContext  *slave,
+@@ -1041,6 +1128,14 @@ _ibus_context_destroy_cb (IBusInputConte
+ }
+ 
+ static void
++_ibus_context_engine_changed_cb (IBusInputContext *ibuscontext,
++                                 IBusIMContext    *ibusimcontext)
++{
++    IDEBUG ("%s", __FUNCTION__);
++    _negotiate_capabilities (ibusimcontext);
++}
++
++static void
+ _create_input_context (IBusIMContext *ibusimcontext)
+ {
+     IDEBUG ("%s", __FUNCTION__);
+@@ -1083,6 +1178,10 @@ _create_input_context (IBusIMContext *ib
+                       "disabled",
+                       G_CALLBACK (_ibus_context_disabled_cb),
+                       ibusimcontext);
++    g_signal_connect (ibusimcontext->ibuscontext,
++                      "engine-changed",
++                      G_CALLBACK (_ibus_context_engine_changed_cb),
++                      ibusimcontext);
+     g_signal_connect (ibusimcontext->ibuscontext, "destroy",
+                       G_CALLBACK (_ibus_context_destroy_cb),
+                       ibusimcontext);
+@@ -1139,17 +1238,21 @@ _slave_preedit_end_cb (GtkIMContext  *sl
      g_signal_emit (ibusimcontext, _signal_preedit_end_id, 0);
  }
  
@@ -390,7 +488,7 @@ index a6a11b4..0c15df9 100644
  _slave_delete_surrounding_cb (GtkIMContext  *slave,
                                gint           offset_from_cursor,
                                guint          nchars,
-@@ -1158,8 +1228,9 @@ _slave_delete_surrounding_cb (GtkIMContext  *slave,
+@@ -1158,8 +1261,9 @@ _slave_delete_surrounding_cb (GtkIMConte
      gboolean return_value;
  
      if (ibusimcontext->enable && ibusimcontext->ibuscontext) {
@@ -474,7 +572,7 @@ diff --git a/ibus/interface/iinputcontext.py b/ibus/interface/iinputcontext.py
 index 89f6dbd..2db1c9b 100644
 --- a/ibus/interface/iinputcontext.py
 +++ b/ibus/interface/iinputcontext.py
-@@ -49,6 +49,9 @@ class IInputContext(dbus.service.Object):
+@@ -49,6 +49,9 @@ class IInputContext(dbus.service.Object)
      @method(in_signature="iiii")
      def SetCursorLocation(self, x, y, w, h): pass
  
@@ -483,6 +581,13 @@ index 89f6dbd..2db1c9b 100644
 +
      @method()
      def FocusIn(self): pass
+ 
+@@ -137,4 +140,6 @@ class IInputContext(dbus.service.Object)
+     @signal(signature="v")
+     def UpdateProperty(self, prop): pass
+ 
++    @signal()
++    def EngineChanged(self): pass
  
 diff --git a/src/ibusengine.c b/src/ibusengine.c
 index ae07393..777d404 100644
@@ -749,7 +854,15 @@ diff --git a/src/ibusinputcontext.c b/src/ibusinputcontext.c
 index fc26a7c..4f08401 100644
 --- a/src/ibusinputcontext.c
 +++ b/src/ibusinputcontext.c
-@@ -59,13 +59,20 @@ enum {
+@@ -52,6 +52,7 @@ enum {
+     CURSOR_DOWN_LOOKUP_TABLE,
+     REGISTER_PROPERTIES,
+     UPDATE_PROPERTY,
++    ENGINE_CHANGED,
+     LAST_SIGNAL,
+ };
+ 
+@@ -59,13 +60,20 @@ enum {
  /* BusInputContextPriv */
  struct _IBusInputContextPrivate {
      gboolean own;
@@ -770,7 +883,7 @@ index fc26a7c..4f08401 100644
  static void     ibus_input_context_g_signal     (GDBusProxy             *proxy,
                                                   const gchar            *sender_name,
                                                   const gchar            *signal_name,
-@@ -76,10 +83,13 @@ G_DEFINE_TYPE (IBusInputContext, ibus_input_context, IBUS_TYPE_PROXY)
+@@ -76,10 +84,13 @@ G_DEFINE_TYPE (IBusInputContext, ibus_in
  static void
  ibus_input_context_class_init (IBusInputContextClass *class)
  {
@@ -784,7 +897,29 @@ index fc26a7c..4f08401 100644
      g_dbus_proxy_class->g_signal = ibus_input_context_g_signal;
  
      /* install signals */
-@@ -442,6 +452,9 @@ ibus_input_context_class_init (IBusInputContextClass *class)
+@@ -114,6 +125,21 @@ ibus_input_context_class_init (IBusInput
+             G_TYPE_NONE, 0);
+ 
+     /**
++     * IBusInputContext::engine-changed:
++     * @context: An IBusInputContext.
++     *
++     * Emitted when an IME is changed.
++     */
++    context_signals[ENGINE_CHANGED] =
++        g_signal_new (I_("engine-changed"),
++            G_TYPE_FROM_CLASS (class),
++            G_SIGNAL_RUN_LAST,
++            0,
++            NULL, NULL,
++            _ibus_marshal_VOID__VOID,
++            G_TYPE_NONE, 0);
++
++    /**
+      * IBusInputContext::commit-text:
+      * @context: An IBusInputContext.
+      * @text: Text to be committed.
+@@ -442,6 +468,9 @@ ibus_input_context_class_init (IBusInput
              G_TYPE_NONE,
              1,
              IBUS_TYPE_PROPERTY);
@@ -794,7 +929,7 @@ index fc26a7c..4f08401 100644
  }
  
  static void
-@@ -450,6 +463,22 @@ ibus_input_context_init (IBusInputContext *context)
+@@ -450,6 +479,22 @@ ibus_input_context_init (IBusInputContex
      IBusInputContextPrivate *priv;
      priv = IBUS_INPUT_CONTEXT_GET_PRIVATE (context);
      priv->own = TRUE;
@@ -817,7 +952,15 @@ index fc26a7c..4f08401 100644
  }
  
  static void
-@@ -821,6 +850,38 @@ ibus_input_context_property_hide (IBusInputContext *context,
+@@ -479,6 +524,7 @@ ibus_input_context_g_signal (GDBusProxy 
+         { "PageDownLookupTable",    PAGE_DOWN_LOOKUP_TABLE   },
+         { "CursorUpLookupTable",    CURSOR_UP_LOOKUP_TABLE   },
+         { "CursorDownLookupTable",  CURSOR_DOWN_LOOKUP_TABLE },
++        { "EngineChanged",          ENGINE_CHANGED           },
+     };
+ 
+     if (g_strcmp0 (signal_name, "CommitText") == 0) {
+@@ -821,6 +867,38 @@ ibus_input_context_property_hide (IBusIn
                         );
  }
  
@@ -897,6 +1040,282 @@ index 5184278..5dc7fc2 100644
  VOID:OBJECT,UINT,BOOL
  VOID:OBJECT,UINT,BOOL,UINT
  VOID:OBJECT,BOOL
+diff --git a/src/ibusenginedesc.c b/src/ibusenginedesc.c
+index 5184278..5dc7fc2 100644
+--- a/src/ibusenginedesc.c
++++ b/src/ibusenginedesc.c
+@@ -22,6 +22,7 @@
+ #include <stdlib.h>
+ #include "ibusenginedesc.h"
+ #include "ibusxml.h"
++#include "ibusenumtypes.h"
+ 
+ enum {
+     LAST_SIGNAL,
+@@ -39,6 +40,7 @@ enum {
+     PROP_LAYOUT,
+     PROP_RANK,
+     PROP_HOTKEYS,
++    PROP_REQUIRES,
+ };
+ 
+ 
+@@ -54,6 +56,7 @@ struct _IBusEngineDescPrivate {
+     gchar      *layout;
+     guint       rank;
+     gchar      *hotkeys;
++    guint       requires;
+ };
+ 
+ #define IBUS_ENGINE_DESC_GET_PRIVATE(o)  \
+@@ -79,9 +82,20 @@ static gboolean     ibus_engine_desc_cop
+                                                      const IBusEngineDesc   *src);
+ static gboolean     ibus_engine_desc_parse_xml_node (IBusEngineDesc         *desc,
+                                                      XMLNode                *node);
++static void         ibus_engine_desc_output_capabilities
++                                                    (guint                   caps,
++                                                     GString                *output,
++                                                     gint                    indent);
++static guint        ibus_engine_desc_parse_capabilities
++                                                    (XMLNode                *node);
+ 
+ G_DEFINE_TYPE (IBusEngineDesc, ibus_engine_desc, IBUS_TYPE_SERIALIZABLE)
+ 
++#define DEFAULT_REQUIRES (IBUS_CAP_PREEDIT_TEXT |   \
++                          IBUS_CAP_AUXILIARY_TEXT | \
++                          IBUS_CAP_LOOKUP_TABLE |   \
++                          IBUS_CAP_FOCUS |          \
++                          IBUS_CAP_PROPERTY)
+ 
+ static void
+ ibus_engine_desc_class_init (IBusEngineDescClass *class)
+@@ -232,6 +246,21 @@ ibus_engine_desc_class_init (IBusEngineD
+                         "The hotkeys of engine description",
+                         "",
+                         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
++
++    /**
++     * IBusEngineDesc:requires:
++     *
++     * The required capabilities of engine description
++     */
++    g_object_class_install_property (gobject_class,
++                    PROP_REQUIRES,
++                    g_param_spec_uint ("requires",
++                        "description requires",
++                        "The required capabilities of engine description",
++                        0,
++                        G_MAXUINT,
++                        DEFAULT_REQUIRES,
++                        G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+ }
+ 
+ static void
+@@ -249,6 +278,7 @@ ibus_engine_desc_init (IBusEngineDesc *d
+     desc->priv->layout = NULL;
+     desc->priv->rank = 0;
+     desc->priv->hotkeys = NULL;
++    desc->priv->requires = DEFAULT_REQUIRES;
+ }
+ 
+ static void
+@@ -313,6 +343,9 @@ ibus_engine_desc_set_property (IBusEngin
+         g_assert (desc->priv->hotkeys == NULL);
+         desc->priv->hotkeys = g_value_dup_string (value);
+         break;
++    case PROP_REQUIRES:
++        desc->priv->requires = g_value_get_uint (value);
++        break;
+     default:
+         G_OBJECT_WARN_INVALID_PROPERTY_ID (desc, prop_id, pspec);
+     }
+@@ -355,6 +388,9 @@ ibus_engine_desc_get_property (IBusEngin
+     case PROP_HOTKEYS:
+         g_value_set_string (value, ibus_engine_desc_get_hotkeys (desc));
+         break;
++    case PROP_REQUIRES:
++        g_value_set_uint (value, ibus_engine_desc_get_requires (desc));
++        break;
+     default:
+         G_OBJECT_WARN_INVALID_PROPERTY_ID (desc, prop_id, pspec);
+     }
+@@ -382,9 +418,28 @@ ibus_engine_desc_serialize (IBusEngineDe
+     g_variant_builder_add (builder, "u", desc->priv->rank);
+     g_variant_builder_add (builder, "s", NOTNULL (desc->priv->hotkeys));
+ #undef NOTNULL
++
++    /* append extra properties */
++    GVariantBuilder array;
++    g_variant_builder_init (&array, G_VARIANT_TYPE ("a{sv}"));
++    g_variant_builder_add (&array, "{sv}", "requires", g_variant_new_uint32 (desc->priv->requires));
++    g_variant_builder_add (builder, "v", g_variant_builder_end (&array));
++
+     return TRUE;
+ }
+ 
++static gboolean
++ibus_engine_desc_deserialize_property (IBusEngineDesc *desc,
++                                       const gchar    *name,
++                                       GVariant       *variant)
++{
++    if (g_strcmp0 (name, "requires") == 0) {
++        g_variant_get (variant, "u", &desc->priv->requires);
++        return TRUE;
++    }
++    return FALSE;
++}
++
+ static gint
+ ibus_engine_desc_deserialize (IBusEngineDesc *desc,
+                               GVariant       *variant)
+@@ -405,6 +460,23 @@ ibus_engine_desc_deserialize (IBusEngine
+     g_variant_get_child (variant, retval++, "u", &desc->priv->rank);
+     g_variant_get_child (variant, retval++, "s", &desc->priv->hotkeys);
+ 
++    /* extract extra properties */
++    GVariantIter iter;
++    GVariant *child, *array;
++
++    g_variant_get_child (variant, retval++, "v", &array);
++    g_variant_iter_init (&iter, array);
++    while ((child = g_variant_iter_next_value (&iter))) {
++        gchar *name;
++        GVariant *value;
++        g_variant_get (child, "{sv}", &name, &value);
++        if (ibus_engine_desc_deserialize_property (desc, name, value))
++            retval++;
++        g_free (name);
++        g_variant_unref (value);
++        g_variant_unref (child);
++    }
++
+     return retval;
+ }
+ 
+@@ -428,6 +500,7 @@ ibus_engine_desc_copy (IBusEngineDesc   
+     dest->priv->layout           = g_strdup (src->priv->layout);
+     dest->priv->rank             = src->priv->rank;
+     dest->priv->hotkeys          = g_strdup (src->priv->hotkeys);
++    dest->priv->requires         = src->priv->requires;
+     return TRUE;
+ }
+ 
+@@ -439,6 +512,52 @@ ibus_engine_desc_copy (IBusEngineDesc   
+         }                                       \
+     }
+ 
++static void
++ibus_engine_desc_output_capabilities (guint    caps,
++                                      GString *output,
++                                      gint     indent)
++{
++    GFlagsClass *flags_class;
++    gint i;
++
++    flags_class = g_type_class_ref (IBUS_TYPE_CAPABILITE);
++    g_return_if_fail (G_TYPE_IS_FLAGS (IBUS_TYPE_CAPABILITE));
++    for (i = 0; i < flags_class->n_values; i++) {
++        GFlagsValue *flags_value = &flags_class->values[i];
++        if (caps & flags_value->value) {
++            g_string_append_indent (output, indent + 1);
++            g_string_append_printf (output, "<capability>%s</capability>\n",
++                                    flags_value->value_nick);
++        }
++    }
++    g_type_class_unref (flags_class);
++}
++
++static guint
++ibus_engine_desc_parse_capabilities (XMLNode *node)
++{
++    GFlagsClass *flags_class;
++    guint caps = 0;
++    GList *p;
++
++    flags_class = g_type_class_ref (IBUS_TYPE_CAPABILITE);
++    for (p = node->sub_nodes; p != NULL; p = p->next) {
++        XMLNode *sub_node = (XMLNode *) p->data;
++
++        if (g_strcmp0 (sub_node->name, "capability") == 0) {
++            gint i;
++            for (i = 0; i < flags_class->n_values; i++) {
++                GFlagsValue *flags_value = &flags_class->values[i];
++                if (g_strcmp0 (flags_value->value_nick, sub_node->text) == 0)
++                    caps |= flags_value->value;
++            }
++        }
++    }
++    g_type_class_unref (flags_class);
++
++    return caps;
++}
++
+ void
+ ibus_engine_desc_output (IBusEngineDesc *desc,
+                          GString        *output,
+@@ -467,6 +586,13 @@ ibus_engine_desc_output (IBusEngineDesc 
+     OUTPUT_ENTRY_1(hotkeys);
+     g_string_append_indent (output, indent + 1);
+     g_string_append_printf (output, "<rank>%u</rank>\n", desc->priv->rank);
++
++    g_string_append_indent (output, indent + 1);
++    g_string_append (output, "<requires>\n");
++    ibus_engine_desc_output_capabilities (desc->priv->requires, output,
++                                          indent + 2);
++    g_string_append_indent (output, indent + 1);
++    g_string_append (output, "</requires>\n");
+ #undef OUTPUT_ENTRY
+ #undef OUTPUT_ENTRY_1
+     g_string_append_indent (output, indent);
+@@ -504,6 +630,11 @@ ibus_engine_desc_parse_xml_node (IBusEng
+             desc->priv->rank = atoi (sub_node->text);
+             continue;
+         }
++        if (g_strcmp0 (sub_node->name , "requires") == 0) {
++            desc->priv->requires =
++                ibus_engine_desc_parse_capabilities (sub_node);
++            continue;
++        }
+         g_warning ("<engines> element contains invalidate element <%s>", sub_node->name);
+     }
+     return TRUE;
+@@ -526,6 +657,7 @@ IBUS_ENGINE_DESC_GET_PROPERTY (icon, con
+ IBUS_ENGINE_DESC_GET_PROPERTY (layout, const gchar *)
+ IBUS_ENGINE_DESC_GET_PROPERTY (rank, guint)
+ IBUS_ENGINE_DESC_GET_PROPERTY (hotkeys, const gchar *)
++IBUS_ENGINE_DESC_GET_PROPERTY (requires, guint)
+ #undef IBUS_ENGINE_DESC_GET_PROPERTY
+ 
+ IBusEngineDesc *
+diff --git a/src/ibusenginedesc.h b/src/ibusenginedesc.h
+index 5184278..5dc7fc2 100644
+--- a/src/ibusenginedesc.h
++++ b/src/ibusenginedesc.h
+@@ -90,6 +90,8 @@ typedef struct _IBusEngineDescClass IBus
+  * the front.
+  * hotkeys: One or more hotkeys for switching to this engine, separated by
+  *  semi-colon.
++ * requires: Capabilities this engine will utilize.  The value is the
++ * union of the IBusCapability flags.
+  */
+ struct _IBusEngineDesc {
+     IBusSerializable parent;
+@@ -249,6 +251,15 @@ guint            ibus_engine_desc_get_ra
+ const gchar     *ibus_engine_desc_get_hotkeys   (IBusEngineDesc *info);
+ 
+ /**
++ * ibus_engine_desc_get_requires:
++ * @info: An IBusEngineDesc
++ * @returns: request capabilites property in IBusEngineDesc
++ *
++ * Return the capabilites property in IBusEngineDesc.
++ */
++guint            ibus_engine_desc_get_requires  (IBusEngineDesc *info);
++
++/**
+  * ibus_engine_desc_output:
+  * @info: An IBusEngineDesc
+  * @output: XML-formatted Input method engine description.
 -- 
 1.7.3.2
 
