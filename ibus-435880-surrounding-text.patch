@@ -30,7 +30,7 @@ resets the current surrounding-text.
  ibus/engine.py                  |    6 ++
  ibus/interface/iengine.py       |    3 +
  ibus/interface/iinputcontext.py |    3 +
- src/ibusengine.c                |  134 +++++++++++++++++++++++++++++++++++++++
+ src/ibusengine.c                |  138 +++++++++++++++++++++++++++++++++++++++++
  src/ibusengine.h                |   21 ++++++-
  src/ibusinputcontext.c          |   61 ++++++++++++++++++
  src/ibusinputcontext.h          |   11 +++
@@ -628,7 +628,18 @@ index ae07393..777d404 100644
  static void      ibus_engine_emit_signal     (IBusEngine         *engine,
                                                const gchar        *signal_name,
                                                GVariant           *parameters);
-@@ -245,6 +255,7 @@ ibus_engine_class_init (IBusEngineClass *class)
+@@ -180,6 +190,10 @@ static const gchar introspection_xml[] =
+     "    <method name='PageDown' />"
+     "    <method name='CursorUp' />"
+     "    <method name='CursorDown' />"
++    "    <method name='SetSurroundingText'>"
++    "      <arg direction='in'  type='v' name='text' />"
++    "      <arg direction='in'  type='u' name='cursor_pos' />"
++    "    </method>"
+     /* FIXME signals */
+     "    <signal name='CommitText'>"
+     "      <arg type='v' name='text' />"
+@@ -245,6 +259,7 @@ ibus_engine_class_init (IBusEngineClass *class)
      class->property_hide        = ibus_engine_property_hide;
      class->set_cursor_location  = ibus_engine_set_cursor_location;
      class->set_capabilities     = ibus_engine_set_capabilities;
@@ -636,7 +647,7 @@ index ae07393..777d404 100644
  
      /* install properties */
      /**
-@@ -611,12 +622,39 @@ ibus_engine_class_init (IBusEngineClass *class)
+@@ -611,12 +626,39 @@ ibus_engine_class_init (IBusEngineClass *class)
              G_TYPE_STRING);
  
      g_type_class_add_private (class, sizeof (IBusEnginePrivate));
@@ -676,7 +687,7 @@ index ae07393..777d404 100644
  }
  
  static void
-@@ -625,6 +663,11 @@ ibus_engine_destroy (IBusEngine *engine)
+@@ -625,6 +667,11 @@ ibus_engine_destroy (IBusEngine *engine)
      g_free (engine->priv->engine_name);
      engine->priv->engine_name = NULL;
  
@@ -688,7 +699,7 @@ index ae07393..777d404 100644
      IBUS_OBJECT_CLASS(ibus_engine_parent_class)->destroy (IBUS_OBJECT (engine));
  }
  
-@@ -796,6 +839,25 @@ ibus_engine_service_method_call (IBusService           *service,
+@@ -796,6 +843,25 @@ ibus_engine_service_method_call (IBusService           *service,
          return;
      }
  
@@ -714,7 +725,7 @@ index ae07393..777d404 100644
      /* should not be reached */
      g_return_if_reached ();
  }
-@@ -950,6 +1012,26 @@ ibus_engine_property_hide (IBusEngine *engine, const gchar *prop_name)
+@@ -950,6 +1016,26 @@ ibus_engine_property_hide (IBusEngine *engine, const gchar *prop_name)
  }
  
  static void
@@ -741,7 +752,7 @@ index ae07393..777d404 100644
  ibus_engine_emit_signal (IBusEngine  *engine,
                           const gchar *signal_name,
                           GVariant    *parameters)
-@@ -1133,14 +1215,66 @@ void ibus_engine_delete_surrounding_text (IBusEngine      *engine,
+@@ -1133,14 +1219,66 @@ void ibus_engine_delete_surrounding_text (IBusEngine      *engine,
                                            gint             offset_from_cursor,
                                            guint            nchars)
  {
