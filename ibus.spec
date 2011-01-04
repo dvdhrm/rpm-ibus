@@ -132,7 +132,10 @@ The ibus-devel-docs package contains developer documentation for ibus
 %prep
 %setup -q
 %patch0 -p1
+# start surrounding patch
 %patch1 -p1 -b .surrounding
+cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
+# end surrounding patch
 %if %have_libxkbfile
 %patch2 -p1 -b .xkb
 %endif
