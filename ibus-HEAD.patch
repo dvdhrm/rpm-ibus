@@ -848,6 +848,15 @@ index a2cd1db..3ea3cde 100644
   *
   * Return GDBusConnection of an IBusIBus instance.
   */
+@@ -318,7 +318,7 @@ gboolean     ibus_bus_set_global_engine (IBusBus        *bus,
+ /**
+  * ibus_bus_get_config:
+  * @bus: An IBusBus.
+- * @returns: An newly allocated IBusConfig which is configurable with @bus.
++ * @returns: (transfer none): An newly allocated IBusConfig which is configurable with @bus.
+  *
+  * Get the config instance from IBusBus.
+  */
 diff --git a/src/ibusinputcontext.h b/src/ibusinputcontext.h
 index 4be9160..fa7d976 100644
 --- a/src/ibusinputcontext.h
