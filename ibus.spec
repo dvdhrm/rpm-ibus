@@ -11,8 +11,8 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.3.99.20101202
-Release:    5%{?dist}
+Version:    1.3.99.20110117
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -298,14 +298,11 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Sun Jan  9 2011 Matthias Clasen <mclasen@redhat.com> - 1.3.99.20101202-5
-- Rebuild against newer gtk3
-
-* Tue Jan 04 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20101202-4
-- Updated ibus-435880-surrounding-text.patch to support the xml setting.
-- Updated ibus-530711-preload-sys.patch to set the default lang base.
+* Wed Jan 26 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110117-1
+- Updated to 1.3.99.20110117
 - Updated ibus-HEAD.patch from upstream.
 - Fixed Bug 666427 - ibus requires dbus-x11
+- Fixed Bug 670137 - QT_IM_MODULE=xim in ibus.conf without ibus-qt
 
 * Thu Dec 09 2010 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20101202-1
 - Updated to 1.3.99.20101202

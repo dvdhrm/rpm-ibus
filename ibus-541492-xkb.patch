@@ -1,6 +1,6 @@
-From 715f102611ac16ebc8f66f4fc3b4547c983105ea Mon Sep 17 00:00:00 2001
+From 836f4375531307a4abac4cdbd3cd091413de2b51 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Thu, 9 Dec 2010 15:03:14 +0900
+Date: Wed, 26 Jan 2011 15:42:49 +0900
 Subject: [PATCH] Add XKB layouts
 
 ---
@@ -72,7 +72,7 @@ index 02b7163..6cbe82a 100644
  	$(NULL)
  
 diff --git a/configure.ac b/configure.ac
-index 1a1e663..ea0d32b 100644
+index def1986..1347991 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -185,6 +185,57 @@ else
@@ -133,7 +133,7 @@ index 1a1e663..ea0d32b 100644
  # GObject introspection
  GOBJECT_INTROSPECTION_CHECK([0.6.8])
  
-@@ -400,6 +451,7 @@ gconf/Makefile
+@@ -413,6 +464,7 @@ gconf/Makefile
  gconf/gconf.xml.in
  bindings/Makefile
  bindings/vala/Makefile
@@ -141,7 +141,7 @@ index 1a1e663..ea0d32b 100644
  ])
  
  AC_OUTPUT
-@@ -415,6 +467,7 @@ Build options:
+@@ -428,6 +480,7 @@ Build options:
    Build gtk2 immodule       $enable_gtk2
    Build gtk3 immodule       $enable_gtk3
    Build XIM agent server    $enable_xim
@@ -150,10 +150,10 @@ index 1a1e663..ea0d32b 100644
    Build gconf modules       $enable_gconf
    Build memconf modules     $enable_memconf
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 9b82857..3007e08 100644
+index aa66aa5..54709ce 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
-@@ -180,6 +180,42 @@
+@@ -167,6 +167,42 @@
        </locale>
      </schema>
      <schema>
@@ -971,7 +971,7 @@ index 2fd8876..7383177 100644
 +        self.__title = title
  
 diff --git a/setup/main.py b/setup/main.py
-index 215670d..c855b86 100644
+index 96e9456..8bac900 100644
 --- a/setup/main.py
 +++ b/setup/main.py
 @@ -37,6 +37,7 @@ from gtk import gdk
@@ -982,7 +982,7 @@ index 215670d..c855b86 100644
  from i18n import DOMAINNAME, _, N_, init as i18n_init
  
  (
-@@ -226,6 +227,8 @@ class Setup(object):
+@@ -219,6 +220,8 @@ class Setup(object):
          self.__combobox.connect("notify::active-engine", self.__combobox_notify_active_engine_cb)
          self.__treeview.connect("notify", self.__treeview_notify_cb)
  
@@ -992,7 +992,7 @@ index 215670d..c855b86 100644
          engine = self.__combobox.get_active_engine()
          button = self.__builder.get_object("button_engine_add")
 diff --git a/setup/setup.ui b/setup/setup.ui
-index ef841a0..71f723d 100644
+index 0e31a78..de58446 100644
 --- a/setup/setup.ui
 +++ b/setup/setup.ui
 @@ -129,7 +129,6 @@
@@ -1019,7 +1019,7 @@ index ef841a0..71f723d 100644
                                          <property name="can_focus">True</property>
                                          <property name="receives_default">False</property>
                                          <property name="use_underline">True</property>
-@@ -744,6 +741,7 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
+@@ -729,6 +726,7 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
                                      <property name="visible">True</property>
                                      <property name="orientation">vertical</property>
                                      <property name="spacing">6</property>
@@ -1027,7 +1027,7 @@ index ef841a0..71f723d 100644
                                      <child>
                                        <object class="GtkCheckButton" id="checkbutton_use_sys_layout">
                                          <property name="label" translatable="yes">Use system keyboard layout</property>
-@@ -812,6 +810,57 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
+@@ -797,6 +795,57 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
                                          <property name="position">0</property>
                                        </packing>
                                      </child>
@@ -1085,7 +1085,7 @@ index ef841a0..71f723d 100644
                                    </object>
                                  </child>
                                </object>
-@@ -957,4 +1006,558 @@ Homepage: http://code.google.com/p/ibus
+@@ -942,4 +991,558 @@ Homepage: http://code.google.com/p/ibus
        </object>
      </child>
    </object>

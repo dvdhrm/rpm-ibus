@@ -1,6 +1,6 @@
-From 6819ae6b980d0c22e498aa367b8d9c0791acf9be Mon Sep 17 00:00:00 2001
+From aef8d6fa4118336f562f74580f0f1986d8054be5 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Thu, 9 Dec 2010 15:03:08 +0900
+Date: Wed, 26 Jan 2011 15:42:56 +0900
 Subject: [PATCH] Reload preload engines until users customize the list.
 
 The idea is, if users don't customize the preload_engines with ibus-setup,
@@ -18,19 +18,19 @@ IBUS_PRELOAD_ENGINE_MODE_USER and users can customize the value
 Loading system default may spend the startup time. If you mind it,
 your dist may like to put TRUE in 'use_local_preload_engines' value.
 ---
- bus/ibusimpl.c       |  229 +++++++++++++++++++++++++++++++++++--------------
+ bus/ibusimpl.c       |  241 ++++++++++++++++++++++++++++++++++----------------
  data/ibus.schemas.in |   13 +++
  ibus/common.py       |    6 ++
  setup/main.py        |   37 +++++++-
  setup/setup.ui       |   21 ++++-
  src/ibustypes.h      |   10 ++
- 6 files changed, 242 insertions(+), 74 deletions(-)
+ 6 files changed, 242 insertions(+), 86 deletions(-)
 
 diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
-index d7e496d..6f39fac 100644
+index cbcf7f4..1bb159e 100644
 --- a/bus/ibusimpl.c
 +++ b/bus/ibusimpl.c
-@@ -144,6 +144,9 @@ static void     bus_ibus_impl_set_previous_engine
+@@ -144,6 +144,9 @@ static void     bus_ibus_impl_set_previo
  static void     bus_ibus_impl_set_preload_engines
                                                  (BusIBusImpl        *ibus,
                                                   GVariant           *value);
@@ -40,7 +40,7 @@ index d7e496d..6f39fac 100644
  static void     bus_ibus_impl_set_use_sys_layout
                                                  (BusIBusImpl        *ibus,
                                                   GVariant           *value);
-@@ -264,6 +267,123 @@ _panel_destroy_cb (BusPanelProxy *panel,
+@@ -270,6 +273,123 @@ _panel_destroy_cb (BusPanelProxy *panel,
      g_object_unref (panel);
  }
  
@@ -164,16 +164,16 @@ index d7e496d..6f39fac 100644
  static void
  bus_ibus_impl_set_hotkey (BusIBusImpl *ibus,
                            GQuark       hotkey,
-@@ -347,34 +467,32 @@ static void
+@@ -354,34 +474,32 @@ static void
  bus_ibus_impl_set_preload_engines (BusIBusImpl *ibus,
                                     GVariant    *value)
  {
 -    GList *engine_list = NULL;
--
--    g_list_foreach (ibus->engine_list, (GFunc) g_object_unref, NULL);
--    g_list_free (ibus->engine_list);
 +    gint preload_engine_mode = _get_config_preload_engine_mode (ibus);
  
+-    g_list_foreach (ibus->engine_list, (GFunc) g_object_unref, NULL);
+-    g_list_free (ibus->engine_list);
+-
 -    if (value != NULL && g_variant_classify (value) == G_VARIANT_CLASS_ARRAY) {
 -        GVariantIter iter;
 -        g_variant_iter_init (&iter, value);
@@ -218,7 +218,7 @@ index d7e496d..6f39fac 100644
  }
  
  /**
-@@ -452,69 +570,47 @@ bus_ibus_impl_set_use_global_engine (BusIBusImpl *ibus,
+@@ -459,79 +577,47 @@ bus_ibus_impl_set_use_global_engine (Bus
      }
  }
  
@@ -304,14 +304,24 @@ index d7e496d..6f39fac 100644
 -        if (ibus_engine_desc_get_rank (desc) > 0)
 -            g_variant_builder_add (&builder, "s", ibus_engine_desc_get_name (desc));
 -    }
--    ibus_config_set_value (ibus->config,
--                    "general", "preload_engines", g_variant_builder_end (&builder));
+-
+-    GVariant *value = g_variant_builder_end (&builder);
+-    if (value != NULL) {
+-        if (g_variant_n_children (value) > 0) {
+-            ibus_config_set_value (ibus->config,
+-                                   "general", "preload_engines", value);
+-        } else {
+-            /* We don't update preload_engines with an empty string for safety.
+-             * Just unref the floating value. */
+-            g_variant_unref (value);
+-        }
+-    }
 -    g_list_free (engines);
 +    _set_language_relative_preload_engines (ibus);
  }
  
  /* The list of config entries that are related to ibus-daemon. */
-@@ -527,6 +623,7 @@ const static struct {
+@@ -544,6 +630,7 @@ const static struct {
      { "general/hotkey", "next_engine_in_menu",  bus_ibus_impl_set_next_engine_in_menu },
      { "general/hotkey", "previous_engine",      bus_ibus_impl_set_previous_engine },
      { "general", "preload_engines",             bus_ibus_impl_set_preload_engines },
@@ -320,7 +330,7 @@ index d7e496d..6f39fac 100644
      { "general", "use_global_engine",           bus_ibus_impl_set_use_global_engine },
      { "general", "embed_preedit_text",          bus_ibus_impl_set_embed_preedit_text },
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index aa66aa5..9b82857 100644
+index 54709ce..2ed0321 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
 @@ -13,6 +13,19 @@
@@ -344,7 +354,7 @@ index aa66aa5..9b82857 100644
        <applyto>/desktop/ibus/general/hotkey/trigger</applyto>
        <owner>ibus</owner>
 diff --git a/ibus/common.py b/ibus/common.py
-index cbc8d56..db881fc 100644
+index 763ed1c..1264787 100644
 --- a/ibus/common.py
 +++ b/ibus/common.py
 @@ -33,6 +33,8 @@ __all__ = (
@@ -368,10 +378,10 @@ index cbc8d56..db881fc 100644
      pass
  
 diff --git a/setup/main.py b/setup/main.py
-index 96e9456..215670d 100644
+index 8bac900..c855b86 100644
 --- a/setup/main.py
 +++ b/setup/main.py
-@@ -190,15 +190,22 @@ class Setup(object):
+@@ -191,15 +191,22 @@ class Setup(object):
          self.__checkbutton_use_global_engine.connect("toggled", self.__checkbutton_use_global_engine_toggled_cb)
  
          # init engine page
@@ -399,7 +409,7 @@ index 96e9456..215670d 100644
  
          self.__treeview = self.__builder.get_object("treeview_engines")
          self.__treeview.set_engines(engines)
-@@ -240,6 +247,13 @@ class Setup(object):
+@@ -243,6 +250,13 @@ class Setup(object):
              engine_names = map(lambda e: e.name, engines)
              self.__config.set_list("general", "preload_engines", engine_names, "s")
  
@@ -413,7 +423,7 @@ index 96e9456..215670d 100644
      def __button_engine_add_cb(self, button):
          engine = self.__combobox.get_active_engine()
          self.__treeview.append_engine(engine)
-@@ -251,6 +265,19 @@ class Setup(object):
+@@ -254,6 +268,19 @@ class Setup(object):
              about.run()
              about.destroy()
  
@@ -434,10 +444,10 @@ index 96e9456..215670d 100644
          try:
              self.__bus = ibus.Bus()
 diff --git a/setup/setup.ui b/setup/setup.ui
-index 0e31a78..ef841a0 100644
+index de58446..71f723d 100644
 --- a/setup/setup.ui
 +++ b/setup/setup.ui
-@@ -489,7 +489,22 @@
+@@ -486,7 +486,22 @@
                      <property name="visible">True</property>
                      <property name="orientation">vertical</property>
                      <child>
@@ -461,7 +471,7 @@ index 0e31a78..ef841a0 100644
                          <property name="visible">True</property>
                          <child>
                            <object class="GtkAlignment" id="alignment6">
-@@ -640,7 +655,7 @@
+@@ -637,7 +652,7 @@
                          </child>
                        </object>
                        <packing>
@@ -470,7 +480,7 @@ index 0e31a78..ef841a0 100644
                        </packing>
                      </child>
                      <child>
-@@ -679,7 +694,7 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
+@@ -676,7 +691,7 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
                        </object>
                        <packing>
                          <property name="expand">False</property>
