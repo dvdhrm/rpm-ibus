@@ -12,7 +12,7 @@
 
 Name:       ibus
 Version:    1.3.99.20110117
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -298,6 +298,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Feb  2 2011 Matthias Clasen <mclasen@redhat.com> - 1.3.99.20110117-2
+- Rebuild against newer gtk
+
 * Wed Jan 26 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110117-1
 - Updated to 1.3.99.20110117
 - Updated ibus-HEAD.patch from upstream.
