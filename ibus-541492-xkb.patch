@@ -1,6 +1,6 @@
-From 836f4375531307a4abac4cdbd3cd091413de2b51 Mon Sep 17 00:00:00 2001
+From 245b932b2a72bd23ab8f40ec624184da7ad53b8d Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 26 Jan 2011 15:42:49 +0900
+Date: Fri, 4 Feb 2011 19:48:10 +0900
 Subject: [PATCH] Add XKB layouts
 
 ---
@@ -72,7 +72,7 @@ index 02b7163..6cbe82a 100644
  	$(NULL)
  
 diff --git a/configure.ac b/configure.ac
-index def1986..1347991 100644
+index 0c06fbc..8667510 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -185,6 +185,57 @@ else
@@ -133,7 +133,7 @@ index def1986..1347991 100644
  # GObject introspection
  GOBJECT_INTROSPECTION_CHECK([0.6.8])
  
-@@ -413,6 +464,7 @@ gconf/Makefile
+@@ -427,6 +478,7 @@ gconf/Makefile
  gconf/gconf.xml.in
  bindings/Makefile
  bindings/vala/Makefile
@@ -141,7 +141,7 @@ index def1986..1347991 100644
  ])
  
  AC_OUTPUT
-@@ -428,6 +480,7 @@ Build options:
+@@ -442,6 +494,7 @@ Build options:
    Build gtk2 immodule       $enable_gtk2
    Build gtk3 immodule       $enable_gtk3
    Build XIM agent server    $enable_xim

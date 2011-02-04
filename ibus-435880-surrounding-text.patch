@@ -1,6 +1,6 @@
-From 2284f5ada37ff8f13a802bd652e2b71b68db1b10 Mon Sep 17 00:00:00 2001
+From 4b115935d47b1a849617aad5db44212856b48630 Mon Sep 17 00:00:00 2001
 From: Daiki Ueno <ueno@unixuser.org>
-Date: Wed, 26 Jan 2011 15:42:44 +0900
+Date: Fri, 4 Feb 2011 19:48:05 +0900
 Subject: [PATCH] Support surrounding-text retrieval.
 
 This change adds a new API function ibus_engine_get_surrounding_text().
@@ -216,7 +216,7 @@ index 32d51e8..20f561c 100644
                     context_signals[ENGINE_CHANGED],
                     0);
 diff --git a/client/gtk2/ibusimcontext.c b/client/gtk2/ibusimcontext.c
-index 009d05d..22d1e46 100644
+index ab9c520..e61dd86 100644
 --- a/client/gtk2/ibusimcontext.c
 +++ b/client/gtk2/ibusimcontext.c
 @@ -27,6 +27,7 @@
@@ -237,7 +237,7 @@ index 009d05d..22d1e46 100644
  };
  
  struct _IBusIMContextClass {
-@@ -108,11 +110,18 @@ static void     ibus_im_context_set_cursor_location
+@@ -110,11 +112,18 @@ static void     ibus_im_context_set_cursor_location
  static void     ibus_im_context_set_use_preedit
                                              (GtkIMContext           *context,
                                               gboolean               use_preedit);
@@ -256,7 +256,7 @@ index 009d05d..22d1e46 100644
  
  static void     _bus_connected_cb           (IBusBus            *bus,
                                               IBusIMContext      *context);
-@@ -126,14 +135,15 @@ static void     _slave_preedit_start_cb     (GtkIMContext       *slave,
+@@ -128,14 +137,15 @@ static void     _slave_preedit_start_cb     (GtkIMContext       *slave,
                                               IBusIMContext       *context);
  static void     _slave_preedit_end_cb       (GtkIMContext       *slave,
                                               IBusIMContext       *context);
@@ -278,9 +278,9 @@ index 009d05d..22d1e46 100644
  static void     _create_fake_input_context  (void);
  
  
-@@ -221,6 +231,17 @@ _focus_out_cb (GtkWidget     *widget,
-     return FALSE;
+@@ -247,6 +257,17 @@ _process_key_event_done (GObject      *object,
  }
+ 
  
 +static void
 +_request_surrounding_text (IBusIMContext *context)
@@ -296,16 +296,16 @@ index 009d05d..22d1e46 100644
  static gint
  _key_snooper_cb (GtkWidget   *widget,
                   GdkEventKey *event,
-@@ -311,6 +332,8 @@ _key_snooper_cb (GtkWidget   *widget,
-         ibusimcontext->time = event->time;
-     }
+@@ -333,6 +354,8 @@ _key_snooper_cb (GtkWidget   *widget,
+ 
+     } while (0);
  
 +    _request_surrounding_text (ibusimcontext);
 +
-     switch (event->type) {
-     case GDK_KEY_RELEASE:
-         retval = ibus_input_context_process_key_event (ibuscontext,
-@@ -357,6 +380,7 @@ ibus_im_context_class_init (IBusIMContextClass *class)
+     if (ibusimcontext != NULL) {
+         ibusimcontext->time = event->time;
+     }
+@@ -429,6 +452,7 @@ ibus_im_context_class_init (IBusIMContextClass *class)
      im_context_class->set_client_window = ibus_im_context_set_client_window;
      im_context_class->set_cursor_location = ibus_im_context_set_cursor_location;
      im_context_class->set_use_preedit = ibus_im_context_set_use_preedit;
@@ -313,7 +313,7 @@ index 009d05d..22d1e46 100644
      gobject_class->finalize = ibus_im_context_finalize;
  
      _signal_commit_id =
-@@ -463,7 +487,12 @@ ibus_im_context_init (GObject *obj)
+@@ -542,7 +566,12 @@ ibus_im_context_init (GObject *obj)
      ibusimcontext->ibuscontext = NULL;
      ibusimcontext->has_focus = FALSE;
      ibusimcontext->time = GDK_CURRENT_TIME;
@@ -327,16 +327,16 @@ index 009d05d..22d1e46 100644
  
  
      // Create slave im context
-@@ -559,6 +588,8 @@ ibus_im_context_filter_keypress (GtkIMContext *context,
-             ibusimcontext->time = event->time;
-         }
+@@ -639,6 +668,8 @@ ibus_im_context_filter_keypress (GtkIMContext *context,
+         if (ibusimcontext->client_window == NULL && event->window != NULL)
+             gtk_im_context_set_client_window ((GtkIMContext *)ibusimcontext, event->window);
  
 +        _request_surrounding_text (ibusimcontext);
 +
-         switch (event->type) {
-         case GDK_KEY_RELEASE:
-             retval = ibus_input_context_process_key_event (ibusimcontext->ibuscontext,
-@@ -623,6 +654,8 @@ ibus_im_context_focus_in (GtkIMContext *context)
+         if (ibusimcontext != NULL) {
+             ibusimcontext->time = event->time;
+         }
+@@ -733,6 +764,8 @@ ibus_im_context_focus_in (GtkIMContext *context)
                                     (gpointer *) &_focus_im_context);
          _focus_im_context = context;
      }
@@ -345,7 +345,7 @@ index 009d05d..22d1e46 100644
  }
  
  static void
-@@ -780,6 +813,25 @@ ibus_im_context_set_cursor_location (GtkIMContext *context, GdkRectangle *area)
+@@ -890,6 +923,25 @@ ibus_im_context_set_cursor_location (GtkIMContext *context, GdkRectangle *area)
  }
  
  static void
@@ -371,7 +371,7 @@ index 009d05d..22d1e46 100644
  ibus_im_context_set_use_preedit (GtkIMContext *context, gboolean use_preedit)
  {
      IDEBUG ("%s", __FUNCTION__);
-@@ -788,17 +840,50 @@ ibus_im_context_set_use_preedit (GtkIMContext *context, gboolean use_preedit)
+@@ -898,17 +950,50 @@ ibus_im_context_set_use_preedit (GtkIMContext *context, gboolean use_preedit)
  
      if(ibusimcontext->ibuscontext) {
          if (use_preedit) {
@@ -425,7 +425,7 @@ index 009d05d..22d1e46 100644
  _bus_connected_cb (IBusBus          *bus,
                     IBusIMContext    *ibusimcontext)
  {
-@@ -817,6 +902,8 @@ _ibus_context_commit_text_cb (IBusInputContext *ibuscontext,
+@@ -927,6 +1012,8 @@ _ibus_context_commit_text_cb (IBusInputContext *ibuscontext,
      IDEBUG ("%s", __FUNCTION__);
  
      g_signal_emit (ibusimcontext, _signal_commit_id, 0, text->text);
@@ -434,7 +434,7 @@ index 009d05d..22d1e46 100644
  }
  
  static gboolean
-@@ -1111,6 +1198,8 @@ _ibus_context_show_preedit_text_cb (IBusInputContext   *ibuscontext,
+@@ -1221,6 +1308,8 @@ _ibus_context_show_preedit_text_cb (IBusInputContext   *ibuscontext,
      ibusimcontext->preedit_visible = TRUE;
      g_signal_emit (ibusimcontext, _signal_preedit_start_id, 0);
      g_signal_emit (ibusimcontext, _signal_preedit_changed_id, 0);
@@ -443,7 +443,7 @@ index 009d05d..22d1e46 100644
  }
  
  static void
-@@ -1176,6 +1265,14 @@ _ibus_context_destroy_cb (IBusInputContext *ibuscontext,
+@@ -1286,6 +1375,14 @@ _ibus_context_destroy_cb (IBusInputContext *ibuscontext,
  }
  
  static void
@@ -458,7 +458,7 @@ index 009d05d..22d1e46 100644
  _create_input_context (IBusIMContext *ibusimcontext)
  {
      IDEBUG ("%s", __FUNCTION__);
-@@ -1218,6 +1315,10 @@ _create_input_context (IBusIMContext *ibusimcontext)
+@@ -1328,6 +1425,10 @@ _create_input_context (IBusIMContext *ibusimcontext)
                        "disabled",
                        G_CALLBACK (_ibus_context_disabled_cb),
                        ibusimcontext);
@@ -469,7 +469,7 @@ index 009d05d..22d1e46 100644
      g_signal_connect (ibusimcontext->ibuscontext, "destroy",
                        G_CALLBACK (_ibus_context_destroy_cb),
                        ibusimcontext);
-@@ -1274,17 +1375,21 @@ _slave_preedit_end_cb (GtkIMContext  *slave,
+@@ -1384,17 +1485,21 @@ _slave_preedit_end_cb (GtkIMContext  *slave,
      g_signal_emit (ibusimcontext, _signal_preedit_end_id, 0);
  }
  
@@ -495,7 +495,7 @@ index 009d05d..22d1e46 100644
  _slave_delete_surrounding_cb (GtkIMContext  *slave,
                                gint           offset_from_cursor,
                                guint          nchars,
-@@ -1293,9 +1398,10 @@ _slave_delete_surrounding_cb (GtkIMContext  *slave,
+@@ -1403,9 +1508,10 @@ _slave_delete_surrounding_cb (GtkIMContext  *slave,
      gboolean return_value;
  
      if (ibusimcontext->enable && ibusimcontext->ibuscontext) {
@@ -508,12 +508,12 @@ index 009d05d..22d1e46 100644
  
  #ifdef OS_CHROMEOS
 diff --git a/configure.ac b/configure.ac
-index 1a1e663..def1986 100644
+index 05ceb18..0c06fbc 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -354,6 +354,19 @@ AC_ARG_WITH(no-snooper-apps,
- AC_DEFINE_UNQUOTED(NO_SNOOPER_APPS, "$NO_SNOOPER_APPS",
-     [Does not enbale keyboard snooper in those applications])
+@@ -368,6 +368,19 @@ else
+     enable_inputcontext_sync="no (disabled, use --enable-inputcontext-sync to enable)"
+ fi
  
 +# option for enable surrounding-text
 +AC_ARG_ENABLE(surrounding-text,
@@ -531,9 +531,9 @@ index 1a1e663..def1986 100644
  # check iso-codes
  PKG_CHECK_MODULES(ISOCODES, [
      iso-codes
-@@ -424,5 +437,6 @@ Build options:
-   Build document            $enable_gtk_doc
+@@ -439,5 +452,6 @@ Build options:
    Enable key snooper        $enable_key_snooper
+   Enable inputcontext sync  $enable_inputcontext_sync
    No snooper regexes        "$NO_SNOOPER_APPS"
 +  Enable surrounding-text   $enable_surrounding_text
  ])
@@ -598,7 +598,7 @@ index 89f6dbd..bb25c5a 100644
 +    def EngineChanged(self): pass
  
 diff --git a/src/ibusengine.c b/src/ibusengine.c
-index ae07393..f284af6 100644
+index 519d7ca..fc129a2 100644
 --- a/src/ibusengine.c
 +++ b/src/ibusengine.c
 @@ -45,6 +45,7 @@ enum {
@@ -636,7 +636,7 @@ index ae07393..f284af6 100644
  static void      ibus_engine_emit_signal     (IBusEngine         *engine,
                                                const gchar        *signal_name,
                                                GVariant           *parameters);
-@@ -180,6 +190,10 @@ static const gchar introspection_xml[] =
+@@ -185,6 +195,10 @@ static const gchar introspection_xml[] =
      "    <method name='PageDown' />"
      "    <method name='CursorUp' />"
      "    <method name='CursorDown' />"
@@ -647,7 +647,7 @@ index ae07393..f284af6 100644
      /* FIXME signals */
      "    <signal name='CommitText'>"
      "      <arg type='v' name='text' />"
-@@ -245,6 +259,7 @@ ibus_engine_class_init (IBusEngineClass *class)
+@@ -250,6 +264,7 @@ ibus_engine_class_init (IBusEngineClass *class)
      class->property_hide        = ibus_engine_property_hide;
      class->set_cursor_location  = ibus_engine_set_cursor_location;
      class->set_capabilities     = ibus_engine_set_capabilities;
@@ -655,7 +655,7 @@ index ae07393..f284af6 100644
  
      /* install properties */
      /**
-@@ -611,12 +626,39 @@ ibus_engine_class_init (IBusEngineClass *class)
+@@ -616,12 +631,39 @@ ibus_engine_class_init (IBusEngineClass *class)
              G_TYPE_STRING);
  
      g_type_class_add_private (class, sizeof (IBusEnginePrivate));
@@ -695,7 +695,7 @@ index ae07393..f284af6 100644
  }
  
  static void
-@@ -625,6 +667,11 @@ ibus_engine_destroy (IBusEngine *engine)
+@@ -630,6 +672,11 @@ ibus_engine_destroy (IBusEngine *engine)
      g_free (engine->priv->engine_name);
      engine->priv->engine_name = NULL;
  
@@ -707,7 +707,7 @@ index ae07393..f284af6 100644
      IBUS_OBJECT_CLASS(ibus_engine_parent_class)->destroy (IBUS_OBJECT (engine));
  }
  
-@@ -796,6 +843,25 @@ ibus_engine_service_method_call (IBusService           *service,
+@@ -801,6 +848,25 @@ ibus_engine_service_method_call (IBusService           *service,
          return;
      }
  
@@ -733,7 +733,7 @@ index ae07393..f284af6 100644
      /* should not be reached */
      g_return_if_reached ();
  }
-@@ -950,6 +1016,26 @@ ibus_engine_property_hide (IBusEngine *engine, const gchar *prop_name)
+@@ -955,6 +1021,26 @@ ibus_engine_property_hide (IBusEngine *engine, const gchar *prop_name)
  }
  
  static void
@@ -760,7 +760,7 @@ index ae07393..f284af6 100644
  ibus_engine_emit_signal (IBusEngine  *engine,
                           const gchar *signal_name,
                           GVariant    *parameters)
-@@ -1133,14 +1219,66 @@ void ibus_engine_delete_surrounding_text (IBusEngine      *engine,
+@@ -1138,14 +1224,66 @@ void ibus_engine_delete_surrounding_text (IBusEngine      *engine,
                                            gint             offset_from_cursor,
                                            guint            nchars)
  {
@@ -1146,7 +1146,7 @@ index 9718b15..209d460 100644
   * @info: An IBusEngineDesc
   * @output: XML-formatted Input method engine description.
 diff --git a/src/ibusinputcontext.c b/src/ibusinputcontext.c
-index 3d25f68..097f203 100644
+index f8f5848..9556df3 100644
 --- a/src/ibusinputcontext.c
 +++ b/src/ibusinputcontext.c
 @@ -28,6 +28,9 @@
@@ -1263,7 +1263,7 @@ index 3d25f68..097f203 100644
      };
  
      if (g_strcmp0 (signal_name, "CommitText") == 0) {
-@@ -805,6 +864,38 @@ ibus_input_context_property_hide (IBusInputContext *context,
+@@ -848,6 +907,38 @@ ibus_input_context_property_hide (IBusInputContext *context,
                         );
  }
  
@@ -1303,7 +1303,7 @@ index 3d25f68..097f203 100644
  ibus_input_context_is_enabled (IBusInputContext *context)
  {
 diff --git a/src/ibusinputcontext.h b/src/ibusinputcontext.h
-index fa7d976..b3e8c96 100644
+index 96fd00e..1f8ae86 100644
 --- a/src/ibusinputcontext.h
 +++ b/src/ibusinputcontext.h
 @@ -41,6 +41,7 @@
@@ -1314,7 +1314,7 @@ index fa7d976..b3e8c96 100644
  
  /*
   * Type macros.
-@@ -279,6 +280,16 @@ IBusEngineDesc
+@@ -324,6 +325,16 @@ IBusEngineDesc
  void         ibus_input_context_set_engine  (IBusInputContext   *context,
                                               const gchar        *name);
  

@@ -1,6 +1,6 @@
-From aef8d6fa4118336f562f74580f0f1986d8054be5 Mon Sep 17 00:00:00 2001
+From 8265052e2616f25af6e6a84cda8fb6d5c4d5f4ed Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 26 Jan 2011 15:42:56 +0900
+Date: Fri, 4 Feb 2011 19:48:19 +0900
 Subject: [PATCH] Reload preload engines until users customize the list.
 
 The idea is, if users don't customize the preload_engines with ibus-setup,
@@ -30,7 +30,7 @@ diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
 index cbcf7f4..1bb159e 100644
 --- a/bus/ibusimpl.c
 +++ b/bus/ibusimpl.c
-@@ -144,6 +144,9 @@ static void     bus_ibus_impl_set_previo
+@@ -144,6 +144,9 @@ static void     bus_ibus_impl_set_previous_engine
  static void     bus_ibus_impl_set_preload_engines
                                                  (BusIBusImpl        *ibus,
                                                   GVariant           *value);
@@ -218,10 +218,11 @@ index cbcf7f4..1bb159e 100644
  }
  
  /**
-@@ -459,79 +577,47 @@ bus_ibus_impl_set_use_global_engine (Bus
+@@ -459,82 +577,48 @@ bus_ibus_impl_set_use_global_engine (BusIBusImpl *ibus,
      }
  }
  
+-#ifndef OS_CHROMEOS
 -static gint
 -_engine_desc_cmp (IBusEngineDesc *desc1,
 -                  IBusEngineDesc *desc2)
@@ -229,6 +230,7 @@ index cbcf7f4..1bb159e 100644
 -    return - ((gint) ibus_engine_desc_get_rank (desc1)) +
 -              ((gint) ibus_engine_desc_get_rank (desc2));
 -}
+-#endif
 -
  /**
   * bus_ibus_impl_set_default_preload_engines:
@@ -254,6 +256,7 @@ index cbcf7f4..1bb159e 100644
  static void
  bus_ibus_impl_set_default_preload_engines (BusIBusImpl *ibus)
  {
+ #ifndef OS_CHROMEOS
 -    g_assert (BUS_IS_IBUS_IMPL (ibus));
 -
      static gboolean done = FALSE;
@@ -318,10 +321,10 @@ index cbcf7f4..1bb159e 100644
 -    }
 -    g_list_free (engines);
 +    _set_language_relative_preload_engines (ibus);
+ #endif
  }
  
- /* The list of config entries that are related to ibus-daemon. */
-@@ -544,6 +630,7 @@ const static struct {
+@@ -548,6 +632,7 @@ const static struct {
      { "general/hotkey", "next_engine_in_menu",  bus_ibus_impl_set_next_engine_in_menu },
      { "general/hotkey", "previous_engine",      bus_ibus_impl_set_previous_engine },
      { "general", "preload_engines",             bus_ibus_impl_set_preload_engines },
