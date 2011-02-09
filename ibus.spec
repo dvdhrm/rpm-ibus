@@ -12,7 +12,7 @@
 
 Name:       ibus
 Version:    1.3.99.20110127
-Release:    2%{?dist}
+Release:    3%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -298,6 +298,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Feb 09 2011 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.3.99.20110127-3
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_15_Mass_Rebuild
+
 * Tue Feb 08 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110127-2
 - Fixed Bug 675503 - a regression in sync mode
   Updated ibus-HEAD.patch from upstream.
