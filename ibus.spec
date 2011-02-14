@@ -11,18 +11,24 @@
 %define im_chooser_version 1.2.5
 
 Name:       ibus
-Version:    1.3.99.20110127
-Release:    4%{?dist}
+Version:    1.3.99.20110206
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
 URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
+Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/ibus-ui-gjs-plugins-20110214.tar.bz2
+Source3:    ibus.js
 Patch0:     ibus-HEAD.patch
 Patch1:     ibus-435880-surrounding-text.patch
 Patch2:     ibus-541492-xkb.patch
 Patch3:     ibus-530711-preload-sys.patch
+Patch4:     ibus-657165-panel-libs.patch
+Patch5:     ibus-657165-gjs-plugins.patch
+# This will be removed after the new gnome-shell is integrated.
+Patch99:    ibus-675503-gnome-shell-workaround.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -132,7 +138,9 @@ The ibus-devel-docs package contains developer documentation for ibus
 
 %prep
 %setup -q
+bzcat %SOURCE2 | tar xf -
 %patch0 -p1
+%patch99 -p1 -b .g-s-typo
 # start surrounding patch
 %patch1 -p1 -b .surrounding
 cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
@@ -141,6 +149,8 @@ cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
 %patch2 -p1 -b .xkb
 %endif
 %patch3 -p1 -b .preload-sys
+%patch4 -p1 -b .panel-libs
+%patch5 -p1 -b .gjs
 
 %build
 %if %have_libxkbfile
@@ -171,6 +181,9 @@ rm -f $RPM_BUILD_ROOT%{_libdir}/gtk-3.0/%{gtk3_binary_version}/immodules/im-ibus
 
 # install xinput config file
 install -pm 644 -D %{SOURCE1} $RPM_BUILD_ROOT%{_xinputconf}
+
+# install ibus.js for a reference
+install -pm 644 -D %{SOURCE3} $RPM_BUILD_ROOT%{_datadir}/ibus/ui/gjs/ibus.js
 
 # install .desktop files
 # correct location in upstream.
@@ -298,15 +311,17 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Fri Feb 11 2011 Matthias Clasen <mclasen@redhat.com>
-- Rebuild against newer gtk
+* Mon Feb 14 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110206-1
+- Integrated the part of gjs in Bug 657165 ibus for gnome-shell.
+  Added ibus-ui-gjs-plugins-20110214.tar.bz2
+  Added ibus-657165-panel-libs.patch
+  Added ibus-657165-gjs-plugins.patch
+- Fixed Bug 675503 - a regression in sync mode
+  Added ibus-675503-gnome-shell-workaround.patch until gnome-shell is updated.
+- Updated ibus-HEAD.patch from upstream.
 
 * Wed Feb 09 2011 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.3.99.20110127-3
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_15_Mass_Rebuild
-
-* Tue Feb 08 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110127-2
-- Fixed Bug 675503 - a regression in sync mode
-  Updated ibus-HEAD.patch from upstream.
 
 * Fri Feb 04 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110127-1
 - Updated to 1.3.99.20110127

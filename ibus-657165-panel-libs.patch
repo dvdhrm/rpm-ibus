@@ -1,0 +1,656 @@
+From 4c390e4259cf3f78ef1fd685925d275be4952ed1 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Wed, 9 Feb 2011 11:02:14 +0900
+Subject: [PATCH] Implement APIs for another non-Python panel.
+
+---
+ bus/dbusimpl.c     |   45 ++++++++++++++++
+ configure.ac       |    1 +
+ src/Makefile.am    |    2 +
+ src/ibusbus.c      |   23 ++++++++
+ src/ibusbus.h      |   12 ++++
+ src/ibusproperty.c |   24 +++++++++
+ src/ibusproperty.h |   85 ++++++++++++++++++++++++++++++-
+ src/ibustext.c     |   18 +++++++
+ src/ibustext.h     |   27 ++++++++++
+ src/ibusutil.c     |  145 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+ src/ibusutil.h     |   33 ++++++++++++
+ ui/gtk/panel.py    |    9 +++
+ 12 files changed, 422 insertions(+), 2 deletions(-)
+ create mode 100644 src/ibusutil.c
+ create mode 100644 src/ibusutil.h
+
+diff --git a/bus/dbusimpl.c b/bus/dbusimpl.c
+index 48dbd42..3abaa4a 100644
+--- a/bus/dbusimpl.c
++++ b/bus/dbusimpl.c
+@@ -138,6 +138,10 @@ static const gchar introspection_xml[] =
+     "      <arg direction='in'  type='s' name='name' />"
+     "      <arg direction='out' type='u' />"
+     "    </method>"
++    "    <method name='AskReleaseName'>"
++    "      <arg direction='in'  type='s' name='name' />"
++    "      <arg direction='in'  type='u' name='reason' />"
++    "    </method>"
+     "    <method name='StartServiceByName'>"
+     "      <arg direction='in'  type='s' />"
+     "      <arg direction='in'  type='u' />"
+@@ -195,6 +199,10 @@ static const gchar introspection_xml[] =
+     "      <arg type='s' name='old_owner' />"
+     "      <arg type='s' name='new_owner' />"
+     "    </signal>"
++    "    <signal name='AskReleaseName'>"
++    "      <arg type='s' name='name' />"
++    "      <arg type='u' name='reason' />"
++    "    </signal>"
+     "    <signal name='NameLost'>"
+     "      <arg type='s' name='name' />"
+     "    </signal>"
+@@ -648,6 +656,42 @@ bus_dbus_impl_release_name (BusDBusImpl           *dbus,
+ }
+ 
+ /**
++ * bus_dbus_impl_ask_release_name:
++ *
++ * Implement the "AskReleaseName" method call of the org.freedesktop.DBus interface.
++ * The "AskReleaseName" signal is broadcasted to clients.
++ */
++static void
++bus_dbus_impl_ask_release_name (BusDBusImpl           *dbus,
++                                BusConnection         *connection,
++                                GVariant              *parameters,
++                                GDBusMethodInvocation *invocation)
++{
++    static guint32 serial = 0;
++    GDBusMessage *message;
++    const gchar *name= NULL;
++    guint reason = 0;
++
++    g_variant_get (parameters, "(&su)", &name, &reason);
++
++    message = g_dbus_message_new_signal ("/org/freedesktop/DBus",
++                                         "org.freedesktop.DBus",
++                                         "AskReleaseName");
++    g_dbus_message_set_sender (message, "org.freedesktop.DBus");
++
++    /* set a non-zero serial to make libdbus happy */
++    g_dbus_message_set_serial (message, ++serial);
++    g_dbus_message_set_body (message,
++                             g_variant_new ("(su)", name, reason));
++
++    /* broadcast the message to clients that listen to the signal. */
++    bus_dbus_impl_dispatch_message_by_rule (dbus, message, NULL);
++    g_object_unref (message);
++
++    g_dbus_method_invocation_return_value (invocation, NULL);
++}
++
++/**
+  * bus_dbus_impl_name_owner_changed:
+  *
+  * The function is called on name-owner-changed signal, typically when g_signal_emit (dbus, NAME_OWNER_CHANGED)
+@@ -725,6 +769,7 @@ bus_dbus_impl_service_method_call (IBusService           *service,
+         { "RemoveMatch",    bus_dbus_impl_remove_match },
+         { "RequestName",    bus_dbus_impl_request_name },
+         { "ReleaseName",    bus_dbus_impl_release_name },
++        { "AskReleaseName", bus_dbus_impl_ask_release_name },
+     };
+ 
+     gint i;
+diff --git a/configure.ac b/configure.ac
+index 1a1e663..f1575e7 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -291,6 +291,7 @@ AC_SUBST(GETTEXT_PACKAGE)
+ AC_DEFINE_UNQUOTED(GETTEXT_PACKAGE,"$GETTEXT_PACKAGE", [Gettext package])
+ 
+ AM_GLIB_GNU_GETTEXT
++AM_GLIB_DEFINE_LOCALEDIR(IBUS_LOCALEDIR)
+ 
+ # define gtk2 immodule dir
+ AC_ARG_WITH(gtk2-im-module-dir,
+diff --git a/src/Makefile.am b/src/Makefile.am
+index 08152a7..d422106 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -87,6 +87,7 @@ ibus_sources =              \
+     ibusenginedesc.c        \
+     ibusobservedpath.c      \
+     ibuscomponent.c         \
++    ibusutil.c              \
+ $(NULL)
+ libibus_1_0_la_SOURCES =    \
+     $(ibus_sources)         \
+@@ -131,6 +132,7 @@ ibus_headers =              \
+     ibusenginedesc.h        \
+     ibusobservedpath.h      \
+     ibuscomponent.h         \
++    ibusutil.h              \
+     $(NULL)
+ ibusincludedir = $(includedir)/ibus-@IBUS_API_VERSION@
+ ibus_public_headers =       \
+diff --git a/src/ibusbus.c b/src/ibusbus.c
+index 5a3b978..ecb7775 100644
+--- a/src/ibusbus.c
++++ b/src/ibusbus.c
+@@ -551,6 +551,29 @@ ibus_bus_release_name (IBusBus      *bus,
+     return retval;
+ }
+ 
++void
++ibus_bus_ask_release_name (IBusBus      *bus,
++                           const gchar  *name,
++                           guint         reason)
++{
++    GVariant *result;
++
++    g_return_if_fail (IBUS_IS_BUS (bus));
++    g_return_if_fail (name != NULL);
++
++    result = ibus_bus_call (bus,
++                            DBUS_SERVICE_DBUS,
++                            DBUS_PATH_DBUS,
++                            DBUS_INTERFACE_DBUS,
++                            "AskReleaseName",
++                            g_variant_new ("(su)", name, reason),
++                            NULL);
++
++    if (result) {
++        g_variant_unref (result);
++    }
++}
++
+ gboolean
+ ibus_bus_name_has_owner (IBusBus        *bus,
+                          const gchar    *name)
+diff --git a/src/ibusbus.h b/src/ibusbus.h
+index b1ec63c..001e989 100644
+--- a/src/ibusbus.h
++++ b/src/ibusbus.h
+@@ -143,6 +143,18 @@ guint        ibus_bus_release_name      (IBusBus        *bus,
+                                          const gchar    *name);
+ 
+ /**
++ * ibus_bus_ask_release_name:
++ * @bus: An IBusBus.
++ * @name: Name to be released.
++ * @reason: Reason to be released.
++ *
++ * Ask other processes to release the name via IBus daemon.
++ */
++void         ibus_bus_ask_release_name  (IBusBus        *bus,
++                                         const gchar    *name,
++                                         guint           reason);
++
++/**
+  * ibus_bus_name_has_owner:
+  * @bus: An IBusBus.
+  * @name: Name to be released.
+diff --git a/src/ibusproperty.c b/src/ibusproperty.c
+index bb9cc21..5a2dd78 100644
+--- a/src/ibusproperty.c
++++ b/src/ibusproperty.c
+@@ -217,6 +217,30 @@ ibus_property_new (const gchar   *key,
+     return prop;
+ }
+ 
++#define IBUS_PROPERTY_GET_FIELD(field, return_type) \
++return_type                                                             \
++ibus_property_get_ ## field (IBusProperty *prop)                        \
++{                                                                       \
++    return prop->field;                                                 \
++}
++
++IBUS_PROPERTY_GET_FIELD (key, const gchar *)
++IBUS_PROPERTY_GET_FIELD (icon, const gchar *)
++IBUS_PROPERTY_GET_FIELD (label, const IBusText *)
++IBUS_PROPERTY_GET_FIELD (tooltip, const IBusText *)
++IBUS_PROPERTY_GET_FIELD (sensitive, gboolean)
++IBUS_PROPERTY_GET_FIELD (visible, gboolean)
++IBUS_PROPERTY_GET_FIELD (state, IBusPropState)
++IBUS_PROPERTY_GET_FIELD (sub_props, const IBusPropList *)
++#undef IBUS_PROPERTY_GET_FIELD
++
++/* ibus_property_get_type() exists */
++IBusPropType
++ibus_property_get_prop_type (IBusProperty *prop)
++{
++    return prop->type;
++}
++
+ void
+ ibus_property_set_label (IBusProperty *prop,
+                          IBusText     *label)
+diff --git a/src/ibusproperty.h b/src/ibusproperty.h
+index 0f8d427..5e76c8f 100644
+--- a/src/ibusproperty.h
++++ b/src/ibusproperty.h
+@@ -164,12 +164,12 @@ GType            ibus_property_get_type     ();
+  * @key: Unique Identity for the IBusProperty.
+  * @type: IBusPropType of IBusProperty.
+  * @label: Text shown in UI.
+- * @icon: Icon file for the IBusProperty.
++ * @icon: (allow-none): Icon file for the IBusProperty.
+  * @tooltip: Message shown if mouse hovered the  IBusProperty.
+  * @sensitive: Whether the IBusProperty is sensitive to keyboard and mouse event.
+  * @visible: Whether the IBusProperty is visible.
+  * @state: IBusPropState of IBusProperty.
+- * @prop_list: IBusPropList that contains sub IBusProperties.
++ * @prop_list: (allow-none): IBusPropList that contains sub IBusProperties.
+  * @returns: A newly allocated IBusProperty.
+  *
+  * New a IBusProperty.
+@@ -185,6 +185,33 @@ IBusProperty    *ibus_property_new          (const gchar    *key,
+                                              IBusPropList   *prop_list);
+ 
+ /**
++ * ibus_property_get_key:
++ * @prop: An IBusProperty.
++ * @returns: the key of IBusProperty. Should not be freed.
++ *
++ * Get the key of IBusProperty.
++ */
++const gchar *    ibus_property_get_key      (IBusProperty   *prop);
++
++/**
++ * ibus_property_get_prop_type:
++ * @prop: An IBusProperty.
++ * @returns: the type of IBusProperty.
++ *
++ * Get the type of IBusProperty.
++ */
++IBusPropType     ibus_property_get_prop_type(IBusProperty   *prop);
++
++/**
++ * ibus_property_get_label:
++ * @prop: An IBusProperty.
++ * @returns: the label of IBusProperty. Should not be freed.
++ *
++ * Get the label of IBusProperty.
++ */
++const IBusText * ibus_property_get_label    (IBusProperty   *prop);
++
++/**
+  * ibus_property_set_label:
+  * @prop: An IBusProperty.
+  * @label: Text shown in UI.
+@@ -195,6 +222,15 @@ void             ibus_property_set_label    (IBusProperty   *prop,
+                                              IBusText       *label);
+ 
+ /**
++ * ibus_property_get_icon:
++ * @prop: An IBusProperty.
++ * @returns: the icon of IBusProperty. Should not be freed.
++ *
++ * Get the icon of IBusProperty.
++ */
++const gchar *    ibus_property_get_icon     (IBusProperty   *prop);
++
++/**
+  * ibus_property_set_icon:
+  * @prop: An IBusProperty.
+  * @icon: Icon shown in UI. It could be a full path of an icon file or an icon name.
+@@ -205,6 +241,15 @@ void             ibus_property_set_icon     (IBusProperty   *prop,
+                                              const gchar    *icon);
+ 
+ /**
++ * ibus_property_get_tooltip:
++ * @prop: An IBusProperty.
++ * @returns: the tooltip of IBusProperty. Should not be freed.
++ *
++ * Get the tooltip of IBusProperty.
++ */
++const IBusText * ibus_property_get_tooltip  (IBusProperty   *prop);
++
++/**
+  * ibus_property_set_tooltip:
+  * @prop: An IBusProperty.
+  * @tooltip: Text of the tooltip.
+@@ -215,6 +260,15 @@ void             ibus_property_set_tooltip  (IBusProperty   *prop,
+                                              IBusText       *tooltip);
+ 
+ /**
++ * ibus_property_get_sensitive:
++ * @prop: An IBusProperty.
++ * @returns: the sensitive of IBusProperty.
++ *
++ * Get the sensitive of IBusProperty.
++ */
++gboolean         ibus_property_get_sensitive(IBusProperty   *prop);
++
++/**
+  * ibus_property_set_sensitive:
+  * @prop: An IBusProperty.
+  * @sensitive: Whether the IBusProperty is sensitive.
+@@ -225,6 +279,15 @@ void             ibus_property_set_sensitive(IBusProperty   *prop,
+                                              gboolean        sensitive);
+ 
+ /**
++ * ibus_property_get_visible:
++ * @prop: An IBusProperty.
++ * @returns: the visible of IBusProperty.
++ *
++ * Get the visible of IBusProperty.
++ */
++gboolean         ibus_property_get_visible  (IBusProperty   *prop);
++
++/**
+  * ibus_property_set_visible:
+  * @prop: An IBusProperty.
+  * @visible: Whether the IBusProperty is visible.
+@@ -235,6 +298,15 @@ void             ibus_property_set_visible  (IBusProperty   *prop,
+                                              gboolean        visible);
+ 
+ /**
++ * ibus_property_get_state:
++ * @prop: An IBusProperty.
++ * @returns: the state of IBusProperty.
++ *
++ * Get the state of IBusProperty.
++ */
++IBusPropState    ibus_property_get_state    (IBusProperty   *prop);
++
++/**
+  * ibus_property_set_state:
+  * @prop: An IBusProperty.
+  * @state: The state of the IBusProperty.
+@@ -244,6 +316,15 @@ void             ibus_property_set_visible  (IBusProperty   *prop,
+ void             ibus_property_set_state    (IBusProperty   *prop,
+                                              IBusPropState   state);
+ 
++/**
++ * ibus_property_get_sub_props:
++ * @prop: An IBusProperty.
++ * @returns: the IBusPropList of IBusProperty. Should not be freed.
++ *
++ * Get the IBusPropList of IBusProperty.
++ */
++const IBusPropList *
++                 ibus_property_get_sub_props(IBusProperty   *prop);
+ 
+ /**
+  * ibus_property_set_sub_props:
+diff --git a/src/ibustext.c b/src/ibustext.c
+index b63cbc9..5889b64 100644
+--- a/src/ibustext.c
++++ b/src/ibustext.c
+@@ -268,3 +268,21 @@ ibus_text_get_length (IBusText *text)
+ {
+     return g_utf8_strlen (text->text, -1);
+ }
++
++gboolean
++ibus_text_get_is_static (IBusText *text)
++{
++    return text->is_static;
++}
++
++const gchar *
++ibus_text_get_text (IBusText *text)
++{
++    return text->text;
++}
++
++const IBusAttrList *
++ibus_text_get_attributes (IBusText *text)
++{
++    return text->attrs;
++}
+diff --git a/src/ibustext.h b/src/ibustext.h
+index 246e5ab..b7638da 100644
+--- a/src/ibustext.h
++++ b/src/ibustext.h
+@@ -169,6 +169,33 @@ void             ibus_text_append_attribute         (IBusText       *text,
+  */
+ guint            ibus_text_get_length               (IBusText       *text);
+ 
++/**
++ * ibus_text_get_is_static:
++ * @text: An IBusText.
++ * @returns: the is_static in @text.
++ *
++ * Return the is_static in an IBusText.
++ */
++gboolean         ibus_text_get_is_static            (IBusText       *text);
++
++/**
++ * ibus_text_get_text:
++ * @text: An IBusText.
++ * @returns: the text in @text.
++ *
++ * Return the text in an IBusText. Should not be freed.
++ */
++const gchar *    ibus_text_get_text                 (IBusText       *text);
++
++/**
++ * ibus_text_get_attributes:
++ * @text: An IBusText.
++ * @returns: the attrs in @text.
++ *
++ * Return the attributes in an IBusText. Should not be freed.
++ */
++const IBusAttrList *
++                 ibus_text_get_attributes           (IBusText       *text);
+ G_END_DECLS
+ #endif
+ 
+diff --git a/src/ibusutil.c b/src/ibusutil.c
+new file mode 100644
+index 0000000..38ac058
+--- /dev/null
++++ b/src/ibusutil.c
+@@ -0,0 +1,145 @@
++/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
++/* vim:set et sts=4: */
++/* bus - The Input Bus
++ * Copyright (C) 2008-2011 Peng Huang <shawn.p.huang@gmail.com>
++ * Copyright (C) 2010-2011 Takao Fujiwara <takao.fujiwara1@gmail.com>
++ * Copyright (C) 2008-2011 Red Hat, Inc.
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the
++ * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
++ * Boston, MA 02111-1307, USA.
++ */
++#ifdef HAVE_CONFIG_H
++#include <config.h>
++#endif
++
++#include <glib/gstdio.h>
++#include "ibusxml.h"
++
++#ifdef ENABLE_NLS
++#include <libintl.h>
++#endif
++
++static GHashTable *__languages_dict;
++
++static gboolean
++_iso_codes_parse_xml_node (XMLNode          *node)
++{
++    GList *p;
++    g_assert (node);
++
++    if (G_UNLIKELY (g_strcmp0 (node->name, "iso_639_entries") != 0)) {
++        return FALSE;
++    }
++
++    for (p = node->sub_nodes; p != NULL; p = p->next) {
++        XMLNode *sub_node = (XMLNode *)p->data;
++        gchar **attributes = NULL;
++        int i, j;
++        struct {
++            const gchar *key;
++            gchar *value;
++        } entries[] = {
++            { "iso_639_2B_code", NULL },
++            { "iso_639_2T_code", NULL },
++            { "iso_639_1_code", NULL },
++            { NULL, NULL },
++        };
++
++
++        if (sub_node->attributes == NULL) {
++            continue;
++        }
++        attributes = sub_node->attributes;
++        for (i = 0; attributes[i]; i+=2) {
++            if (g_strcmp0 (attributes[i], "name") == 0) {
++                for (j = 0; entries[j].key; j++) {
++                    if (entries[j].value == NULL) {
++                        continue;
++                    }
++                    g_hash_table_insert (__languages_dict,
++                                         (gpointer) entries[j].value,
++                                         (gpointer) g_strdup (attributes[i + 1]));
++                    entries[j].value = NULL;
++                }
++            } else {
++                for (j = 0; entries[j].key; j++) {
++                    if (g_strcmp0 (attributes[i], entries[j].key) == 0 &&
++                        attributes[i + 1] != NULL) {
++                        entries[j].value = g_strdup (attributes[i + 1]);
++                    }
++                }
++            }
++        }
++    }
++
++    return TRUE;
++}
++
++void
++_load_lang()
++{
++    gchar *filename;
++    XMLNode *node;
++    struct stat buf;
++    gboolean retval;
++
++#ifdef ENABLE_NLS
++    bindtextdomain(GETTEXT_PACKAGE, IBUS_LOCALEDIR);
++    bind_textdomain_codeset(GETTEXT_PACKAGE, "UTF-8");
++#endif
++
++    __languages_dict = g_hash_table_new (g_str_hash, (GEqualFunc) g_str_equal);
++    filename = g_build_filename ("/usr", "share/xml/iso-codes/iso_639.xml", NULL);
++    if (g_stat (filename, &buf) != 0) {
++        g_warning ("Can not get stat of file %s", filename);
++        g_free (filename);
++        return;
++    }
++
++    node = ibus_xml_parse_file (filename);
++    g_free (filename);
++
++    if (!node) {
++        return;
++    }
++
++    retval = _iso_codes_parse_xml_node (node);
++    ibus_xml_free (node);
++}
++
++const gchar *
++ibus_get_language_name(const gchar *_locale) {
++    const gchar *retval;
++
++    if (__languages_dict == NULL ) {
++        _load_lang();
++    }
++    retval = (const gchar *) g_hash_table_lookup (__languages_dict, _locale);
++    if (retval != NULL) {
++#ifdef ENABLE_NLS
++        return dgettext("iso_639", retval);
++#else
++        return retval;
++#endif
++    } else {
++#ifdef ENABLE_NLS
++#define _(a) dgettext(GETTEXT_PACKAGE, (a))
++        return _("Other");
++#undef _
++#else
++        return "Other";
++#endif
++    }
++}
+diff --git a/src/ibusutil.h b/src/ibusutil.h
+new file mode 100644
+index 0000000..d012589
+--- /dev/null
++++ b/src/ibusutil.h
+@@ -0,0 +1,33 @@
++/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
++/* vim:set et sts=4: */
++/* bus - The Input Bus
++ * Copyright (C) 2008-2011 Peng Huang <shawn.p.huang@gmail.com>
++ * Copyright (C) 2010-2011 Takao Fujiwara <takao.fujiwara1@gmail.com>
++ * Copyright (C) 2008-2011 Red Hat, Inc.
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the
++ * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
++ * Boston, MA 02111-1307, USA.
++ */
++
++#if !defined (__IBUS_H_INSIDE__) && !defined (IBUS_COMPILATION)
++#error "Only <ibus.h> can be included directly"
++#endif
++
++/**
++ * ibus_get_language_name:
++ * @_locale: A const locale name.
++ * @returns: language name
++ */
++const gchar *    ibus_get_language_name         (const gchar    *_locale);
+diff --git a/ui/gtk/panel.py b/ui/gtk/panel.py
+index 07b0fa2..30ece51 100644
+--- a/ui/gtk/panel.py
++++ b/ui/gtk/panel.py
+@@ -117,6 +117,11 @@ class Panel(ibus.PanelBase):
+         self.__config_load_show_im_name()
+         # self.__bus.request_name(ibus.panel.IBUS_SERVICE_PANEL, 0)
+ 
++        self.__bus.add_match("type='signal',\
++                             sender='org.freedesktop.DBus',\
++                             member='AskReleaseName'")
++        self.__bus.get_dbusconn().add_signal_receiver(self.__ask_release_name_cb, signal_name="AskReleaseName")
++
+         # init xkb
+         self.__xkblayout = ibus.XKBLayout(self.__config)
+         use_xkb = self.__config.get_value("general", "use_system_keyboard_layout", False)
+@@ -196,6 +201,10 @@ class Panel(ibus.PanelBase):
+     def get_status_icon(self):
+         return self.__status_icon
+ 
++    def __ask_release_name_cb(self, name, reason):
++        print "Quiting ibus because of", str(reason)
++        gtk.main_quit()
++
+     def __set_im_icon(self, icon_name):
+         if not icon_name:
+             icon_name = ICON_ENGINE
+-- 
+1.7.3.2
+

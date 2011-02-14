@@ -1,60 +1,3 @@
-From 03c9e591430c62354bbf26ef7bd4a2e6acfb7c8f Mon Sep 17 00:00:00 2001
-From: Yusuke Sato <yusukes@chromium.org>
-Date: Thu, 3 Feb 2011 10:15:24 +0900
-Subject: [PATCH] Overwrite Gtk+'s default compose table to fix crosbug.com/11421.
-
-BUG=chromium-os:11421
-TEST=manually done on Chrome OS.
-
-Review URL: http://codereview.appspot.com/3989060
----
- client/gtk2/ibusimcontext.c |   23 +++++++++++++++++++++++
- 1 files changed, 23 insertions(+), 0 deletions(-)
-
-diff --git a/client/gtk2/ibusimcontext.c b/client/gtk2/ibusimcontext.c
-index b1ae0c8..745722f 100644
---- a/client/gtk2/ibusimcontext.c
-+++ b/client/gtk2/ibusimcontext.c
-@@ -496,6 +496,24 @@ ibus_im_context_class_init (IBusIMContextClass *class)
-         _key_snooper_id = gtk_key_snooper_install (_key_snooper_cb, NULL);
- }
- 
-+/* Copied from gtk+2.0-2.20.1/modules/input/imcedilla.c to fix crosbug.com/11421.
-+ * Overwrite the original Gtk+'s compose table in gtk+-2.x.y/gtk/gtkimcontextsimple.c. */
-+
-+/* The difference between this and the default input method is the handling
-+ * of C+acute - this method produces C WITH CEDILLA rather than C WITH ACUTE.
-+ * For languages that use CCedilla and not acute, this is the preferred mapping,
-+ * and is particularly important for pt_BR, where the us-intl keyboard is
-+ * used extensively.
-+ */
-+static guint16 cedilla_compose_seqs[] = {
-+  GDK_dead_acute,	GDK_C,	0,	0,	0,	0x00C7,	/* LATIN_CAPITAL_LETTER_C_WITH_CEDILLA */
-+  GDK_dead_acute,	GDK_c,	0,	0,	0,	0x00E7,	/* LATIN_SMALL_LETTER_C_WITH_CEDILLA */
-+  GDK_Multi_key,	GDK_apostrophe,	GDK_C,  0,      0,      0x00C7, /* LATIN_CAPITAL_LETTER_C_WITH_CEDILLA */
-+  GDK_Multi_key,	GDK_apostrophe,	GDK_c,  0,      0,      0x00E7, /* LATIN_SMALL_LETTER_C_WITH_CEDILLA */
-+  GDK_Multi_key,	GDK_C,  GDK_apostrophe,	0,      0,      0x00C7, /* LATIN_CAPITAL_LETTER_C_WITH_CEDILLA */
-+  GDK_Multi_key,	GDK_c,  GDK_apostrophe,	0,      0,      0x00E7, /* LATIN_SMALL_LETTER_C_WITH_CEDILLA */
-+};
-+
- static void
- ibus_im_context_init (GObject *obj)
- {
-@@ -528,6 +546,11 @@ ibus_im_context_init (GObject *obj)
- 
-     // Create slave im context
-     ibusimcontext->slave = gtk_im_context_simple_new ();
-+    gtk_im_context_simple_add_table (GTK_IM_CONTEXT_SIMPLE (ibusimcontext->slave),
-+                                     cedilla_compose_seqs,
-+                                     4,
-+                                     G_N_ELEMENTS (cedilla_compose_seqs) / (4 + 2));
-+
-     g_signal_connect (ibusimcontext->slave,
-                       "commit",
-                       G_CALLBACK (_slave_commit_cb),
--- 
-1.7.3.2
-
 From 2cf859f01912fe41fd36edaeb0efc21f4fabcb0f Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
 Date: Sat, 5 Feb 2011 03:00:04 +0900
@@ -126,90 +69,28 @@ index 608f294..bb5ae5c 100644
 -- 
 1.7.3.2
 
-From c6949a852235bedb44126c3c6f36e1fba4b71bce Mon Sep 17 00:00:00 2001
+From 0501756a1e51469849eca064aeb1e340afbf8be2 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Tue, 8 Feb 2011 18:21:50 +0900
-Subject: [PATCH] Added the optional sync mode apps in IBusIMContext.
+Date: Wed, 9 Feb 2011 00:51:39 +0900
+Subject: [PATCH] Add pkgdatadir in ibus-1.0.pc.in
 
 ---
- client/gtk2/ibusimcontext.c |   27 +++++++++++++++++++++++++++
- configure.ac                |   11 +++++++++++
- 2 files changed, 38 insertions(+), 0 deletions(-)
+ ibus-1.0.pc.in |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/client/gtk2/ibusimcontext.c b/client/gtk2/ibusimcontext.c
-index bb5ae5c..a4e46cb 100644
---- a/client/gtk2/ibusimcontext.c
-+++ b/client/gtk2/ibusimcontext.c
-@@ -79,6 +79,7 @@ static const gchar *_no_snooper_apps = NO_SNOOPER_APPS;
- static gboolean _use_key_snooper = ENABLE_SNOOPER;
- static guint    _key_snooper_id = 0;
+diff --git a/ibus-1.0.pc.in b/ibus-1.0.pc.in
+index 88357af..9f593ab 100644
+--- a/ibus-1.0.pc.in
++++ b/ibus-1.0.pc.in
+@@ -2,6 +2,8 @@ prefix=@prefix@
+ exec_prefix=@exec_prefix@
+ libdir=@libdir@
+ includedir=@includedir@
++datadir=@datadir@
++pkgdatadir=@datadir@/ibus
  
-+static const gchar *_sync_mode_apps = SYNC_MODE_APPS;
- static gboolean _use_sync_mode = FALSE;
- 
- static GtkIMContext *_focus_im_context = NULL;
-@@ -477,6 +478,32 @@ ibus_im_context_class_init (IBusIMContextClass *class)
-         g_strfreev (apps);
-     }
- 
-+    /* env IBUS_SYNC_MODE_APPS for sync mode apps */
-+    /* It seems MetaDisplay does not take the events from gdk_event_put()
-+     * in async mode. So if gnome-shell + mutter are used,
-+     * the key events are lost in async mode.
-+     * gnome-shell search box, actually st_im_text_key_press_event(),
-+     * does not call the parent filter_keypress() when the IM client
-+     * returns TRUE. The class inherits ClutterActor which is not
-+     * GtkWidget so the clutter does not call GTK snoopers.
-+     * So ibus_im_context_filter_keypress() needs to return FALSE. */
-+    if (!_use_sync_mode) {
-+        /* enable sync mode if app is in _sync_mode_apps */
-+        const gchar * prgname = g_get_prgname ();
-+        if (g_getenv ("IBUS_SYNC_MODE_APPS")) {
-+            _sync_mode_apps = g_getenv ("IBUS_SYNC_MODE_APPS");
-+        }
-+        gchar **p;
-+        gchar ** apps = g_strsplit (_sync_mode_apps, ",", 0);
-+        for (p = apps; *p != NULL; p++) {
-+            if (g_regex_match_simple (*p, prgname, 0, 0)) {
-+                _use_sync_mode = TRUE;
-+                break;
-+            }
-+        }
-+        g_strfreev (apps);
-+    }
-+
-     /* init bus object */
-     if (_bus == NULL) {
-         ibus_set_display (gdk_display_get_name (gdk_display_get_default ()));
-diff --git a/configure.ac b/configure.ac
-index 1a1e663..81efe81 100644
---- a/configure.ac
-+++ b/configure.ac
-@@ -354,6 +354,16 @@ AC_ARG_WITH(no-snooper-apps,
- AC_DEFINE_UNQUOTED(NO_SNOOPER_APPS, "$NO_SNOOPER_APPS",
-     [Does not enbale keyboard snooper in those applications])
- 
-+# option for sync mode applications.
-+AC_ARG_WITH(sync-mode-apps,
-+    AS_HELP_STRING([--with-sync-mode-apps[=regex1,regex2]],
-+        [Enable sync mode in those applications (like: .*chrome.*,firefox.*)]),
-+    [SYNC_MODE_APPS=$with_sync_mode_apps],
-+    [SYNC_MODE_APPS=[mutter]]
-+)
-+AC_DEFINE_UNQUOTED(SYNC_MODE_APPS, "$SYNC_MODE_APPS",
-+    [Enbale sync mode in those applications])
-+
- # check iso-codes
- PKG_CHECK_MODULES(ISOCODES, [
-     iso-codes
-@@ -423,6 +433,7 @@ Build options:
-   Build vala binding        $enable_vala
-   Build document            $enable_gtk_doc
-   Enable key snooper        $enable_key_snooper
-+  Sync mode regexes         "$SYNC_MODE_APPS"
-   No snooper regexes        "$NO_SNOOPER_APPS"
- ])
- 
+ Name: IBus
+ Description: IBus Library
 -- 
 1.7.3.2
 

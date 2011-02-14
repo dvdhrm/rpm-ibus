@@ -1,0 +1,87 @@
+From c6949a852235bedb44126c3c6f36e1fba4b71bce Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Tue, 8 Feb 2011 18:21:50 +0900
+Subject: [PATCH] Added the optional sync mode apps in IBusIMContext.
+
+---
+ client/gtk2/ibusimcontext.c |   27 +++++++++++++++++++++++++++
+ configure.ac                |   11 +++++++++++
+ 2 files changed, 38 insertions(+), 0 deletions(-)
+
+diff --git a/client/gtk2/ibusimcontext.c b/client/gtk2/ibusimcontext.c
+index bb5ae5c..a4e46cb 100644
+--- a/client/gtk2/ibusimcontext.c
++++ b/client/gtk2/ibusimcontext.c
+@@ -79,6 +79,7 @@ static const gchar *_no_snooper_apps = NO_SNOOPER_APPS;
+ static gboolean _use_key_snooper = ENABLE_SNOOPER;
+ static guint    _key_snooper_id = 0;
+ 
++static const gchar *_sync_mode_apps = SYNC_MODE_APPS;
+ static gboolean _use_sync_mode = FALSE;
+ 
+ static GtkIMContext *_focus_im_context = NULL;
+@@ -477,6 +478,32 @@ ibus_im_context_class_init (IBusIMContextClass *class)
+         g_strfreev (apps);
+     }
+ 
++    /* env IBUS_SYNC_MODE_APPS for sync mode apps */
++    /* It seems MetaDisplay does not take the events from gdk_event_put()
++     * in async mode. So if gnome-shell + mutter are used,
++     * the key events are lost in async mode.
++     * gnome-shell search box, actually st_im_text_key_press_event(),
++     * does not call the parent filter_keypress() when the IM client
++     * returns TRUE. The class inherits ClutterActor which is not
++     * GtkWidget so the clutter does not call GTK snoopers.
++     * So ibus_im_context_filter_keypress() needs to return FALSE. */
++    if (!_use_sync_mode) {
++        /* enable sync mode if app is in _sync_mode_apps */
++        const gchar * prgname = g_get_prgname ();
++        if (g_getenv ("IBUS_SYNC_MODE_APPS")) {
++            _sync_mode_apps = g_getenv ("IBUS_SYNC_MODE_APPS");
++        }
++        gchar **p;
++        gchar ** apps = g_strsplit (_sync_mode_apps, ",", 0);
++        for (p = apps; *p != NULL; p++) {
++            if (g_regex_match_simple (*p, prgname, 0, 0)) {
++                _use_sync_mode = TRUE;
++                break;
++            }
++        }
++        g_strfreev (apps);
++    }
++
+     /* init bus object */
+     if (_bus == NULL) {
+         ibus_set_display (gdk_display_get_name (gdk_display_get_default ()));
+diff --git a/configure.ac b/configure.ac
+index 1a1e663..81efe81 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -354,6 +354,16 @@ AC_ARG_WITH(no-snooper-apps,
+ AC_DEFINE_UNQUOTED(NO_SNOOPER_APPS, "$NO_SNOOPER_APPS",
+     [Does not enbale keyboard snooper in those applications])
+ 
++# option for sync mode applications.
++AC_ARG_WITH(sync-mode-apps,
++    AS_HELP_STRING([--with-sync-mode-apps[=regex1,regex2]],
++        [Enable sync mode in those applications (like: .*chrome.*,firefox.*)]),
++    [SYNC_MODE_APPS=$with_sync_mode_apps],
++    [SYNC_MODE_APPS=[mutter]]
++)
++AC_DEFINE_UNQUOTED(SYNC_MODE_APPS, "$SYNC_MODE_APPS",
++    [Enbale sync mode in those applications])
++
+ # check iso-codes
+ PKG_CHECK_MODULES(ISOCODES, [
+     iso-codes
+@@ -423,6 +433,7 @@ Build options:
+   Build vala binding        $enable_vala
+   Build document            $enable_gtk_doc
+   Enable key snooper        $enable_key_snooper
++  Sync mode regexes         "$SYNC_MODE_APPS"
+   No snooper regexes        "$NO_SNOOPER_APPS"
+ ])
+ 
+-- 
+1.7.3.2
+
