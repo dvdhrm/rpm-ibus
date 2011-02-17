@@ -40,7 +40,7 @@ index cbcf7f4..1bb159e 100644
  static void     bus_ibus_impl_set_use_sys_layout
                                                  (BusIBusImpl        *ibus,
                                                   GVariant           *value);
-@@ -270,6 +273,123 @@ _panel_destroy_cb (BusPanelProxy *panel,
+@@ -270,6 +273,126 @@ _panel_destroy_cb (BusPanelProxy *panel,
      g_object_unref (panel);
  }
  
@@ -131,7 +131,10 @@ index cbcf7f4..1bb159e 100644
 +
 +    g_assert (BUS_IS_IBUS_IMPL (ibus));
 +
-+    lang = g_strdup (setlocale (LC_ALL, NULL));
++    lang = g_strdup (setlocale (LC_CTYPE, NULL));
++    if (lang == NULL) {
++        return;
++    }
 +    p = index (lang, '.');
 +    if (p) {
 +        *p = '\0';
@@ -164,7 +167,7 @@ index cbcf7f4..1bb159e 100644
  static void
  bus_ibus_impl_set_hotkey (BusIBusImpl *ibus,
                            GQuark       hotkey,
-@@ -354,34 +474,32 @@ static void
+@@ -354,34 +477,32 @@ static void
  bus_ibus_impl_set_preload_engines (BusIBusImpl *ibus,
                                     GVariant    *value)
  {
@@ -218,7 +221,7 @@ index cbcf7f4..1bb159e 100644
  }
  
  /**
-@@ -459,82 +577,48 @@ bus_ibus_impl_set_use_global_engine (BusIBusImpl *ibus,
+@@ -459,82 +580,48 @@ bus_ibus_impl_set_use_global_engine (BusIBusImpl *ibus,
      }
  }
  
@@ -324,7 +327,7 @@ index cbcf7f4..1bb159e 100644
  #endif
  }
  
-@@ -548,6 +632,7 @@ const static struct {
+@@ -548,6 +635,7 @@ const static struct {
      { "general/hotkey", "next_engine_in_menu",  bus_ibus_impl_set_next_engine_in_menu },
      { "general/hotkey", "previous_engine",      bus_ibus_impl_set_previous_engine },
      { "general", "preload_engines",             bus_ibus_impl_set_preload_engines },

@@ -12,7 +12,7 @@
 
 Name:       ibus
 Version:    1.3.99.20110206
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -29,6 +29,8 @@ Patch4:     ibus-657165-panel-libs.patch
 Patch5:     ibus-657165-gjs-plugins.patch
 # This will be removed after the new gnome-shell is integrated.
 Patch99:    ibus-675503-gnome-shell-workaround.patch
+# The latest gnome-icon-theme removes the legacy gtk-stock symlinks.
+Patch100:   ibus-xx-gtk-legacy-icon.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -141,6 +143,7 @@ The ibus-devel-docs package contains developer documentation for ibus
 bzcat %SOURCE2 | tar xf -
 %patch0 -p1
 %patch99 -p1 -b .g-s-typo
+%patch100 -p1 -b .legacy-stock
 # start surrounding patch
 %patch1 -p1 -b .surrounding
 cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
@@ -311,6 +314,10 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Feb 17 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110206-2
+- Fixed Bug 677856 - left ibus snooper when im client is switched.
+- Added ibus-xx-gtk-legacy-icon.patch to work without legacy gtk stock.
+
 * Mon Feb 14 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110206-1
 - Integrated the part of gjs in Bug 657165 ibus for gnome-shell.
   Added ibus-ui-gjs-plugins-20110214.tar.bz2
