@@ -6,13 +6,13 @@
 %define ibus_api_version 1.0
 
 %define glib_ver %([ -a %{_libdir}/pkgconfig/glib-2.0.pc ] && pkg-config --modversion glib-2.0 | cut -d. -f 1,2 || echo -n "999")
-%define gconf2_version 2.12.0
 %define dbus_python_version 0.83.0
-%define im_chooser_version 1.2.5
+# FIXME: It's better to use the new icon names
+%define gnome_icon_theme_legacy_version 2.91.6
 
 Name:       ibus
 Version:    1.3.99.20110206
-Release:    2%{?dist}
+Release:    3%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -29,8 +29,6 @@ Patch4:     ibus-657165-panel-libs.patch
 Patch5:     ibus-657165-gjs-plugins.patch
 # This will be removed after the new gnome-shell is integrated.
 Patch99:    ibus-675503-gnome-shell-workaround.patch
-# The latest gnome-icon-theme removes the legacy gtk-stock symlinks.
-Patch100:   ibus-xx-gtk-legacy-icon.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -64,17 +62,18 @@ Requires:   pyxdg
 Requires:   iso-codes
 Requires:   dbus-python >= %{dbus_python_version}
 Requires:   dbus-x11
-Requires:   im-chooser >= %{im_chooser_version}
-Requires:   GConf2 >= %{gconf2_version}
+Requires:   im-chooser
+Requires:   GConf2
 Requires:   notify-python
 Requires:   librsvg2
+Requires:   gnome-icon-theme-legacy >= %{gnome_icon_theme_legacy_version}
 
 Requires(post):  desktop-file-utils
 Requires(postun):  desktop-file-utils
 
-Requires(pre): GConf2 >= %{gconf2_version}
-Requires(post): GConf2 >= %{gconf2_version}
-Requires(preun): GConf2 >= %{gconf2_version}
+Requires(pre): GConf2
+Requires(post): GConf2
+Requires(preun): GConf2
 
 Requires(post):  %{_sbindir}/alternatives
 Requires(postun):  %{_sbindir}/alternatives
@@ -143,7 +142,6 @@ The ibus-devel-docs package contains developer documentation for ibus
 bzcat %SOURCE2 | tar xf -
 %patch0 -p1
 %patch99 -p1 -b .g-s-typo
-%patch100 -p1 -b .legacy-stock
 # start surrounding patch
 %patch1 -p1 -b .surrounding
 cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
@@ -314,9 +312,8 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Thu Feb 17 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110206-2
+* Fri Feb 18 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110206-3
 - Fixed Bug 677856 - left ibus snooper when im client is switched.
-- Added ibus-xx-gtk-legacy-icon.patch to work without legacy gtk stock.
 
 * Mon Feb 14 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110206-1
 - Integrated the part of gjs in Bug 657165 ibus for gnome-shell.
