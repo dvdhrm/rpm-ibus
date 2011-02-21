@@ -94,29 +94,20 @@ index 88357af..9f593ab 100644
 -- 
 1.7.3.2
 
-From 6575fab67eaf6f8e483a001f26dbfd61c3258e0a Mon Sep 17 00:00:00 2001
+From 8ebad5f07b1ba821e278d4d04ab74e2d31a40139 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Thu, 17 Feb 2011 14:46:45 +0900
+Date: Sat, 19 Feb 2011 04:52:40 +0900
 Subject: [PATCH] Call gtk_key_snooper_remove when GTK IM client is switched.
 
 ---
- client/gtk2/ibusimcontext.c |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+ client/gtk2/ibusimcontext.c |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
 diff --git a/client/gtk2/ibusimcontext.c b/client/gtk2/ibusimcontext.c
-index bb5ae5c..bb9cb3d 100644
+index bb5ae5c..c4ade53 100644
 --- a/client/gtk2/ibusimcontext.c
 +++ b/client/gtk2/ibusimcontext.c
-@@ -258,6 +258,8 @@ _key_snooper_cb (GtkWidget   *widget,
-     IBusIMContext *ibusimcontext = (IBusIMContext *) _focus_im_context;
-     IBusInputContext *ibuscontext = NULL;
- 
-+    g_return_val_if_fail (IBUS_IS_IM_CONTEXT (ibusimcontext), FALSE);
-+
-     if (ibusimcontext != NULL &&
-         ibusimcontext->has_focus == TRUE) {
-         /* has IC with focus and use_key_snooper is true */
-@@ -620,6 +622,12 @@ ibus_im_context_finalize (GObject *obj)
+@@ -620,6 +620,12 @@ ibus_im_context_finalize (GObject *obj)
          pango_attr_list_unref (ibusimcontext->preedit_attrs);
      }
  
@@ -129,15 +120,6 @@ index bb5ae5c..bb9cb3d 100644
      G_OBJECT_CLASS(parent_class)->finalize (obj);
  }
  
-@@ -631,6 +639,8 @@ ibus_im_context_filter_keypress (GtkIMContext *context,
- 
-     IBusIMContext *ibusimcontext = IBUS_IM_CONTEXT (context);
- 
-+    g_return_val_if_fail (IBUS_IS_IM_CONTEXT (ibusimcontext), FALSE);
-+
-     if (G_LIKELY (ibusimcontext->ibuscontext && ibusimcontext->has_focus)) {
-         /* If context does not have focus, ibus will process key event in sync mode.
-          * It is a workaround for increase search in treeview.
 -- 
 1.7.4
 

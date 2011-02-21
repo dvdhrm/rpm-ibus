@@ -12,7 +12,7 @@
 
 Name:       ibus
 Version:    1.3.99.20110206
-Release:    3%{?dist}
+Release:    4%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -312,8 +312,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Fri Feb 18 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110206-3
+* Mon Feb 21 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110206-4
 - Fixed Bug 677856 - left ibus snooper when im client is switched.
+- Fixed Bug 678825 - SEGV in g_return_if_fail_warning.
 
 * Mon Feb 14 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110206-1
 - Integrated the part of gjs in Bug 657165 ibus for gnome-shell.
