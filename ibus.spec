@@ -3,6 +3,7 @@
 %{!?gtk3_binary_version: %define gtk3_binary_version %(pkg-config  --variable=gtk_binary_version gtk+-3.0)}
 
 %define have_libxkbfile 1
+%define have_gjsfile 1
 %define ibus_api_version 1.0
 
 %define glib_ver %([ -a %{_libdir}/pkgconfig/glib-2.0.pc ] && pkg-config --modversion glib-2.0 | cut -d. -f 1,2 || echo -n "999")
@@ -11,22 +12,22 @@
 %define gnome_icon_theme_legacy_version 2.91.6
 
 Name:       ibus
-Version:    1.3.99.20110206
-Release:    4%{?dist}
+Version:    1.3.99.20110228
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
 URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
-Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/ibus-ui-gjs-plugins-20110214.tar.bz2
-Source3:    ibus.js
-Patch0:     ibus-HEAD.patch
+%if %have_gjsfile
+Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/gnome-shell-ibus-plugins-20110304.tar.bz2
+%endif
+# Patch0:     ibus-HEAD.patch
 Patch1:     ibus-435880-surrounding-text.patch
 Patch2:     ibus-541492-xkb.patch
 Patch3:     ibus-530711-preload-sys.patch
 Patch4:     ibus-657165-panel-libs.patch
-Patch5:     ibus-657165-gjs-plugins.patch
 # This will be removed after the new gnome-shell is integrated.
 Patch99:    ibus-675503-gnome-shell-workaround.patch
 
@@ -139,8 +140,10 @@ The ibus-devel-docs package contains developer documentation for ibus
 
 %prep
 %setup -q
+%if %have_gjsfile
 bzcat %SOURCE2 | tar xf -
-%patch0 -p1
+%endif
+# %patch0 -p1
 %patch99 -p1 -b .g-s-typo
 # start surrounding patch
 %patch1 -p1 -b .surrounding
@@ -151,7 +154,6 @@ cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
 %endif
 %patch3 -p1 -b .preload-sys
 %patch4 -p1 -b .panel-libs
-%patch5 -p1 -b .gjs
 
 %build
 %if %have_libxkbfile
@@ -183,9 +185,6 @@ rm -f $RPM_BUILD_ROOT%{_libdir}/gtk-3.0/%{gtk3_binary_version}/immodules/im-ibus
 # install xinput config file
 install -pm 644 -D %{SOURCE1} $RPM_BUILD_ROOT%{_xinputconf}
 
-# install ibus.js for a reference
-install -pm 644 -D %{SOURCE3} $RPM_BUILD_ROOT%{_datadir}/ibus/ui/gjs/ibus.js
-
 # install .desktop files
 # correct location in upstream.
 if test ! -f $RPM_BUILD_ROOT%{_sysconfdir}/xdg/autostart/ibus.desktop -a \
@@ -204,6 +203,22 @@ sed -i -e 's|Comment\[ja\]=IBus |& |' \
 desktop-file-install --delete-original          \
   --dir $RPM_BUILD_ROOT%{_datadir}/applications \
   $RPM_BUILD_ROOT%{_datadir}/applications/*
+
+%if %have_gjsfile
+cp -R js/ui/status/ibus $RPM_BUILD_ROOT%{_datadir}/ibus/ui/gjs-g-s
+cat >> $RPM_BUILD_ROOT%{_datadir}/ibus/ui/gjs-g-s/README <<_EOF
+IBus Panel for GNOME-Shell
+--------------------------
+
+This is an alpha version of IBus Panel for GNOME-Shell.
+These files under this directory are prepared for the test purpose.
+It is planned to integrate the files into gnome-shell finally.
+Please refer the installation:
+https://fedoraproject.org/wiki/I18N/InputMethods#GNOME-Shell
+Bug Report:
+https://bugzilla.redhat.com/show_bug.cgi?id=657165
+_EOF
+%endif
 
 # FIXME: no version number
 %find_lang %{name}10
@@ -312,18 +327,16 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Mon Feb 21 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110206-4
-- Fixed Bug 677856 - left ibus snooper when im client is switched.
-- Fixed Bug 678825 - SEGV in g_return_if_fail_warning.
-
-* Mon Feb 14 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110206-1
+* Thu Mar 10 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110228-1
+- Updated to 1.3.99.20110228
 - Integrated the part of gjs in Bug 657165 ibus for gnome-shell.
-  Added ibus-ui-gjs-plugins-20110214.tar.bz2
   Added ibus-657165-panel-libs.patch
-  Added ibus-657165-gjs-plugins.patch
+  Added gnome-shell-ibus-plugins-20110304.tar.bz2
 - Fixed Bug 675503 - a regression in sync mode
   Added ibus-675503-gnome-shell-workaround.patch until gnome-shell is updated.
-- Updated ibus-HEAD.patch from upstream.
+- Fixed Bug 677856 - left ibus snooper when im client is switched.
+- Fixed Bug 673047 - abrt ibus_xkb_get_current_layout for non-XKB system
+  Updated ibus-541492-xkb.patch
 
 * Wed Feb 09 2011 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.3.99.20110127-3
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_15_Mass_Rebuild

@@ -1,114 +1,777 @@
-From 4c390e4259cf3f78ef1fd685925d275be4952ed1 Mon Sep 17 00:00:00 2001
+From 71689f16ab8d19045ed44f2609c90202a6bf5db7 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 9 Feb 2011 11:02:14 +0900
+Date: Fri, 4 Mar 2011 00:04:34 +0900
 Subject: [PATCH] Implement APIs for another non-Python panel.
 
+1. Support icon and prop_list = null in ibus_property_new with GIR.
+2. Add getter methods in IBusText and IBusProperty since GJS cannot access
+   the members in C-Structure.
+3. Add ibus_get_language_name() since GIR libxml2 does not provide the
+   useful APIs.
+4. Implement flags in ibus_bus_request_name() to follow DBus
+   RequestName signal spec.
+   http://dbus.freedesktop.org/doc/dbus-specification.html#message-bus-names
+   This is needed to terminate the current IBus panel.
+   E.g. IBus GTK panel is launched by ibus-daemon but another panel is
+   launched by gnome-shell.
+5. Support IBUS_BUS_NAME_FLAG_ALLOW_REPLACEMENT in ui/gtk/main.py
+6. Fix bus_component_set_factory() not to call
+   bus_component_factory_destroy_cb() twice.
+7. Hide ibus_text_new_from_static_string() for GIR.
+8. Add ibus_is_running_gnome_shell() for ibus-ui-gtk because
+   gnome-shell runs earlier than ibus-ui-gtk.
 ---
- bus/dbusimpl.c     |   45 ++++++++++++++++
- configure.ac       |    1 +
- src/Makefile.am    |    2 +
- src/ibusbus.c      |   23 ++++++++
- src/ibusbus.h      |   12 ++++
- src/ibusproperty.c |   24 +++++++++
- src/ibusproperty.h |   85 ++++++++++++++++++++++++++++++-
- src/ibustext.c     |   18 +++++++
- src/ibustext.h     |   27 ++++++++++
- src/ibusutil.c     |  145 ++++++++++++++++++++++++++++++++++++++++++++++++++++
- src/ibusutil.h     |   33 ++++++++++++
- ui/gtk/panel.py    |    9 +++
- 12 files changed, 422 insertions(+), 2 deletions(-)
+ bus/component.c           |    2 +-
+ bus/connection.c          |    8 +
+ bus/connection.h          |   12 +-
+ bus/dbusimpl.c            |  480 +++++++++++++++++++++++++++++++++++++++++++--
+ bus/marshalers.list       |    3 +-
+ ibus/common.py            |   24 +++-
+ src/Makefile.am           |    2 +
+ src/ibusbus.c             |    6 +-
+ src/ibusbus.h             |    8 +-
+ src/ibusproperty.c        |   24 +++
+ src/ibusproperty.h        |   85 ++++++++-
+ src/ibustext.c            |   18 ++
+ src/ibustext.h            |   29 +++-
+ src/ibustypes.h           |   33 +++
+ src/ibusutil.c            |  169 ++++++++++++++++
+ src/ibusutil.h            |   39 ++++
+ ui/gtk/gtkpanel.xml.in.in |    2 +-
+ ui/gtk/main.py            |   23 ++-
+ 18 files changed, 928 insertions(+), 39 deletions(-)
  create mode 100644 src/ibusutil.c
  create mode 100644 src/ibusutil.h
 
+diff --git a/bus/component.c b/bus/component.c
+index c1ff85a..fdff9c3 100644
+--- a/bus/component.c
++++ b/bus/component.c
+@@ -256,7 +256,7 @@ bus_component_set_factory (BusComponent    *component,
+     }
+ 
+     if (component->factory) {
+-        g_signal_handlers_disconnect_by_func (factory,
++        g_signal_handlers_disconnect_by_func (component->factory,
+                                               bus_component_factory_destroy_cb,
+                                               component);
+         g_object_unref (component->factory);
+diff --git a/bus/connection.c b/bus/connection.c
+index a3b4c9c..9e73213 100644
+--- a/bus/connection.c
++++ b/bus/connection.c
+@@ -204,6 +204,14 @@ bus_connection_remove_name (BusConnection     *connection,
+     return FALSE;
+ }
+ 
++gboolean
++bus_connection_has_name (BusConnection     *connection,
++                         const gchar       *name)
++{
++    GList *list = g_list_find_custom (connection->names, name, (GCompareFunc) g_strcmp0);
++    return list != NULL;
++}
++
+ GDBusConnection *
+ bus_connection_get_dbus_connection (BusConnection *connection)
+ {
+diff --git a/bus/connection.h b/bus/connection.h
+index df86036..2a34319 100644
+--- a/bus/connection.h
++++ b/bus/connection.h
+@@ -85,7 +85,7 @@ const gchar     *bus_connection_add_name            (BusConnection      *connect
+                                                      const gchar        *name);
+ 
+ /**
+- * bus_connection_add_name:
++ * bus_connection_remove_name:
+  * @name: a well-known name for the connection.
+  * @returns: TRUE on success.
+  *
+@@ -95,6 +95,16 @@ gboolean         bus_connection_remove_name         (BusConnection      *connect
+                                                      const gchar        *name);
+ 
+ /**
++ * bus_connection_has_name:
++ * @name: a well-known name for the connection.
++ * @returns: TRUE if found the name.
++ *
++ * Lookup the well-known name from the connection.
++ */
++gboolean         bus_connection_has_name            (BusConnection      *connection,
++                                                     const gchar        *name);
++
++/**
+  * bus_connection_get_dbus_connection:
+  *
+  * Get the underlying GDBus connection.
 diff --git a/bus/dbusimpl.c b/bus/dbusimpl.c
-index 48dbd42..3abaa4a 100644
+index 48dbd42..8002bac 100644
 --- a/bus/dbusimpl.c
 +++ b/bus/dbusimpl.c
-@@ -138,6 +138,10 @@ static const gchar introspection_xml[] =
-     "      <arg direction='in'  type='s' name='name' />"
-     "      <arg direction='out' type='u' />"
-     "    </method>"
-+    "    <method name='AskReleaseName'>"
-+    "      <arg direction='in'  type='s' name='name' />"
-+    "      <arg direction='in'  type='u' name='reason' />"
-+    "    </method>"
-     "    <method name='StartServiceByName'>"
-     "      <arg direction='in'  type='s' />"
-     "      <arg direction='in'  type='u' />"
-@@ -195,6 +199,10 @@ static const gchar introspection_xml[] =
-     "      <arg type='s' name='old_owner' />"
-     "      <arg type='s' name='new_owner' />"
-     "    </signal>"
-+    "    <signal name='AskReleaseName'>"
-+    "      <arg type='s' name='name' />"
-+    "      <arg type='u' name='reason' />"
-+    "    </signal>"
-     "    <signal name='NameLost'>"
-     "      <arg type='s' name='name' />"
-     "    </signal>"
-@@ -648,6 +656,42 @@ bus_dbus_impl_release_name (BusDBusImpl           *dbus,
+@@ -27,6 +27,8 @@
+ 
+ enum {
+     NAME_OWNER_CHANGED,
++    NAME_LOST,
++    NAME_ACQUIRED,
+     LAST_SIGNAL,
+ };
+ 
+@@ -68,6 +70,14 @@ struct _BusDBusImplClass {
+                                     gchar           *name,
+                                     gchar           *old_name,
+                                     gchar           *new_name);
++
++    void    (* name_lost)          (BusDBusImpl     *dbus,
++                                    BusConnection   *connection,
++                                    gchar           *name);
++
++    void    (* name_acquired)      (BusDBusImpl     *dbus,
++                                    BusConnection   *connection,
++                                    gchar           *name);
+ };
+ 
+ typedef struct _BusDispatchData BusDispatchData;
+@@ -76,6 +86,19 @@ struct _BusDispatchData {
+     BusConnection *skip_connection;
+ };
+ 
++typedef struct _BusNameService BusNameService;
++struct _BusNameService {
++    gchar *name;
++    GSList *owners;
++};
++
++typedef struct _BusConnectionOwner BusConnectionOwner;
++struct _BusConnectionOwner {
++    BusConnection *conn;
++
++    guint allow_replacement : 1;
++    guint do_not_queue : 1;
++};
+ 
+ /* functions prototype */
+ static void     bus_dbus_impl_destroy           (BusDBusImpl        *dbus);
+@@ -111,6 +134,14 @@ static void      bus_dbus_impl_name_owner_changed
+                                                  gchar              *name,
+                                                  gchar              *old_name,
+                                                  gchar              *new_name);
++static void      bus_dbus_impl_name_lost
++                                                (BusDBusImpl        *dbus,
++                                                 BusConnection      *connection,
++                                                 gchar              *name);
++static void      bus_dbus_impl_name_acquired
++                                                (BusDBusImpl        *dbus,
++                                                 BusConnection      *connection,
++                                                 gchar              *name);
+ static void      bus_dbus_impl_connection_destroy_cb
+                                                 (BusConnection      *connection,
+                                                  BusDBusImpl        *dbus);
+@@ -205,6 +236,188 @@ static const gchar introspection_xml[] =
+     "</node>";
+ 
+ static void
++bus_connection_owner_set_flags (BusConnectionOwner *owner,
++                                guint32             flags)
++{
++    owner->allow_replacement =
++        (flags & IBUS_BUS_NAME_FLAG_ALLOW_REPLACEMENT) != 0;
++
++    owner->do_not_queue =
++        (flags & IBUS_BUS_NAME_FLAG_DO_NOT_QUEUE) != 0;
++}
++
++static BusConnectionOwner *
++bus_connection_owner_new (BusConnection *connection,
++                          guint32        flags)
++{
++    BusConnectionOwner *owner = NULL;
++
++    g_assert (connection != NULL);
++
++    owner = (BusConnectionOwner *) g_new0 (BusConnectionOwner, 1);
++    if (owner != NULL) {
++        owner->conn = g_object_ref (connection);
++        bus_connection_owner_set_flags (owner, flags);
++    }
++
++    return owner;
++}
++
++static void
++bus_connection_owner_free (BusConnectionOwner *owner)
++{
++    g_assert (owner != NULL);
++
++    g_object_unref (owner->conn);
++    owner->conn = NULL;
++    g_free (owner);
++}
++
++static GSList *
++_bus_name_service_find_owner_link (BusNameService *service,
++                                   BusConnection  *connection)
++{
++    GSList *owners = service->owners;
++
++    while (owners) {
++        BusConnectionOwner *owner = (BusConnectionOwner *) owners->data;
++        if (owner->conn == connection) {
++            break;
++        }
++        owners = owners->next;
++    }
++
++    return owners;
++}
++
++static BusNameService *
++bus_name_service_new (const gchar *name)
++{
++    BusNameService *service = NULL;
++
++    g_assert (name != NULL);
++
++    service = g_new0 (BusNameService, 1);
++    if (service != NULL) {
++        service->name = g_strdup (name);
++    }
++
++    return service;
++}
++
++static void
++bus_name_service_free (BusNameService *service)
++{
++    GSList *list = NULL;
++
++    g_assert (service != NULL);
++
++    list = service->owners;
++
++    while (list) {
++        bus_connection_owner_free ((BusConnectionOwner *) list->data);
++        list->data = NULL;
++        list = list->next;
++    }
++    if (service->owners) {
++        g_slist_free (service->owners);
++        service->owners = NULL;
++    }
++    g_free (service->name);
++    service->name = NULL;
++    g_free (service);
++}
++
++static void
++bus_name_service_add_primary_owner (BusNameService     *service,
++                                    BusConnectionOwner *owner,
++                                    BusDBusImpl        *dbus)
++{
++    g_assert (service != NULL);
++
++    if (dbus) {
++        g_signal_emit (dbus,
++                       dbus_signals[NAME_ACQUIRED],
++                       0,
++                       g_object_ref (owner->conn),
++                       service->name ? service->name : "");
++    }
++
++    service->owners = g_slist_prepend (service->owners, (gpointer) owner);
++}
++
++static BusConnectionOwner *
++bus_name_service_get_primary_owner (BusNameService *service)
++{
++    g_assert (service != NULL);
++
++    if (service->owners == NULL) {
++        return NULL;
++    }
++
++    return (BusConnectionOwner *) service->owners->data;
++}
++
++static void
++bus_name_service_add_owner (BusNameService     *service,
++                            BusConnectionOwner *owner,
++                            BusDBusImpl        *dbus)
++{
++    g_assert (service != NULL);
++
++    if (dbus && service->owners == NULL) {
++        g_signal_emit (dbus,
++                       dbus_signals[NAME_ACQUIRED],
++                       0,
++                       g_object_ref (owner->conn),
++                       service->name ? service->name : "");
++    }
++
++    service->owners = g_slist_append (service->owners, (gpointer) owner);
++}
++
++static void
++bus_name_service_remove_owner (BusNameService     *service,
++                               BusConnectionOwner *owner,
++                               BusDBusImpl        *dbus)
++{
++    GSList *owners;
++
++    g_assert (service != NULL);
++    g_assert (owner != NULL);
++
++    owners = _bus_name_service_find_owner_link (service, owner->conn);
++    if (owners == NULL) {
++        return;
++    }
++
++    if (dbus &&
++        owners->data == bus_name_service_get_primary_owner (service)) {
++        g_signal_emit (dbus,
++                       dbus_signals[NAME_LOST],
++                       0,
++                       g_object_ref (owner->conn),
++                       service->name ? service->name : "");
++    }
++
++    service->owners = g_slist_remove_link (service->owners, (gpointer) owners);
++}
++
++static gboolean
++bus_name_service_get_allow_replacement (BusNameService *service)
++{
++    BusConnectionOwner *owner = NULL;
++
++    g_assert (service != NULL);
++
++    owner = bus_name_service_get_primary_owner (service);
++    if (owner == NULL) {
++        return TRUE;
++    }
++    return owner->allow_replacement;
++}
++
++static void
+ bus_dbus_impl_class_init (BusDBusImplClass *class)
+ {
+     GObjectClass *gobject_class = G_OBJECT_CLASS (class);
+@@ -221,6 +434,12 @@ bus_dbus_impl_class_init (BusDBusImplClass *class)
+     /* register a handler of the name-owner-changed signal below. */
+     class->name_owner_changed = bus_dbus_impl_name_owner_changed;
+ 
++    /* register a handler of the name-lost signal below. */
++    class->name_lost = bus_dbus_impl_name_lost;
++
++    /* register a handler of the name-acquired signal below. */
++    class->name_acquired = bus_dbus_impl_name_acquired;
++
+     /* install signals */
+     dbus_signals[NAME_OWNER_CHANGED] =
+         g_signal_new (I_("name-owner-changed"),
+@@ -234,13 +453,39 @@ bus_dbus_impl_class_init (BusDBusImplClass *class)
+             G_TYPE_STRING,
+             G_TYPE_STRING,
+             G_TYPE_STRING);
++
++    dbus_signals[NAME_LOST] =
++        g_signal_new (I_("name-lost"),
++            G_TYPE_FROM_CLASS (class),
++            G_SIGNAL_RUN_FIRST,
++            G_STRUCT_OFFSET (BusDBusImplClass, name_lost),
++            NULL, NULL,
++            bus_marshal_VOID__OBJECT_STRING,
++            G_TYPE_NONE,
++            2,
++            BUS_TYPE_CONNECTION,
++            G_TYPE_STRING);
++
++    dbus_signals[NAME_ACQUIRED] =
++        g_signal_new (I_("name-acquired"),
++            G_TYPE_FROM_CLASS (class),
++            G_SIGNAL_RUN_FIRST,
++            G_STRUCT_OFFSET (BusDBusImplClass, name_acquired),
++            NULL, NULL,
++            bus_marshal_VOID__OBJECT_STRING,
++            G_TYPE_NONE,
++            2,
++            BUS_TYPE_CONNECTION,
++            G_TYPE_STRING);
+ }
+ 
+ static void
+ bus_dbus_impl_init (BusDBusImpl *dbus)
+ {
+     dbus->unique_names = g_hash_table_new (g_str_hash, g_str_equal);
+-    dbus->names = g_hash_table_new (g_str_hash, g_str_equal);
++    dbus->names = g_hash_table_new_full (g_str_hash, g_str_equal,
++                                         (GDestroyNotify) g_free,
++                                         (GDestroyNotify) bus_name_service_free);
+ 
+     dbus->dispatch_lock = g_mutex_new ();
+     dbus->forward_lock = g_mutex_new ();
+@@ -557,10 +802,15 @@ bus_dbus_impl_request_name (BusDBusImpl           *dbus,
+                             GVariant              *parameters,
+                             GDBusMethodInvocation *invocation)
+ {
+-    /* FIXME need to handle flags defined in:
+-     * http://dbus.freedesktop.org/doc/dbus-specification.html#message-bus-names */
+     const gchar *name = NULL;  // e.g. "org.freedesktop.IBus.Panel"
+-    guint flags = 0;
++    guint32 flags = 0;
++    guint32 retval = 0;
++    gchar *old_owner_name = NULL;
++    BusNameService *service = NULL;
++    BusConnectionOwner *primary_owner = NULL;
++    BusConnectionOwner *owner = NULL;
++    BusConnection *old_owner_conn = NULL;
++
+     g_variant_get (parameters, "(&su)", &name, &flags);
+ 
+     if (name == NULL ||
+@@ -580,25 +830,82 @@ bus_dbus_impl_request_name (BusDBusImpl           *dbus,
+         return;
+     }
+ 
+-    if (g_hash_table_lookup (dbus->names, name) != NULL) {
+-        g_dbus_method_invocation_return_error (invocation,
+-                        G_DBUS_ERROR, G_DBUS_ERROR_FAILED,
+-                        "Service name '%s' already has an owner.", name);
+-        return;
++    service = (BusNameService *) g_hash_table_lookup (dbus->names, name);
++
++    if (service != NULL) {
++        primary_owner = bus_name_service_get_primary_owner (service);
++        if (primary_owner != NULL) {
++            old_owner_conn = primary_owner->conn;
++        } else {
++            old_owner_conn = NULL;
++        }
++    } else {
++        old_owner_conn = NULL;
+     }
+ 
+-    const guint retval = 1; /* DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER */
+-    g_dbus_method_invocation_return_value (invocation, g_variant_new ("(u)", retval));
+-    g_hash_table_insert (dbus->names,
+-                         (gpointer) bus_connection_add_name (connection, name),
+-                         connection);
++    if (old_owner_conn == NULL) {
++        retval = IBUS_BUS_REQUEST_NAME_REPLY_PRIMARY_OWNER;
++    }
++    else if (old_owner_conn == connection) {
++        retval = IBUS_BUS_REQUEST_NAME_REPLY_ALREADY_OWNER;
++        goto out;
++    }
++    else if (((flags & IBUS_BUS_NAME_FLAG_DO_NOT_QUEUE) &&
++             !(bus_name_service_get_allow_replacement (service))) ||
++             ((flags & IBUS_BUS_NAME_FLAG_DO_NOT_QUEUE) &&
++             !(flags & IBUS_BUS_NAME_FLAG_REPLACE_EXISTING))) {
++        retval = IBUS_BUS_REQUEST_NAME_REPLY_EXISTS;
++        goto out;
++    }
++    else if (!(flags & IBUS_BUS_NAME_FLAG_DO_NOT_QUEUE) &&
++             (!(flags & IBUS_BUS_NAME_FLAG_REPLACE_EXISTING) ||
++              !(bus_name_service_get_allow_replacement (service)))) {
++        if (!bus_connection_has_name (connection, name)) {
++            bus_connection_add_name (connection, name);
++        }
++        owner = bus_connection_owner_new (connection, flags);
++        bus_name_service_add_owner (service, owner, dbus);
++        retval = IBUS_BUS_REQUEST_NAME_REPLY_IN_QUEUE;
++        goto out;
++    }
++    else {
++        if (!bus_connection_has_name (connection, name)) {
++            bus_connection_add_name (connection, name);
++        }
++        owner = bus_connection_owner_new (connection, flags);
++        old_owner_name = g_strdup (bus_connection_get_unique_name (primary_owner->conn));
++        bus_name_service_remove_owner (service, primary_owner, dbus);
++        bus_name_service_add_primary_owner (service, owner, dbus);
++        if (primary_owner->do_not_queue == 0) {
++            bus_name_service_add_owner (service, primary_owner, dbus);
++        } else {
++            if (bus_connection_has_name (primary_owner->conn, name)) {
++                bus_connection_remove_name (primary_owner->conn, name);
++            }
++            bus_connection_owner_free (primary_owner);
++        }
++        retval = IBUS_BUS_REQUEST_NAME_REPLY_PRIMARY_OWNER;
++    }
++
++    if (service == NULL) {
++        service = bus_name_service_new (name);
++        owner = bus_connection_owner_new (connection, flags);
++        bus_name_service_add_owner (service, owner, dbus);
++        g_hash_table_insert (dbus->names,
++                             (gpointer) g_strdup (bus_connection_add_name (connection, name)),
++                             service);
++    }
+ 
+     g_signal_emit (dbus,
+                    dbus_signals[NAME_OWNER_CHANGED],
+                    0,
+                    name,
+-                   "",
++                   old_owner_name ? old_owner_name : "",
+                    bus_connection_get_unique_name (connection));
++    g_free (old_owner_name);
++
++out:
++    g_dbus_method_invocation_return_value (invocation, g_variant_new ("(u)", retval));
  }
  
  /**
-+ * bus_dbus_impl_ask_release_name:
+@@ -682,6 +989,70 @@ bus_dbus_impl_name_owner_changed (BusDBusImpl   *dbus,
+ }
+ 
+ /**
++ * bus_dbus_impl_name_lost:
 + *
-+ * Implement the "AskReleaseName" method call of the org.freedesktop.DBus interface.
-+ * The "AskReleaseName" signal is broadcasted to clients.
++ * The function is called on name-lost signal, typically when g_signal_emit (dbus, NAME_LOST)
++ * is called, and broadcasts the signal to clients.
 + */
 +static void
-+bus_dbus_impl_ask_release_name (BusDBusImpl           *dbus,
-+                                BusConnection         *connection,
-+                                GVariant              *parameters,
-+                                GDBusMethodInvocation *invocation)
++bus_dbus_impl_name_lost (BusDBusImpl   *dbus,
++                         BusConnection *connection,
++                         gchar         *name)
 +{
 +    static guint32 serial = 0;
-+    GDBusMessage *message;
-+    const gchar *name= NULL;
-+    guint reason = 0;
 +
-+    g_variant_get (parameters, "(&su)", &name, &reason);
++    g_assert (BUS_IS_DBUS_IMPL (dbus));
++    g_assert (name != NULL);
 +
-+    message = g_dbus_message_new_signal ("/org/freedesktop/DBus",
-+                                         "org.freedesktop.DBus",
-+                                         "AskReleaseName");
++    GDBusMessage *message = g_dbus_message_new_signal ("/org/freedesktop/DBus",
++                                                       "org.freedesktop.DBus",
++                                                       "NameLost");
 +    g_dbus_message_set_sender (message, "org.freedesktop.DBus");
++    g_dbus_message_set_destination (message, bus_connection_get_unique_name (connection));
 +
 +    /* set a non-zero serial to make libdbus happy */
 +    g_dbus_message_set_serial (message, ++serial);
 +    g_dbus_message_set_body (message,
-+                             g_variant_new ("(su)", name, reason));
++                             g_variant_new ("(s)", name));
 +
-+    /* broadcast the message to clients that listen to the signal. */
-+    bus_dbus_impl_dispatch_message_by_rule (dbus, message, NULL);
++    bus_dbus_impl_forward_message (dbus, connection, message);
 +    g_object_unref (message);
-+
-+    g_dbus_method_invocation_return_value (invocation, NULL);
++    g_object_unref (connection);
 +}
 +
 +/**
-  * bus_dbus_impl_name_owner_changed:
++ * bus_dbus_impl_name_acquired:
++ *
++ * The function is called on name-acquired signal, typically when g_signal_emit (dbus, NAME_LOST)
++ * is called, and broadcasts the signal to clients.
++ */
++static void
++bus_dbus_impl_name_acquired (BusDBusImpl   *dbus,
++                             BusConnection *connection,
++                             gchar         *name)
++{
++    static guint32 serial = 0;
++
++    g_assert (BUS_IS_DBUS_IMPL (dbus));
++    g_assert (name != NULL);
++
++    GDBusMessage *message = g_dbus_message_new_signal ("/org/freedesktop/DBus",
++                                                       "org.freedesktop.DBus",
++                                                       "NameAcquired");
++    g_dbus_message_set_sender (message, "org.freedesktop.DBus");
++    g_dbus_message_set_destination (message, bus_connection_get_unique_name (connection));
++
++    /* set a non-zero serial to make libdbus happy */
++    g_dbus_message_set_serial (message, ++serial);
++    g_dbus_message_set_body (message,
++                             g_variant_new ("(s)", name));
++
++    bus_dbus_impl_forward_message (dbus, connection, message);
++    g_object_unref (message);
++    g_object_unref (connection);
++}
++
++/**
+  * bus_dbus_impl_service_method_call:
   *
-  * The function is called on name-owner-changed signal, typically when g_signal_emit (dbus, NAME_OWNER_CHANGED)
-@@ -725,6 +769,7 @@ bus_dbus_impl_service_method_call (IBusService           *service,
-         { "RemoveMatch",    bus_dbus_impl_remove_match },
-         { "RequestName",    bus_dbus_impl_request_name },
-         { "ReleaseName",    bus_dbus_impl_release_name },
-+        { "AskReleaseName", bus_dbus_impl_ask_release_name },
-     };
+  * Handle a D-Bus method call from a client. This function overrides an implementation in src/ibusservice.c.
+@@ -935,6 +1306,10 @@ bus_dbus_impl_connection_destroy_cb (BusConnection *connection,
+                                      BusDBusImpl   *dbus)
+ {
+     const gchar *unique_name = bus_connection_get_unique_name (connection);
++    const GList *names = NULL;
++    BusNameService *service = NULL;
++    GSList *owners = NULL;
++
+     if (unique_name != NULL) {
+         g_hash_table_remove (dbus->unique_names, unique_name);
+         g_signal_emit (dbus,
+@@ -945,16 +1320,71 @@ bus_dbus_impl_connection_destroy_cb (BusConnection *connection,
+                        "");
+     }
  
-     gint i;
-diff --git a/configure.ac b/configure.ac
-index 1a1e663..f1575e7 100644
---- a/configure.ac
-+++ b/configure.ac
-@@ -291,6 +291,7 @@ AC_SUBST(GETTEXT_PACKAGE)
- AC_DEFINE_UNQUOTED(GETTEXT_PACKAGE,"$GETTEXT_PACKAGE", [Gettext package])
+-    const GList *name = bus_connection_get_names (connection);
+-    while (name != NULL) {
+-        g_hash_table_remove (dbus->names, name->data);
++    /* service->owners is the queue of connections.
++     * If the connection is the primary owner and
++     * bus_name_service_remove_owner() is called, the owner is removed
++     * in the queue and the next owner will become the primary owner
++     * automatically because service->owners is just a GSList.
++     * If service->owners == NULL, it's good to remove the service in
++     * dbus->names.
++     * I suppose dbus->names are global queue for every connection and
++     * connection->names are private queue of the connection.
++     */
++    names = bus_connection_get_names (connection);
++    while (names != NULL) {
++        service = (BusNameService *) g_hash_table_lookup (dbus->names,
++                                                          names->data);
++        if (service) {
++            owners = _bus_name_service_find_owner_link (service, connection);
++            if (owners) {
++                BusConnectionOwner *owner = owners->data;
++                bus_name_service_remove_owner (service, owner, dbus);
++                bus_connection_owner_free (owner);
++            }
++            if (service->owners == NULL) {
++                /* g_hash_table_remove() will call bus_name_service_free()
++                 * due to g_hash_table_new_full() */
++                g_hash_table_remove (dbus->names, names->data);
++                service = NULL;
++            }
++        }
++        /* if service == NULL, the names->data should be removed in
++         * the connection by bus_connection_remove_name().
++         * But connection->names is GSList so it cannot be removed
++         * during this while loop because names->next would not
++         * become the wrong pointer here.
++         * the next while loop can call bus_connection_remove_name().
++         */
++
+         g_signal_emit (dbus,
+                        dbus_signals[NAME_OWNER_CHANGED],
+                        0,
+-                       name->data,
++                       names->data,
+                        unique_name,
+                        "");
+-        name = name->next;
++        names = names->next;
++    }
++
++    while ((names = bus_connection_get_names (connection)) != NULL) {
++        const gchar *name = NULL;
++        service = NULL;
++
++        while (names != NULL) {
++            name = (const gchar *) names->data;
++            service = (BusNameService *) g_hash_table_lookup (dbus->names,
++                                                              name);
++            if (service == NULL) {
++                break;
++            }
++            names = names->next;
++        }
++        if (names == NULL) {
++            break;
++        }
++        if (name == NULL) {
++            break;
++        }
++        bus_connection_remove_name (connection, name);
+     }
  
- AM_GLIB_GNU_GETTEXT
-+AM_GLIB_DEFINE_LOCALEDIR(IBUS_LOCALEDIR)
+     dbus->connections = g_list_remove (dbus->connections, connection);
+@@ -1004,7 +1434,15 @@ bus_dbus_impl_get_connection_by_name (BusDBusImpl    *dbus,
+         return (BusConnection *) g_hash_table_lookup (dbus->unique_names, name);
+     }
+     else {
+-        return (BusConnection *) g_hash_table_lookup (dbus->names, name);
++        BusNameService *service;
++        BusConnectionOwner *owner;
++
++        service = (BusNameService *) g_hash_table_lookup (dbus->names, name);
++        if (service == NULL) {
++            return NULL;
++        }
++        owner = bus_name_service_get_primary_owner (service);
++        return owner ? owner->conn : NULL;
+     }
+ }
  
- # define gtk2 immodule dir
- AC_ARG_WITH(gtk2-im-module-dir,
+diff --git a/bus/marshalers.list b/bus/marshalers.list
+index 15bdf02..514d6ea 100644
+--- a/bus/marshalers.list
++++ b/bus/marshalers.list
+@@ -5,9 +5,10 @@ VOID:INT,UINT
+ VOID:UINT,UINT,UINT
+ VOID:INT,INT,INT,INT
+ VOID:STRING,INT
+-VOID:OBJECT
+ VOID:STRING,STRING,STRING
++VOID:OBJECT
+ VOID:OBJECT,BOOLEAN
++VOID:OBJECT,STRING
+ VOID:OBJECT,UINT,BOOLEAN
+ VOID:OBJECT,UINT,BOOLEAN,UINT
+ BOOL:UINT,UINT,UINT
+diff --git a/ibus/common.py b/ibus/common.py
+index cbc8d56..614d782 100644
+--- a/ibus/common.py
++++ b/ibus/common.py
+@@ -35,6 +35,13 @@ __all__ = (
+         "ORIENTATION_SYSTEM",
+         "PRELOAD_ENGINE_MODE_USER",
+         "PRELOAD_ENGINE_MODE_LANG_RELATIVE",
++        "BUS_NAME_FLAG_ALLOW_REPLACEMENT",
++        "BUS_NAME_FLAG_REPLACE_EXISTING",
++        "BUS_NAME_FLAG_DO_NOT_QUEUE",
++        "BUS_REQUEST_NAME_REPLY_PRIMARY_OWNER",
++        "BUS_REQUEST_NAME_REPLY_IN_QUEUE",
++        "BUS_REQUEST_NAME_REPLY_EXISTS",
++        "BUS_REQUEST_NAME_REPLY_ALREADY_OWNER",
+         "default_reply_handler",
+         "default_error_handler",
+         "DEFAULT_ASYNC_HANDLERS",
+@@ -47,7 +54,8 @@ __all__ = (
+         "main_quit",
+         "main_iteration",
+         "get_address",
+-        "get_socket_path"
++        "get_socket_path",
++        "is_running_gnome_shell",
+     )
+ 
+ import os
+@@ -106,6 +114,9 @@ get_address.restype=ctypes.c_char_p
+ get_socket_path = libibus.ibus_get_socket_path
+ get_socket_path.restype=ctypes.c_char_p
+ 
++is_running_gnome_shell = libibus.ibus_is_running_gnome_shell
++is_running_gnome_shell.restype = ctypes.c_bool
++
+ # __session_id = os.getenv ("IBUS_SESSION_ID")
+ # 
+ # IBUS_ADDR = "unix:path=/tmp/ibus-%s%s/ibus-%s-%s" % (__username,
+@@ -138,6 +149,17 @@ ORIENTATION_SYSTEM      = 2
+ PRELOAD_ENGINE_MODE_USER          = 0
+ PRELOAD_ENGINE_MODE_LANG_RELATIVE = 1
+ 
++# define bus name flag
++BUS_NAME_FLAG_ALLOW_REPLACEMENT   = (1 << 0)
++BUS_NAME_FLAG_REPLACE_EXISTING    = (1 << 1)
++BUS_NAME_FLAG_DO_NOT_QUEUE        = (1 << 2)
++
++# define bus request name reply
++BUS_REQUEST_NAME_REPLY_PRIMARY_OWNER = 1
++BUS_REQUEST_NAME_REPLY_IN_QUEUE      = 2
++BUS_REQUEST_NAME_REPLY_EXISTS        = 3
++BUS_REQUEST_NAME_REPLY_ALREADY_OWNER = 4
++
+ def default_reply_handler( *args):
+     pass
+ 
 diff --git a/src/Makefile.am b/src/Makefile.am
 index 08152a7..d422106 100644
 --- a/src/Makefile.am
@@ -130,62 +793,53 @@ index 08152a7..d422106 100644
  ibusincludedir = $(includedir)/ibus-@IBUS_API_VERSION@
  ibus_public_headers =       \
 diff --git a/src/ibusbus.c b/src/ibusbus.c
-index 5a3b978..ecb7775 100644
+index 5a3b978..78808a4 100644
 --- a/src/ibusbus.c
 +++ b/src/ibusbus.c
-@@ -551,6 +551,29 @@ ibus_bus_release_name (IBusBus      *bus,
-     return retval;
+@@ -613,15 +613,15 @@ ibus_bus_hello (IBusBus *bus)
+ #endif
  }
  
-+void
-+ibus_bus_ask_release_name (IBusBus      *bus,
-+                           const gchar  *name,
-+                           guint         reason)
-+{
-+    GVariant *result;
-+
-+    g_return_if_fail (IBUS_IS_BUS (bus));
-+    g_return_if_fail (name != NULL);
-+
-+    result = ibus_bus_call (bus,
-+                            DBUS_SERVICE_DBUS,
-+                            DBUS_PATH_DBUS,
-+                            DBUS_INTERFACE_DBUS,
-+                            "AskReleaseName",
-+                            g_variant_new ("(su)", name, reason),
-+                            NULL);
-+
-+    if (result) {
-+        g_variant_unref (result);
-+    }
-+}
-+
- gboolean
- ibus_bus_name_has_owner (IBusBus        *bus,
-                          const gchar    *name)
+-guint
++guint32
+ ibus_bus_request_name (IBusBus      *bus,
+                        const gchar  *name,
+-                       guint         flags)
++                       guint32       flags)
+ {
+     g_return_val_if_fail (IBUS_IS_BUS (bus), 0);
+     g_return_val_if_fail (name != NULL, 0);
+ 
+-    guint retval = 0;
++    guint32 retval = 0;
+     GVariant *result;
+     result = ibus_bus_call_sync (bus,
+                                  DBUS_SERVICE_DBUS,
 diff --git a/src/ibusbus.h b/src/ibusbus.h
-index b1ec63c..001e989 100644
+index b1ec63c..de4cd36 100644
 --- a/src/ibusbus.h
 +++ b/src/ibusbus.h
-@@ -143,6 +143,18 @@ guint        ibus_bus_release_name      (IBusBus        *bus,
-                                          const gchar    *name);
+@@ -122,16 +122,16 @@ const gchar *ibus_bus_hello             
+  * ibus_bus_request_name:
+  * @bus: the IBusBus instance to be processed.
+  * @name: Name to be requested.
+- * @flags: Flags (FixMe).
+- * @returns: 0 if failed; positive number otherwise.
++ * @flags: IBusBusNameFlag.
++ * @returns: 0 if failed; IBusBusRequestNameReply otherwise.
+  *
+  * Request a name from IBus daemon synchronously.
+  *
+  * FIXME add an asynchronous version.
+  */
+-guint        ibus_bus_request_name      (IBusBus        *bus,
++guint32      ibus_bus_request_name      (IBusBus        *bus,
+                                          const gchar    *name,
+-                                         guint           flags);
++                                         guint32         flags);
  
  /**
-+ * ibus_bus_ask_release_name:
-+ * @bus: An IBusBus.
-+ * @name: Name to be released.
-+ * @reason: Reason to be released.
-+ *
-+ * Ask other processes to release the name via IBus daemon.
-+ */
-+void         ibus_bus_ask_release_name  (IBusBus        *bus,
-+                                         const gchar    *name,
-+                                         guint           reason);
-+
-+/**
-  * ibus_bus_name_has_owner:
-  * @bus: An IBusBus.
-  * @name: Name to be released.
+  * ibus_bus_release_name:
 diff --git a/src/ibusproperty.c b/src/ibusproperty.c
 index bb9cc21..5a2dd78 100644
 --- a/src/ibusproperty.c
@@ -397,9 +1051,18 @@ index b63cbc9..5889b64 100644
 +    return text->attrs;
 +}
 diff --git a/src/ibustext.h b/src/ibustext.h
-index 246e5ab..b7638da 100644
+index 246e5ab..6f7c505 100644
 --- a/src/ibustext.h
 +++ b/src/ibustext.h
+@@ -110,7 +110,7 @@ IBusText        *ibus_text_new_from_string          (const gchar    *str);
+ IBusText        *ibus_text_new_from_ucs4            (const gunichar *str);
+ 
+ /**
+- * ibus_text_new_from_static_string:
++ * ibus_text_new_from_static_string: (skip)
+  * @str: An text string to be set.
+  * @returns: A newly allocated IBusText.
+  *
 @@ -169,6 +169,33 @@ void             ibus_text_append_attribute         (IBusText       *text,
   */
  guint            ibus_text_get_length               (IBusText       *text);
@@ -434,12 +1097,56 @@ index 246e5ab..b7638da 100644
  G_END_DECLS
  #endif
  
+diff --git a/src/ibustypes.h b/src/ibustypes.h
+index 035d124..6a31847 100644
+--- a/src/ibustypes.h
++++ b/src/ibustypes.h
+@@ -154,6 +154,39 @@ typedef enum {
+ } IBusPreloadEngineMode;
+ 
+ /**
++ * IBusBusNameFlag:
++ * @IBUS_BUS_NAME_FLAG_ALLOW_REPLACEMENT:
++ *    same as DBUS_NAME_FLAG_ALLOW_REPLACEMENT	
++ * @IBUS_BUS_NAME_FLAG_REPLACE_EXISTING:
++ *    same as DBUS_NAME_FLAG_REPLACE_EXISTING
++ * @IBUS_BUS_NAME_FLAG_DO_NOT_QUEUE:
++ *    same as DBUS_NAME_FLAG_DO_NOT_QUEUE 
++ */
++typedef enum {
++    IBUS_BUS_NAME_FLAG_ALLOW_REPLACEMENT   = (1 << 0),
++    IBUS_BUS_NAME_FLAG_REPLACE_EXISTING    = (1 << 1),
++    IBUS_BUS_NAME_FLAG_DO_NOT_QUEUE        = (1 << 2),
++} IBusBusNameFlag;
++
++/**
++ * IBusBusRequestNameReply:
++ * @IBUS_BUS_REQUEST_NAME_REPLY_PRIMARY_OWNER:
++ *    same as DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER
++ * @IBUS_BUS_REQUEST_NAME_REPLY_IN_QUEUE:
++ *    same as DBUS_REQUEST_NAME_REPLY_IN_QUEUE
++ * @IBUS_BUS_REQUEST_NAME_REPLY_EXISTS:
++ *    same as DBUS_REQUEST_NAME_REPLY_EXISTS
++ * @IBUS_BUS_REQUEST_NAME_REPLY_ALREADY_OWNER:
++ *    same as DBUS_REQUEST_NAME_REPLY_ALREADY_OWNER
++ */
++typedef enum {
++    IBUS_BUS_REQUEST_NAME_REPLY_PRIMARY_OWNER   = 1,
++    IBUS_BUS_REQUEST_NAME_REPLY_IN_QUEUE        = 2,
++    IBUS_BUS_REQUEST_NAME_REPLY_EXISTS          = 3,
++    IBUS_BUS_REQUEST_NAME_REPLY_ALREADY_OWNER   = 4,
++} IBusBusRequestNameReply;
++
++/**
+  * IBusRectangle:
+  * @x: x coordinate.
+  * @y: y coordinate.
 diff --git a/src/ibusutil.c b/src/ibusutil.c
 new file mode 100644
-index 0000000..38ac058
+index 0000000..59291f9
 --- /dev/null
 +++ b/src/ibusutil.c
-@@ -0,0 +1,145 @@
+@@ -0,0 +1,169 @@
 +/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
 +/* vim:set et sts=4: */
 +/* bus - The Input Bus
@@ -466,7 +1173,9 @@ index 0000000..38ac058
 +#include <config.h>
 +#endif
 +
++#include <glib.h>
 +#include <glib/gstdio.h>
++#include <gio/gio.h>
 +#include "ibusxml.h"
 +
 +#ifdef ENABLE_NLS
@@ -535,12 +1244,6 @@ index 0000000..38ac058
 +    gchar *filename;
 +    XMLNode *node;
 +    struct stat buf;
-+    gboolean retval;
-+
-+#ifdef ENABLE_NLS
-+    bindtextdomain(GETTEXT_PACKAGE, IBUS_LOCALEDIR);
-+    bind_textdomain_codeset(GETTEXT_PACKAGE, "UTF-8");
-+#endif
 +
 +    __languages_dict = g_hash_table_new (g_str_hash, (GEqualFunc) g_str_equal);
 +    filename = g_build_filename ("/usr", "share/xml/iso-codes/iso_639.xml", NULL);
@@ -557,7 +1260,7 @@ index 0000000..38ac058
 +        return;
 +    }
 +
-+    retval = _iso_codes_parse_xml_node (node);
++    _iso_codes_parse_xml_node (node);
 +    ibus_xml_free (node);
 +}
 +
@@ -575,22 +1278,50 @@ index 0000000..38ac058
 +#else
 +        return retval;
 +#endif
-+    } else {
-+#ifdef ENABLE_NLS
-+#define _(a) dgettext(GETTEXT_PACKAGE, (a))
-+        return _("Other");
-+#undef _
-+#else
-+        return "Other";
-+#endif
 +    }
++    return retval;
++}
++
++gboolean
++ibus_is_running_gnome_shell (void)
++{
++    GDBusConnection *connection = NULL;
++    GVariant *result;
++    gboolean is_running = FALSE;
++
++    connection = g_bus_get_sync (G_BUS_TYPE_SESSION, NULL, NULL);
++    if (connection == NULL) {
++        return FALSE;
++    }
++
++    result = g_dbus_connection_call_sync (connection,
++                                          "org.freedesktop.DBus",
++                                          "/org/freedesktop/DBus",
++                                          "org.freedesktop.DBus",
++                                          "GetNameOwner",
++                                          g_variant_new ("(s)", "org.gnome.Shell"),
++                                          G_VARIANT_TYPE ("(s)"),
++                                          G_DBUS_CALL_FLAGS_NONE,
++                                          -1,
++                                          NULL,
++                                          NULL);
++
++    if (result != NULL) {
++        is_running = TRUE;
++        g_variant_unref (result);
++    } else {
++        is_running = FALSE;
++    }
++    g_object_unref (connection);
++
++    return is_running;
 +}
 diff --git a/src/ibusutil.h b/src/ibusutil.h
 new file mode 100644
-index 0000000..d012589
+index 0000000..8892996
 --- /dev/null
 +++ b/src/ibusutil.h
-@@ -0,0 +1,33 @@
+@@ -0,0 +1,39 @@
 +/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
 +/* vim:set et sts=4: */
 +/* bus - The Input Bus
@@ -624,33 +1355,84 @@ index 0000000..d012589
 + * @returns: language name
 + */
 +const gchar *    ibus_get_language_name         (const gchar    *_locale);
-diff --git a/ui/gtk/panel.py b/ui/gtk/panel.py
-index 07b0fa2..30ece51 100644
---- a/ui/gtk/panel.py
-+++ b/ui/gtk/panel.py
-@@ -117,6 +117,11 @@ class Panel(ibus.PanelBase):
-         self.__config_load_show_im_name()
-         # self.__bus.request_name(ibus.panel.IBUS_SERVICE_PANEL, 0)
++
++/**
++ * ibus_is_running_gnome_shell:
++ * @returns: TRUE if gnome-shell is running
++ */
++gboolean         ibus_is_running_gnome_shell    (void);
+diff --git a/ui/gtk/gtkpanel.xml.in.in b/ui/gtk/gtkpanel.xml.in.in
+index edeed1c..1e1e656 100644
+--- a/ui/gtk/gtkpanel.xml.in.in
++++ b/ui/gtk/gtkpanel.xml.in.in
+@@ -3,7 +3,7 @@
+ <component>
+ 	<name>org.freedesktop.IBus.Panel</name>
+ 	<description>Gtk Panel Component</description>
+-	<exec>${libexecdir}/ibus-ui-gtk</exec>
++	<exec>${libexecdir}/ibus-ui-gtk -s</exec>
+ 	<version>@VERSION@</version>
+ 	<author>Peng Huang &lt;shawn.p.huang@gmail.com&gt;</author>
+ 	<license>GPL</license>
+diff --git a/ui/gtk/main.py b/ui/gtk/main.py
+index f4c901d..5e75ab7 100644
+--- a/ui/gtk/main.py
++++ b/ui/gtk/main.py
+@@ -50,7 +50,13 @@ class UIApplication:
+         self.__bus.add_match(match_rule)
  
+         self.__panel = panel.Panel(self.__bus)
+-        self.__bus.request_name(ibus.IBUS_SERVICE_PANEL, 0)
++        self.__bus.request_name(ibus.IBUS_SERVICE_PANEL,
++                                ibus.BUS_NAME_FLAG_ALLOW_REPLACEMENT |
++                                ibus.BUS_NAME_FLAG_REPLACE_EXISTING)
 +        self.__bus.add_match("type='signal',\
 +                             sender='org.freedesktop.DBus',\
-+                             member='AskReleaseName'")
-+        self.__bus.get_dbusconn().add_signal_receiver(self.__ask_release_name_cb, signal_name="AskReleaseName")
-+
-         # init xkb
-         self.__xkblayout = ibus.XKBLayout(self.__config)
-         use_xkb = self.__config.get_value("general", "use_system_keyboard_layout", False)
-@@ -196,6 +201,10 @@ class Panel(ibus.PanelBase):
-     def get_status_icon(self):
-         return self.__status_icon
++                             member='NameLost'")
++        self.__bus.get_dbusconn().add_signal_receiver(self.__name_lost_cb, signal_name="NameLost")
+         self.__notify = pynotify.Notification("IBus", \
+                             _("Some input methods have been installed, removed or updated. " \
+                             "Please restart ibus input platform."), \
+@@ -66,6 +72,10 @@ class UIApplication:
+     def __registry_changed_cb(self, bus):
+         self.__notify.show()
  
-+    def __ask_release_name_cb(self, name, reason):
-+        print "Quiting ibus because of", str(reason)
++    def __name_lost_cb(self, name):
++        print "Got NameLost signal", name
 +        gtk.main_quit()
 +
-     def __set_im_icon(self, icon_name):
-         if not icon_name:
-             icon_name = ICON_ENGINE
+     def run(self):
+         try:
+             gtk.main()
+@@ -84,8 +94,9 @@ def print_help(out, v = 0):
+ 
+ def main():
+     daemonize = False
+-    shortopt = "hd"
+-    longopt = ["help", "daemonize"]
++    stop_by_shell = False
++    shortopt = "hds"
++    longopt = ["help", "daemonize", "stop-by-shell"]
+     try:
+         opts, args = getopt.getopt(sys.argv[1:], shortopt, longopt)
+     except getopt.GetoptError, err:
+@@ -96,10 +107,16 @@ def main():
+             print_help(sys.stdout)
+         elif o in("-d", "--daemonize"):
+             daemonize = True
++        elif o in("-s", "--stop-by-shell"):
++            stop_by_shell = True
+         else:
+             print >> sys.stderr, "Unknown argument: %s" % o
+             print_help(sys.stderr, 1)
+ 
++    if stop_by_shell and ibus.is_running_gnome_shell():
++        print "Exit because GNOME-Shell is running"
++        sys.exit()
++
+     if daemonize:
+         if os.fork():
+             sys.exit()
 -- 
-1.7.3.2
+1.7.4.1
 

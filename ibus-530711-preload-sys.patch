@@ -1,6 +1,6 @@
-From 8265052e2616f25af6e6a84cda8fb6d5c4d5f4ed Mon Sep 17 00:00:00 2001
+From 4e217b71d30c4f645014e67dd083364a58bd15db Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Fri, 4 Feb 2011 19:48:19 +0900
+Date: Thu, 10 Mar 2011 15:31:55 +0900
 Subject: [PATCH] Reload preload engines until users customize the list.
 
 The idea is, if users don't customize the preload_engines with ibus-setup,
@@ -18,19 +18,19 @@ IBUS_PRELOAD_ENGINE_MODE_USER and users can customize the value
 Loading system default may spend the startup time. If you mind it,
 your dist may like to put TRUE in 'use_local_preload_engines' value.
 ---
- bus/ibusimpl.c       |  241 ++++++++++++++++++++++++++++++++++----------------
+ bus/ibusimpl.c       |  279 ++++++++++++++++++++++++++++++++++---------------
  data/ibus.schemas.in |   13 +++
- ibus/common.py       |    6 ++
- setup/main.py        |   37 +++++++-
- setup/setup.ui       |   21 ++++-
+ ibus/common.py       |    6 +
+ setup/main.py        |   37 ++++++-
+ setup/setup.ui       |   21 +++-
  src/ibustypes.h      |   10 ++
- 6 files changed, 242 insertions(+), 86 deletions(-)
+ 6 files changed, 272 insertions(+), 94 deletions(-)
 
 diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
-index cbcf7f4..1bb159e 100644
+index 8d4ec36..f86b149 100644
 --- a/bus/ibusimpl.c
 +++ b/bus/ibusimpl.c
-@@ -144,6 +144,9 @@ static void     bus_ibus_impl_set_previous_engine
+@@ -144,6 +144,9 @@ static void     bus_ibus_impl_set_previo
  static void     bus_ibus_impl_set_preload_engines
                                                  (BusIBusImpl        *ibus,
                                                   GVariant           *value);
@@ -40,10 +40,11 @@ index cbcf7f4..1bb159e 100644
  static void     bus_ibus_impl_set_use_sys_layout
                                                  (BusIBusImpl        *ibus,
                                                   GVariant           *value);
-@@ -270,6 +273,126 @@ _panel_destroy_cb (BusPanelProxy *panel,
+@@ -271,6 +274,141 @@ _panel_destroy_cb (BusPanelProxy *panel,
      g_object_unref (panel);
  }
  
++#ifndef OS_CHROMEOS
 +static gint
 +_engine_desc_cmp (IBusEngineDesc *desc1,
 +                  IBusEngineDesc *desc2)
@@ -51,7 +52,9 @@ index cbcf7f4..1bb159e 100644
 +    return - ((gint) ibus_engine_desc_get_rank (desc1)) +
 +              ((gint) ibus_engine_desc_get_rank (desc2));
 +}
++#endif
 +
++#ifndef OS_CHROMEOS
 +static gint
 +_get_config_preload_engine_mode (BusIBusImpl *ibus)
 +{
@@ -75,6 +78,7 @@ index cbcf7f4..1bb159e 100644
 +
 +    return preload_engine_mode;
 +}
++#endif
 +
 +static void
 +_set_preload_engines (BusIBusImpl *ibus,
@@ -104,7 +108,13 @@ index cbcf7f4..1bb159e 100644
 +                                   "preload_engines") == NULL) {
 +            ibus_config_set_value (ibus->config, "general",
 +                                   "preload_engines", value);
++        } else {
++            /* We don't update preload_engines with an empty string for safety.
++             * Just unref the floating value. */
++            g_variant_unref (value);
 +        }
++    } else if (value != NULL) {
++        g_variant_unref (value);
 +    }
 +
 +    g_list_foreach (engine_list, (GFunc) g_object_ref, NULL);
@@ -120,6 +130,7 @@ index cbcf7f4..1bb159e 100644
 +    bus_ibus_impl_update_engines_hotkey_profile (ibus);
 +}
 +
++#ifndef OS_CHROMEOS
 +static void
 +_set_language_relative_preload_engines (BusIBusImpl *ibus)
 +{
@@ -131,10 +142,13 @@ index cbcf7f4..1bb159e 100644
 +
 +    g_assert (BUS_IS_IBUS_IMPL (ibus));
 +
++    /* The setlocale call first checks LC_ALL. If it's not available, checks
++     * LC_CTYPE. If it's also not available, checks LANG. */
 +    lang = g_strdup (setlocale (LC_CTYPE, NULL));
 +    if (lang == NULL) {
 +        return;
 +    }
++
 +    p = index (lang, '.');
 +    if (p) {
 +        *p = '\0';
@@ -163,20 +177,22 @@ index cbcf7f4..1bb159e 100644
 +    _set_preload_engines (ibus, g_variant_builder_end (&builder));
 +    g_list_free (engines);
 +}
++#endif
 +
  static void
  bus_ibus_impl_set_hotkey (BusIBusImpl *ibus,
                            GQuark       hotkey,
-@@ -354,34 +477,32 @@ static void
+@@ -381,34 +519,43 @@ static void
  bus_ibus_impl_set_preload_engines (BusIBusImpl *ibus,
                                     GVariant    *value)
  {
 -    GList *engine_list = NULL;
-+    gint preload_engine_mode = _get_config_preload_engine_mode (ibus);
- 
+-
 -    g_list_foreach (ibus->engine_list, (GFunc) g_object_unref, NULL);
 -    g_list_free (ibus->engine_list);
--
++#ifndef OS_CHROMEOS
++    gint preload_engine_mode = _get_config_preload_engine_mode (ibus);
+ 
 -    if (value != NULL && g_variant_classify (value) == G_VARIANT_CLASS_ARRAY) {
 -        GVariantIter iter;
 -        g_variant_iter_init (&iter, value);
@@ -193,14 +209,23 @@ index cbcf7f4..1bb159e 100644
 +            _set_preload_engines (ibus, value);
          }
      }
++#else
++    _set_preload_engines (ibus, value);
++#endif
 +}
  
 -    g_list_foreach (engine_list, (GFunc) g_object_ref, NULL);
 -    ibus->engine_list = engine_list;
++/**
++ * bus_ibus_impl_set_preload_engine_mode:
++ *
++ * A function to be called when "preload_engines_mode" config is updated.
++ */
 +static void
 +bus_ibus_impl_set_preload_engine_mode (BusIBusImpl *ibus,
 +                                       GVariant    *value)
 +{
++#ifndef OS_CHROMEOS
 +    gint preload_engine_mode = IBUS_PRELOAD_ENGINE_MODE_LANG_RELATIVE;
  
 -    if (ibus->engine_list) {
@@ -218,10 +243,11 @@ index cbcf7f4..1bb159e 100644
 +    }
 +
 +    _set_language_relative_preload_engines (ibus);
++#endif
  }
  
  /**
-@@ -459,82 +580,48 @@ bus_ibus_impl_set_use_global_engine (BusIBusImpl *ibus,
+@@ -489,89 +636,48 @@ bus_ibus_impl_set_use_global_engine (Bus
      }
  }
  
@@ -238,7 +264,7 @@ index cbcf7f4..1bb159e 100644
  /**
   * bus_ibus_impl_set_default_preload_engines:
   *
-- * If the "preload_engines" config variable is not set yet, set the default value which is determined based on a current locale (LC_ALL).
+- * If the "preload_engines" config variable is not set yet, set the default value which is determined based on a current locale.
 + * bus_ibus_impl_set_default_preload_engines handles the gconf value
 + * /desktop/ibus/general/preload_engines and preload_engine_mode.
 + * The idea is, if users don't customize the preload_engines with ibus-setup,
@@ -282,7 +308,14 @@ index cbcf7f4..1bb159e 100644
      }
  
      done = TRUE;
--    gchar *lang = g_strdup (setlocale (LC_ALL, NULL));
+-
+-    /* The setlocale call first checks LC_ALL. If it's not available, checks
+-     * LC_CTYPE. If it's also not available, checks LANG. */
+-    gchar *lang = g_strdup (setlocale (LC_CTYPE, NULL));
+-    if (lang == NULL) {
+-        return;
+-    }
+-
 -    gchar *p = index (lang, '.');
 -    if (p) {
 -        *p = '\0';
@@ -327,16 +360,16 @@ index cbcf7f4..1bb159e 100644
  #endif
  }
  
-@@ -548,6 +635,7 @@ const static struct {
-     { "general/hotkey", "next_engine_in_menu",  bus_ibus_impl_set_next_engine_in_menu },
-     { "general/hotkey", "previous_engine",      bus_ibus_impl_set_previous_engine },
-     { "general", "preload_engines",             bus_ibus_impl_set_preload_engines },
-+    { "general", "preload_engine_mode",         bus_ibus_impl_set_preload_engine_mode },
-     { "general", "use_system_keyboard_layout",  bus_ibus_impl_set_use_sys_layout },
-     { "general", "use_global_engine",           bus_ibus_impl_set_use_global_engine },
-     { "general", "embed_preedit_text",          bus_ibus_impl_set_embed_preedit_text },
+@@ -587,6 +693,7 @@ const static struct {
+     { "general/hotkey", "next_engine_in_menu",   bus_ibus_impl_set_next_engine_in_menu },
+     { "general/hotkey", "previous_engine",       bus_ibus_impl_set_previous_engine },
+     { "general", "preload_engines",              bus_ibus_impl_set_preload_engines },
++    { "general", "preload_engines_mode",         bus_ibus_impl_set_preload_engine_mode },
+     { "general", "use_system_keyboard_layout",   bus_ibus_impl_set_use_sys_layout },
+     { "general", "use_global_engine",            bus_ibus_impl_set_use_global_engine },
+     { "general", "embed_preedit_text",           bus_ibus_impl_set_embed_preedit_text },
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 54709ce..2ed0321 100644
+index 7ca4899..39922a0 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
 @@ -13,6 +13,19 @@
@@ -360,7 +393,7 @@ index 54709ce..2ed0321 100644
        <applyto>/desktop/ibus/general/hotkey/trigger</applyto>
        <owner>ibus</owner>
 diff --git a/ibus/common.py b/ibus/common.py
-index 763ed1c..1264787 100644
+index e105f18..20c0710 100644
 --- a/ibus/common.py
 +++ b/ibus/common.py
 @@ -33,6 +33,8 @@ __all__ = (
@@ -372,7 +405,7 @@ index 763ed1c..1264787 100644
          "default_reply_handler",
          "default_error_handler",
          "DEFAULT_ASYNC_HANDLERS",
-@@ -133,6 +135,10 @@ ORIENTATION_HORIZONTAL  = 0
+@@ -132,6 +134,10 @@ ORIENTATION_HORIZONTAL  = 0
  ORIENTATION_VERTICAL    = 1
  ORIENTATION_SYSTEM      = 2
  
@@ -384,10 +417,10 @@ index 763ed1c..1264787 100644
      pass
  
 diff --git a/setup/main.py b/setup/main.py
-index 8bac900..c855b86 100644
+index 7f4a040..9cdce02 100644
 --- a/setup/main.py
 +++ b/setup/main.py
-@@ -191,15 +191,22 @@ class Setup(object):
+@@ -213,15 +213,22 @@ class Setup(object):
          self.__checkbutton_use_global_engine.connect("toggled", self.__checkbutton_use_global_engine_toggled_cb)
  
          # init engine page
@@ -415,7 +448,7 @@ index 8bac900..c855b86 100644
  
          self.__treeview = self.__builder.get_object("treeview_engines")
          self.__treeview.set_engines(engines)
-@@ -243,6 +250,13 @@ class Setup(object):
+@@ -265,6 +272,13 @@ class Setup(object):
              engine_names = map(lambda e: e.name, engines)
              self.__config.set_list("general", "preload_engines", engine_names, "s")
  
@@ -429,7 +462,7 @@ index 8bac900..c855b86 100644
      def __button_engine_add_cb(self, button):
          engine = self.__combobox.get_active_engine()
          self.__treeview.append_engine(engine)
-@@ -254,6 +268,19 @@ class Setup(object):
+@@ -276,6 +290,19 @@ class Setup(object):
              about.run()
              about.destroy()
  
@@ -450,10 +483,10 @@ index 8bac900..c855b86 100644
          try:
              self.__bus = ibus.Bus()
 diff --git a/setup/setup.ui b/setup/setup.ui
-index de58446..71f723d 100644
+index cddae98..edfb3a8 100644
 --- a/setup/setup.ui
 +++ b/setup/setup.ui
-@@ -486,7 +486,22 @@
+@@ -582,7 +582,22 @@
                      <property name="visible">True</property>
                      <property name="orientation">vertical</property>
                      <child>
@@ -477,7 +510,7 @@ index de58446..71f723d 100644
                          <property name="visible">True</property>
                          <child>
                            <object class="GtkAlignment" id="alignment6">
-@@ -637,7 +652,7 @@
+@@ -733,7 +748,7 @@
                          </child>
                        </object>
                        <packing>
@@ -486,7 +519,7 @@ index de58446..71f723d 100644
                        </packing>
                      </child>
                      <child>
-@@ -676,7 +691,7 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
+@@ -772,7 +787,7 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
                        </object>
                        <packing>
                          <property name="expand">False</property>
@@ -517,5 +550,5 @@ index 035d124..0a9d7b2 100644
   * @x: x coordinate.
   * @y: y coordinate.
 -- 
-1.7.3.2
+1.7.4.1
 

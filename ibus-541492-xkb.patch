@@ -1,6 +1,6 @@
-From 245b932b2a72bd23ab8f40ec624184da7ad53b8d Mon Sep 17 00:00:00 2001
+From ab4b0cc4dca45cc950a72ec65664649b415d40f0 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Fri, 4 Feb 2011 19:48:10 +0900
+Date: Thu, 10 Mar 2011 14:26:49 +0900
 Subject: [PATCH] Add XKB layouts
 
 ---
@@ -27,11 +27,11 @@ Subject: [PATCH] Add XKB layouts
  xkb/ibus-xkb-main.c        |  105 +++++++
  xkb/xkblayout.xml.in       |   16 +
  xkb/xkblayoutconfig.xml.in |    6 +
- xkb/xkblib.c               |  297 +++++++++++++++++++
+ xkb/xkblib.c               |  303 +++++++++++++++++++
  xkb/xkblib.h               |   40 +++
  xkb/xkbxml.c               |  696 ++++++++++++++++++++++++++++++++++++++++++++
  xkb/xkbxml.h               |  189 ++++++++++++
- 27 files changed, 3793 insertions(+), 6 deletions(-)
+ 27 files changed, 3799 insertions(+), 6 deletions(-)
  create mode 100644 ibus/xkblayout.py.in
  create mode 100644 ibus/xkbxml.py.in
  create mode 100644 setup/xkbsetup.py
@@ -72,7 +72,7 @@ index 02b7163..6cbe82a 100644
  	$(NULL)
  
 diff --git a/configure.ac b/configure.ac
-index 0c06fbc..8667510 100644
+index def1986..1347991 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -185,6 +185,57 @@ else
@@ -133,7 +133,7 @@ index 0c06fbc..8667510 100644
  # GObject introspection
  GOBJECT_INTROSPECTION_CHECK([0.6.8])
  
-@@ -427,6 +478,7 @@ gconf/Makefile
+@@ -413,6 +464,7 @@ gconf/Makefile
  gconf/gconf.xml.in
  bindings/Makefile
  bindings/vala/Makefile
@@ -141,7 +141,7 @@ index 0c06fbc..8667510 100644
  ])
  
  AC_OUTPUT
-@@ -442,6 +494,7 @@ Build options:
+@@ -428,6 +480,7 @@ Build options:
    Build gtk2 immodule       $enable_gtk2
    Build gtk3 immodule       $enable_gtk3
    Build XIM agent server    $enable_xim
@@ -150,10 +150,10 @@ index 0c06fbc..8667510 100644
    Build gconf modules       $enable_gconf
    Build memconf modules     $enable_memconf
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index aa66aa5..54709ce 100644
+index b75295e..7ca4899 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
-@@ -167,6 +167,42 @@
+@@ -190,6 +190,42 @@
        </locale>
      </schema>
      <schema>
@@ -251,10 +251,10 @@ index 7c8f8be..3c25605 100644
 +from xkbxml import *
  from _config import *
 diff --git a/ibus/bus.py b/ibus/bus.py
-index 15a8fd3..74b6820 100644
+index b915190..c01468c 100644
 --- a/ibus/bus.py
 +++ b/ibus/bus.py
-@@ -154,6 +154,9 @@ class Bus(object.Object):
+@@ -157,6 +157,9 @@ class Bus(object.Object):
              data = serializable.deserialize_object(data)
          return data
  
@@ -265,10 +265,10 @@ index 15a8fd3..74b6820 100644
          return self.__ibus.Introspect()
  
 diff --git a/ibus/interface/iibus.py b/ibus/interface/iibus.py
-index e63caa3..8b7b6f7 100644
+index 678d517..7de56fc 100644
 --- a/ibus/interface/iibus.py
 +++ b/ibus/interface/iibus.py
-@@ -72,6 +72,9 @@ class IIBus(dbus.service.Object):
+@@ -75,6 +75,9 @@ class IIBus(dbus.service.Object):
      @method(in_signature="v", out_signature="v")
      def Ping(self, data, dbusconn): pass
  
@@ -971,7 +971,7 @@ index 2fd8876..7383177 100644
 +        self.__title = title
  
 diff --git a/setup/main.py b/setup/main.py
-index 96e9456..8bac900 100644
+index a22bb0c..7f4a040 100644
 --- a/setup/main.py
 +++ b/setup/main.py
 @@ -37,6 +37,7 @@ from gtk import gdk
@@ -982,7 +982,7 @@ index 96e9456..8bac900 100644
  from i18n import DOMAINNAME, _, N_, init as i18n_init
  
  (
-@@ -219,6 +220,8 @@ class Setup(object):
+@@ -241,6 +242,8 @@ class Setup(object):
          self.__combobox.connect("notify::active-engine", self.__combobox_notify_active_engine_cb)
          self.__treeview.connect("notify", self.__treeview_notify_cb)
  
@@ -992,10 +992,10 @@ index 96e9456..8bac900 100644
          engine = self.__combobox.get_active_engine()
          button = self.__builder.get_object("button_engine_add")
 diff --git a/setup/setup.ui b/setup/setup.ui
-index 0e31a78..de58446 100644
+index 0a69df8..cddae98 100644
 --- a/setup/setup.ui
 +++ b/setup/setup.ui
-@@ -129,7 +129,6 @@
+@@ -117,7 +117,6 @@
                                  <child>
                                    <object class="GtkLabel" id="label9">
                                      <property name="visible">True</property>
@@ -1003,7 +1003,7 @@ index 0e31a78..de58446 100644
                                      <property name="tooltip_text" translatable="yes">The shortcut keys for switching to previous input method in the list</property>
                                      <property name="xalign">0</property>
                                      <property name="label" translatable="yes">Previous input method:</property>
-@@ -216,7 +215,6 @@
+@@ -204,7 +203,6 @@
                                      <child>
                                        <object class="GtkEntry" id="entry_prev_engine">
                                          <property name="visible">True</property>
@@ -1011,7 +1011,7 @@ index 0e31a78..de58446 100644
                                          <property name="can_focus">True</property>
                                          <property name="editable">False</property>
                                        </object>
-@@ -228,7 +226,6 @@
+@@ -216,7 +214,6 @@
                                        <object class="GtkButton" id="button_prev_engine">
                                          <property name="label" translatable="yes">...</property>
                                          <property name="visible">True</property>
@@ -1019,7 +1019,7 @@ index 0e31a78..de58446 100644
                                          <property name="can_focus">True</property>
                                          <property name="receives_default">False</property>
                                          <property name="use_underline">True</property>
-@@ -729,6 +726,7 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
+@@ -825,6 +822,7 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
                                      <property name="visible">True</property>
                                      <property name="orientation">vertical</property>
                                      <property name="spacing">6</property>
@@ -1027,7 +1027,7 @@ index 0e31a78..de58446 100644
                                      <child>
                                        <object class="GtkCheckButton" id="checkbutton_use_sys_layout">
                                          <property name="label" translatable="yes">Use system keyboard layout</property>
-@@ -797,6 +795,57 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
+@@ -840,6 +838,57 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
                                          <property name="position">0</property>
                                        </packing>
                                      </child>
@@ -1036,7 +1036,7 @@ index 0e31a78..de58446 100644
 +                                        <property name="visible">True</property>
 +                                        <property name="spacing">6</property>
 +                                        <child>
-+                                          <object class="GtkLabel" id="label18">
++                                          <object class="GtkLabel" id="label20">
 +                                            <property name="visible">True</property>
 +                                            <property name="label" translatable="yes">System Keyboard Layout:</property>
 +                                            <property name="use_markup">True</property>
@@ -1085,7 +1085,7 @@ index 0e31a78..de58446 100644
                                    </object>
                                  </child>
                                </object>
-@@ -942,4 +991,558 @@ Homepage: http://code.google.com/p/ibus
+@@ -1038,4 +1087,558 @@ Homepage: http://code.google.com/p/ibus
        </object>
      </child>
    </object>
@@ -2984,10 +2984,10 @@ index 0000000..b1212d1
 +</xkblayout>
 diff --git a/xkb/xkblib.c b/xkb/xkblib.c
 new file mode 100644
-index 0000000..1f6f8d7
+index 0000000..640f783
 --- /dev/null
 +++ b/xkb/xkblib.c
-@@ -0,0 +1,297 @@
+@@ -0,0 +1,303 @@
 +/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
 +/* vim:set et sts=4: */
 +/* bus - The Input Bus
@@ -3053,12 +3053,6 @@ index 0000000..1f6f8d7
 +    unsigned long l, nitems, bytes_after;
 +    unsigned char *prop = NULL;
 +
-+    if (XkbGetState (xdisplay, XkbUseCoreKbd, &state) != Success) {
-+        g_warning ("Could not get state");
-+        return;
-+    }
-+    default_layout_group = state.group;
-+
 +    xkb_rules_name = XInternAtom (xdisplay, "_XKB_RULES_NAMES", TRUE);
 +    if (xkb_rules_name == None) {
 +        g_warning ("Could not get XKB rules atom");
@@ -3088,6 +3082,12 @@ index 0000000..1f6f8d7
 +    default_models = g_strsplit ((gchar *) prop, ",", -1);
 +    prop += strlen ((const char *) prop) + 1;
 +    default_options = g_strsplit ((gchar *) prop, ",", -1);
++
++    if (XkbGetState (xdisplay, XkbUseCoreKbd, &state) != Success) {
++        g_warning ("Could not get state");
++        return;
++    }
++    default_layout_group = state.group;
 +}
 +
 +static Bool
@@ -3232,7 +3232,10 @@ index 0000000..1f6f8d7
 +gchar *
 +ibus_xkb_get_current_layout (void)
 +{
-+    g_assert (default_layouts != NULL);
++    if (default_layouts == NULL) {
++        g_warning ("Your system seems not to support XKB.");
++        return NULL;
++    }
 +
 +    return g_strjoinv (",", (gchar **) default_layouts);
 +}
@@ -3266,7 +3269,10 @@ index 0000000..1f6f8d7
 +    gboolean retval;
 +    gchar *layouts_line;
 +
-+    g_assert (default_layouts != NULL);
++    if (default_layouts == NULL) {
++        g_warning ("Your system seems not to support XKB.");
++        return NULL;
++    }
 +
 +    if (layouts == NULL || g_strcmp0 (layouts, "default") == 0) {
 +        layouts_line = g_strjoinv (",", (gchar **) default_layouts);
@@ -4229,5 +4235,5 @@ index 0000000..f4858fa
 +G_END_DECLS
 +#endif
 -- 
-1.7.3.2
+1.7.4.1
 
