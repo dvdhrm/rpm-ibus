@@ -13,7 +13,7 @@
 
 Name:       ibus
 Version:    1.3.99.20110228
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -23,7 +23,7 @@ Source1:    xinput-ibus
 %if %have_gjsfile
 Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/gnome-shell-ibus-plugins-20110304.tar.bz2
 %endif
-# Patch0:     ibus-HEAD.patch
+Patch0:     ibus-HEAD.patch
 Patch1:     ibus-435880-surrounding-text.patch
 Patch2:     ibus-541492-xkb.patch
 Patch3:     ibus-530711-preload-sys.patch
@@ -143,7 +143,7 @@ The ibus-devel-docs package contains developer documentation for ibus
 %if %have_gjsfile
 bzcat %SOURCE2 | tar xf -
 %endif
-# %patch0 -p1
+%patch0 -p1
 %patch99 -p1 -b .g-s-typo
 # start surrounding patch
 %patch1 -p1 -b .surrounding
@@ -327,6 +327,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Mar 11 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110228-2
+- Revised ibus-530711-preload-sys.patch
+
 * Thu Mar 10 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110228-1
 - Updated to 1.3.99.20110228
 - Integrated the part of gjs in Bug 657165 ibus for gnome-shell.
