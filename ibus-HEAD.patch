@@ -94,3 +94,292 @@ index a2967cc..16104de 100644
 -- 
 1.7.4.1
 
+From b9b2c42596e1a7394e89c11025074aed2fcb099a Mon Sep 17 00:00:00 2001
+From: Peng Huang <shawn.p.huang@gmail.com>
+Date: Wed, 16 Mar 2011 10:02:47 -0400
+Subject: [PATCH] Fix issue of InputContext.SetEngine.
+
+InputContext.SetEngine returns error sometimes, because "request-engine"
+signal handler calls an async function to set the engine of the context.
+So checking context->engine != NULL just after emiting "request-engine"
+signal is not correct.
+
+BUG=none
+TEST=Linux desktop
+
+Review URL: http://codereview.appspot.com/4287049
+---
+ bus/ibusimpl.c      |   68 ++++++++++++++++++++++++-----------
+ bus/inputcontext.c  |   97 +++++++++++++++++++++++++++++++++++++++++++--------
+ bus/marshalers.list |   14 ++++----
+ 3 files changed, 136 insertions(+), 43 deletions(-)
+
+diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
+index 8d4ec36..5a8e134 100644
+--- a/bus/ibusimpl.c
++++ b/bus/ibusimpl.c
+@@ -186,6 +186,9 @@ static BusInputContext
+                                                 (BusIBusImpl        *ibus,
+                                                  BusConnection      *connection,
+                                                  const gchar        *client);
++static IBusEngineDesc
++               *bus_ibus_impl_get_engine_desc   (BusIBusImpl        *ibus,
++                                                 const gchar        *engine_name);
+ /* some callback functions */
+ static void     _context_engine_changed_cb      (BusInputContext    *context,
+                                                  BusIBusImpl        *ibus);
+@@ -975,21 +978,30 @@ _find_engine_desc_by_name (BusIBusImpl *ibus,
+  *
+  * A callback function to be called when the "request-engine" signal is sent to the context.
+  */
+-static void
++static IBusEngineDesc *
+ _context_request_engine_cb (BusInputContext *context,
+                             const gchar     *engine_name,
+                             BusIBusImpl     *ibus)
+ {
+-    IBusEngineDesc *desc = NULL;
++    return bus_ibus_impl_get_engine_desc (ibus, engine_name);
++}
+ 
+-    /* context should has focus before request an engine */
+-    g_return_if_fail (bus_input_context_has_focus (context) ||
+-                      context == ibus->focused_context);
++/**
++ * bus_ibus_impl_get_engine_desc:
++ *
++ * Get the IBusEngineDesc by engine_name. If the engine_name is NULL, return
++ * a default engine desc.
++ */
++static IBusEngineDesc *
++bus_ibus_impl_get_engine_desc (BusIBusImpl *ibus,
++                               const gchar *engine_name)
++{
++    IBusEngineDesc *desc = NULL;
+ 
+     if (engine_name != NULL && engine_name[0] != '\0') {
+         /* request engine by name */
+         desc = _find_engine_desc_by_name (ibus, engine_name);
+-        g_return_if_fail (desc != NULL);
++        g_return_val_if_fail (desc != NULL, NULL);
+     }
+     else {
+         /* Use global engine if possible. */
+@@ -1018,11 +1030,11 @@ _context_request_engine_cb (BusInputContext *context,
+              * not find any default engines. another possiblity is that the
+              * user hasn't installed an engine yet? just give up. */
+             g_warning ("No engine is available. Run ibus-setup first.");
+-            return;
++            return NULL;
+         }
+     }
+ 
+-    bus_ibus_impl_set_context_engine_from_desc (ibus, context, desc);
++    return desc;
+ }
+ 
+ /**
+@@ -1041,7 +1053,11 @@ bus_ibus_impl_context_request_next_engine_in_menu (BusIBusImpl     *ibus,
+ 
+     engine = bus_input_context_get_engine (context);
+     if (engine == NULL) {
+-        _context_request_engine_cb (context, NULL, ibus);
++        desc = bus_ibus_impl_get_engine_desc (ibus, NULL);
++        if (desc != NULL)
++            bus_ibus_impl_set_context_engine_from_desc (ibus,
++                                                        context,
++                                                        desc);
+         return;
+     }
+ 
+@@ -1112,7 +1128,14 @@ bus_ibus_impl_context_request_previous_engine (BusIBusImpl     *ibus,
+         bus_ibus_impl_context_request_next_engine_in_menu (ibus, context);
+         return;
+     }
+-    _context_request_engine_cb (context, engine_name, ibus);
++
++    IBusEngineDesc *desc = NULL;
++    desc = bus_ibus_impl_get_engine_desc (ibus, engine_name);
++    if (desc != NULL) {
++        bus_ibus_impl_set_context_engine_from_desc (ibus,
++                                                    context,
++                                                    desc);
++    }
+ }
+ 
+ static void
+diff --git a/bus/inputcontext.c b/bus/inputcontext.c
+index c226a20..6d65830 100644
+--- a/bus/inputcontext.c
++++ b/bus/inputcontext.c
+@@ -20,11 +20,13 @@
+  * Boston, MA 02111-1307, USA.
+  */
+ #include "inputcontext.h"
+-#include "types.h"
+-#include "marshalers.h"
+-#include "ibusimpl.h"
++
+ #include "engineproxy.h"
+ #include "factoryproxy.h"
++#include "ibusimpl.h"
++#include "marshalers.h"
++#include "option.h"
++#include "types.h"
+ 
+ struct _SetEngineByDescData {
+     /* context related to the data */
+@@ -565,8 +567,8 @@ bus_input_context_class_init (BusInputContextClass *class)
+             G_SIGNAL_RUN_LAST,
+             0,
+             NULL, NULL,
+-            bus_marshal_VOID__STRING,
+-            G_TYPE_NONE,
++            bus_marshal_OBJECT__STRING,
++            IBUS_TYPE_ENGINE_DESC,
+             1,
+             G_TYPE_STRING);
+ 
+@@ -917,6 +919,26 @@ _ic_is_enabled (BusInputContext       *context,
+     g_dbus_method_invocation_return_value (invocation, g_variant_new ("(b)", context->enabled));
+ }
+ 
++static void
++_ic_set_engine_done (BusInputContext       *context,
++                     GAsyncResult          *res,
++                     GDBusMethodInvocation *invocation)
++{
++    gboolean retval = FALSE;
++    GError *error = NULL;
++
++    retval = bus_input_context_set_engine_by_desc_finish (context,
++                    res, &error);
++
++    if (!retval) {
++        g_dbus_method_invocation_return_gerror (invocation, error);
++        g_error_free (error);
++    }
++    else {
++        g_dbus_method_invocation_return_value (invocation, NULL);
++    }
++}
++
+ /**
+  * _ic_set_engine:
+  *
+@@ -930,16 +952,34 @@ _ic_set_engine (BusInputContext       *context,
+     gchar *engine_name = NULL;
+     g_variant_get (parameters, "(&s)", &engine_name);
+ 
+-    g_signal_emit (context, context_signals[REQUEST_ENGINE], 0, engine_name);
+-
+-    if (context->engine == NULL) {
+-        g_dbus_method_invocation_return_error (invocation, G_DBUS_ERROR, G_DBUS_ERROR_FAILED,
+-                        "Can not find engine '%s'.", engine_name);
++    if (!bus_input_context_has_focus (context)) {
++        g_dbus_method_invocation_return_error (invocation,
++                G_DBUS_ERROR, G_DBUS_ERROR_FAILED,
++                "Context which does not has focus can not change engine to %s.",
++                engine_name);
++        return;
+     }
+-    else {
+-        bus_input_context_enable (context);
+-        g_dbus_method_invocation_return_value (invocation, NULL);
++
++    IBusEngineDesc *desc = NULL;
++    g_signal_emit (context,
++                   context_signals[REQUEST_ENGINE], 0,
++                   engine_name,
++                   &desc);
++    if (desc == NULL) {
++        g_dbus_method_invocation_return_error (invocation,
++                        G_DBUS_ERROR, G_DBUS_ERROR_FAILED,
++                        "Can not find engine %s.", engine_name);
++        return;
+     }
++
++    bus_input_context_set_engine_by_desc (context,
++                            desc,
++                            g_gdbus_timeout,
++                            NULL,
++                            (GAsyncReadyCallback)_ic_set_engine_done,
++                            invocation);
++
++    g_object_unref (desc);
+ }
+ 
+ /**
+@@ -1045,7 +1085,21 @@ bus_input_context_focus_in (BusInputContext *context)
+ 
+     if (context->engine == NULL && context->enabled) {
+         /* request an engine, e.g. a global engine if the feature is enabled. */
+-        g_signal_emit (context, context_signals[REQUEST_ENGINE], 0, NULL);
++        IBusEngineDesc *desc = NULL;
++        g_signal_emit (context,
++                       context_signals[REQUEST_ENGINE], 0,
++                       NULL,
++                       &desc);
++
++        if (desc != NULL) {
++            bus_input_context_set_engine_by_desc (context,
++                            desc,
++                            g_gdbus_timeout, /* timeout in msec. */
++                            NULL, /* we do not cancel the call. */
++                            NULL, /* use the default callback function. */
++                            NULL);
++            g_object_unref (desc);
++        }
+     }
+ 
+     if (context->engine && context->enabled) {
+@@ -1927,7 +1981,20 @@ bus_input_context_enable (BusInputContext *context)
+     }
+ 
+     if (context->engine == NULL) {
+-        g_signal_emit (context, context_signals[REQUEST_ENGINE], 0, NULL);
++        IBusEngineDesc *desc = NULL;
++        g_signal_emit (context,
++                       context_signals[REQUEST_ENGINE], 0,
++                       NULL,
++                       &desc);
++        if (desc != NULL) {
++            bus_input_context_set_engine_by_desc (context,
++                            desc,
++                            g_gdbus_timeout, /* timeout in msec. */
++                            NULL, /* we do not cancel the call. */
++                            NULL, /* use the default callback function. */
++                            NULL);
++            g_object_unref (desc);
++        }
+     }
+ 
+     if (context->engine == NULL)
+diff --git a/bus/marshalers.list b/bus/marshalers.list
+index 15bdf02..159bc24 100644
+--- a/bus/marshalers.list
++++ b/bus/marshalers.list
+@@ -1,13 +1,13 @@
+-VOID:VOID
+-VOID:STRING
+-VOID:OBJECT
++BOOL:UINT,UINT,UINT
++OBJECT:STRING
+ VOID:INT,UINT
+-VOID:UINT,UINT,UINT
+ VOID:INT,INT,INT,INT
+-VOID:STRING,INT
+ VOID:OBJECT
+-VOID:STRING,STRING,STRING
+ VOID:OBJECT,BOOLEAN
+ VOID:OBJECT,UINT,BOOLEAN
+ VOID:OBJECT,UINT,BOOLEAN,UINT
+-BOOL:UINT,UINT,UINT
++VOID:STRING
++VOID:STRING,INT
++VOID:STRING,STRING,STRING
++VOID:UINT,UINT,UINT
++VOID:VOID
+-- 
+1.7.4.1
+

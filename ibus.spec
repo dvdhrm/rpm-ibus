@@ -13,7 +13,7 @@
 
 Name:       ibus
 Version:    1.3.99.20110228
-Release:    2%{?dist}
+Release:    3%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -21,7 +21,7 @@ URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
 %if %have_gjsfile
-Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/gnome-shell-ibus-plugins-20110304.tar.bz2
+Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/gnome-shell-ibus-plugins-20110317.tar.bz2
 %endif
 Patch0:     ibus-HEAD.patch
 Patch1:     ibus-435880-surrounding-text.patch
@@ -327,8 +327,10 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Fri Mar 11 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110228-2
-- Revised ibus-530711-preload-sys.patch
+* Thu Mar 17 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110228-3
+- Updated ibus-HEAD.patch
+  Fixed Bug 683484 - Timed out SetEngine when select an engine from panel.
+- Updated ibus-657165-panel-libs.patch
 
 * Thu Mar 10 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110228-1
 - Updated to 1.3.99.20110228

@@ -35,7 +35,7 @@ Subject: [PATCH] Implement APIs for another non-Python panel.
  src/ibustext.c            |   18 ++
  src/ibustext.h            |   29 +++-
  src/ibustypes.h           |   33 +++
- src/ibusutil.c            |  169 ++++++++++++++++
+ src/ibusutil.c            |  180 ++++++++++++++++
  src/ibusutil.h            |   39 ++++
  ui/gtk/gtkpanel.xml.in.in |    2 +-
  ui/gtk/main.py            |   23 ++-
@@ -704,18 +704,14 @@ diff --git a/bus/marshalers.list b/bus/marshalers.list
 index 15bdf02..514d6ea 100644
 --- a/bus/marshalers.list
 +++ b/bus/marshalers.list
-@@ -5,9 +5,10 @@ VOID:INT,UINT
- VOID:UINT,UINT,UINT
+@@ -4,6 +4,7 @@ VOID:INT,UINT
  VOID:INT,INT,INT,INT
- VOID:STRING,INT
--VOID:OBJECT
- VOID:STRING,STRING,STRING
-+VOID:OBJECT
+ VOID:OBJECT
  VOID:OBJECT,BOOLEAN
 +VOID:OBJECT,STRING
  VOID:OBJECT,UINT,BOOLEAN
  VOID:OBJECT,UINT,BOOLEAN,UINT
- BOOL:UINT,UINT,UINT
+ VOID:STRING
 diff --git a/ibus/common.py b/ibus/common.py
 index cbc8d56..614d782 100644
 --- a/ibus/common.py
@@ -1146,7 +1142,7 @@ new file mode 100644
 index 0000000..59291f9
 --- /dev/null
 +++ b/src/ibusutil.c
-@@ -0,0 +1,169 @@
+@@ -0,0 +1,180 @@
 +/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
 +/* vim:set et sts=4: */
 +/* bus - The Input Bus
@@ -1176,6 +1172,7 @@ index 0000000..59291f9
 +#include <glib.h>
 +#include <glib/gstdio.h>
 +#include <gio/gio.h>
++#include <string.h>
 +#include "ibusxml.h"
 +
 +#ifdef ENABLE_NLS
@@ -1267,11 +1264,21 @@ index 0000000..59291f9
 +const gchar *
 +ibus_get_language_name(const gchar *_locale) {
 +    const gchar *retval;
++    gchar *p = NULL;
++    gchar *lang = NULL;
 +
 +    if (__languages_dict == NULL ) {
 +        _load_lang();
 +    }
-+    retval = (const gchar *) g_hash_table_lookup (__languages_dict, _locale);
++    if ((p = strchr (_locale, '_')) !=  NULL) {
++        p = g_strndup (_locale, p - _locale);
++    } else {
++        p = g_strdup (_locale);
++    }
++    lang = g_ascii_strdown (p, -1);
++    g_free (p);
++    retval = (const gchar *) g_hash_table_lookup (__languages_dict, lang);
++    g_free (lang);
 +    if (retval != NULL) {
 +#ifdef ENABLE_NLS
 +        return dgettext("iso_639", retval);
