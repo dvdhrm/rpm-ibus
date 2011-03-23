@@ -13,7 +13,7 @@
 
 Name:       ibus
 Version:    1.3.99.20110228
-Release:    3%{?dist}
+Release:    4%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -30,6 +30,8 @@ Patch3:     ibus-530711-preload-sys.patch
 Patch4:     ibus-657165-panel-libs.patch
 # This will be removed after the new gnome-shell is integrated.
 Patch99:    ibus-675503-gnome-shell-workaround.patch
+# This will be removed after the gnome-shell ibus patch is integrated.
+Patch100:   ibus-688034-fedora-g-s.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -154,6 +156,8 @@ cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
 %endif
 %patch3 -p1 -b .preload-sys
 %patch4 -p1 -b .panel-libs
+# workaround until the ibus feature is integrated into gnome-shell.
+%patch100 -p1 -b .fedora-g-s
 
 %build
 %if %have_libxkbfile
@@ -327,10 +331,11 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Thu Mar 17 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110228-3
+* Wed Mar 23 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110228-4
 - Updated ibus-HEAD.patch
   Fixed Bug 683484 - Timed out SetEngine when select an engine from panel.
 - Updated ibus-657165-panel-libs.patch
+- Added ibus-688034-fedora-g-s.patch for Fedora workaround.
 
 * Thu Mar 10 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110228-1
 - Updated to 1.3.99.20110228

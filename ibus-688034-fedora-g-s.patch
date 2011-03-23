@@ -1,0 +1,14 @@
+--- ibus/ui/gtk/main.py.bak	2011-03-23 13:15:53.150298531 +0900
++++ ibus/ui/gtk/main.py	2011-03-23 13:16:35.336275938 +0900
+@@ -114,8 +114,9 @@ def main():
+             print_help(sys.stderr, 1)
+ 
+     if stop_by_shell and ibus.is_running_gnome_shell():
+-        print "Exit because GNOME-Shell is running"
+-        sys.exit()
++        if os.path.exists('/usr/share/gnome-shell/js/ui/status/ibus'):
++            print "Exit because GNOME-Shell is running"
++            sys.exit()
+ 
+     if daemonize:
+         if os.fork():
