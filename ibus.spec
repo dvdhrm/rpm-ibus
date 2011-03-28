@@ -13,7 +13,7 @@
 
 Name:       ibus
 Version:    1.3.99.20110228
-Release:    5%{?dist}
+Release:    6%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -23,7 +23,6 @@ Source1:    xinput-ibus
 %if %have_gjsfile
 Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/gnome-shell-ibus-plugins-20110317.tar.bz2
 %endif
-Source3:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/ibus-icons-20110325.tar.bz2
 Patch0:     ibus-HEAD.patch
 Patch1:     ibus-435880-surrounding-text.patch
 Patch2:     ibus-541492-xkb.patch
@@ -71,6 +70,7 @@ Requires:   GConf2
 Requires:   notify-python
 Requires:   librsvg2
 Requires:   gnome-icon-theme-legacy >= %{gnome_icon_theme_legacy_version}
+Requires:   gnome-icon-theme-symbolic
 
 Requires(post):  desktop-file-utils
 Requires(postun):  desktop-file-utils
@@ -146,7 +146,6 @@ The ibus-devel-docs package contains developer documentation for ibus
 %if %have_gjsfile
 bzcat %SOURCE2 | tar xf -
 %endif
-bzcat %SOURCE3 | tar xf -
 %patch0 -p1
 %patch99 -p1 -b .g-s-typo
 # start surrounding patch
@@ -333,13 +332,12 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Fri Mar 25 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110228-5
+* Mon Mar 28 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110228-6
 - Updated ibus-HEAD.patch
   Fixed Bug 683484 - Timed out SetEngine when select an engine from panel.
   Fixed Bug 657165 - IBus for gnome-shell for Fedora 15.
 - Updated ibus-657165-panel-libs.patch
 - Added ibus-688034-fedora-g-s.patch for Fedora workaround.
-- Added ibus-icons-20110325.tar.bz2 for GNOME 3 theme
 
 * Thu Mar 10 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110228-1
 - Updated to 1.3.99.20110228
