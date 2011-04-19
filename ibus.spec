@@ -12,8 +12,8 @@
 %define gnome_icon_theme_legacy_version 2.91.6
 
 Name:       ibus
-Version:    1.3.99.20110228
-Release:    7%{?dist}
+Version:    1.3.99.20110408
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -23,16 +23,12 @@ Source1:    xinput-ibus
 %if %have_gjsfile
 Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/gnome-shell-ibus-plugins-20110317.tar.bz2
 %endif
-Source3:    http://fujiwara.fedorapeople.org/ibus/20110404/ibus-po-20110404.tar.bz2
-Patch0:     ibus-HEAD.patch
+Source3:    https://www.transifex.net/projects/p/ibus/resource/master/l/da/download/ibus_master_da.po
+# Patch0:     ibus-HEAD.patch
 Patch1:     ibus-435880-surrounding-text.patch
 Patch2:     ibus-541492-xkb.patch
 Patch3:     ibus-530711-preload-sys.patch
-Patch4:     ibus-657165-panel-libs.patch
-# This will be removed after the new gnome-shell is integrated.
-Patch99:    ibus-675503-gnome-shell-workaround.patch
-# This will be removed after the gnome-shell ibus patch is integrated.
-Patch100:   ibus-688034-fedora-g-s.patch
+Patch4:     ibus-xx-setup-frequent-lang.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -116,6 +112,7 @@ Summary:    IBus im module for gtk3
 Group:      System Environment/Libraries
 Requires:   %{name} = %{version}-%{release}
 Requires:   %{name}-libs = %{version}-%{release}
+Requires:   imsettings-gnome
 Requires(post): glib2 >= %{glib_ver}
 
 %description gtk3
@@ -147,9 +144,8 @@ The ibus-devel-docs package contains developer documentation for ibus
 %if %have_gjsfile
 bzcat %SOURCE2 | tar xf -
 %endif
-bzcat %SOURCE3 | tar xf -
-%patch0 -p1
-%patch99 -p1 -b .g-s-typo
+cp %SOURCE3 po/da.po
+# %patch0 -p1
 # start surrounding patch
 %patch1 -p1 -b .surrounding
 cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
@@ -158,9 +154,7 @@ cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
 %patch2 -p1 -b .xkb
 %endif
 %patch3 -p1 -b .preload-sys
-%patch4 -p1 -b .panel-libs
-# workaround until the ibus feature is integrated into gnome-shell.
-%patch100 -p1 -b .fedora-g-s
+%patch4 -p1 -b .setup-frequent-lang
 
 %build
 %if %have_libxkbfile
@@ -334,13 +328,17 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Tue Apr 05 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110228-7
-- Updated ibus-HEAD.patch
+* Tue Apr 19 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110408-1
+- Updated to 1.3.99.20110408
   Fixed Bug 683484 - Timed out SetEngine when select an engine from panel.
   Fixed Bug 657165 - IBus for gnome-shell for Fedora 15.
-- Updated ibus-657165-panel-libs.patch
-- Added ibus-688034-fedora-g-s.patch for Fedora workaround.
-- Added ibus-po-20110404.tar.bz2 for po files.
+- Upstreamed ibus-657165-panel-libs.patch
+- Removed ibus-675503-gnome-shell-workaround.patch
+- Added ibus-xx-setup-frequent-lang.patch
+- Updated ibus-541492-xkb.patch
+  Fixed Bug 696481 - no the variant maps without language codes
+- Added dependency of imsettings-gnome.
+  Fixed Bug 696510 - need a dependency in ibus-gtk3 for imsettings-gnome
 
 * Thu Mar 10 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110228-1
 - Updated to 1.3.99.20110228

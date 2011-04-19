@@ -30,7 +30,7 @@ diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
 index 8d4ec36..0caa8c7 100644
 --- a/bus/ibusimpl.c
 +++ b/bus/ibusimpl.c
-@@ -144,6 +144,9 @@ static void     bus_ibus_impl_set_previous_engine
+@@ -144,6 +144,9 @@ static void     bus_ibus_impl_set_previo
  static void     bus_ibus_impl_set_preload_engines
                                                  (BusIBusImpl        *ibus,
                                                   GVariant           *value);
@@ -40,7 +40,7 @@ index 8d4ec36..0caa8c7 100644
  static void     bus_ibus_impl_set_use_sys_layout
                                                  (BusIBusImpl        *ibus,
                                                   GVariant           *value);
-@@ -278,6 +281,141 @@ _panel_destroy_cb (BusPanelProxy *panel,
+@@ -284,6 +287,142 @@ _panel_destroy_cb (BusPanelProxy *panel,
      g_object_unref (panel);
  }
  
@@ -127,6 +127,7 @@ index 8d4ec36..0caa8c7 100644
 +        }
 +    }
 +
++    bus_ibus_impl_check_global_engine (ibus);
 +    bus_ibus_impl_update_engines_hotkey_profile (ibus);
 +}
 +
@@ -182,7 +183,7 @@ index 8d4ec36..0caa8c7 100644
  static void
  bus_ibus_impl_set_hotkey (BusIBusImpl *ibus,
                            GQuark       hotkey,
-@@ -388,34 +526,50 @@ static void
+@@ -394,35 +533,50 @@ static void
  bus_ibus_impl_set_preload_engines (BusIBusImpl *ibus,
                                     GVariant    *value)
  {
@@ -244,6 +245,7 @@ index 8d4ec36..0caa8c7 100644
 +        preload_engine_mode = _get_config_preload_engine_mode (ibus);
      }
  
+-    bus_ibus_impl_check_global_engine (ibus);
 -    bus_ibus_impl_update_engines_hotkey_profile (ibus);
 +    if (preload_engine_mode == IBUS_PRELOAD_ENGINE_MODE_USER) {
 +        return;
@@ -254,7 +256,7 @@ index 8d4ec36..0caa8c7 100644
  }
  
  /**
-@@ -496,89 +650,48 @@ bus_ibus_impl_set_use_global_engine (BusIBusImpl *ibus,
+@@ -503,89 +657,48 @@ bus_ibus_impl_set_use_global_engine (Bus
      }
  }
  
@@ -367,7 +369,7 @@ index 8d4ec36..0caa8c7 100644
  #endif
  }
  
-@@ -594,6 +707,7 @@ const static struct {
+@@ -601,6 +714,7 @@ const static struct {
      { "general/hotkey", "next_engine_in_menu",   bus_ibus_impl_set_next_engine_in_menu },
      { "general/hotkey", "previous_engine",       bus_ibus_impl_set_previous_engine },
      { "general", "preload_engines",              bus_ibus_impl_set_preload_engines },
@@ -403,18 +405,18 @@ diff --git a/ibus/common.py b/ibus/common.py
 index e105f18..20c0710 100644
 --- a/ibus/common.py
 +++ b/ibus/common.py
-@@ -33,6 +33,8 @@ __all__ = (
-         "ORIENTATION_HORIZONTAL",
-         "ORIENTATION_VERTICAL",
-         "ORIENTATION_SYSTEM",
+@@ -40,6 +40,8 @@ __all__ = (
+         "BUS_REQUEST_NAME_REPLY_IN_QUEUE",
+         "BUS_REQUEST_NAME_REPLY_EXISTS",
+         "BUS_REQUEST_NAME_REPLY_ALREADY_OWNER",
 +        "PRELOAD_ENGINE_MODE_USER",
 +        "PRELOAD_ENGINE_MODE_LANG_RELATIVE",
          "default_reply_handler",
          "default_error_handler",
          "DEFAULT_ASYNC_HANDLERS",
-@@ -132,6 +134,10 @@ ORIENTATION_HORIZONTAL  = 0
- ORIENTATION_VERTICAL    = 1
- ORIENTATION_SYSTEM      = 2
+@@ -150,6 +152,10 @@ BUS_REQUEST_NAME_REPLY_IN_QUEUE      = 2
+ BUS_REQUEST_NAME_REPLY_EXISTS        = 3
+ BUS_REQUEST_NAME_REPLY_ALREADY_OWNER = 4
  
 +# define preload engine mode
 +PRELOAD_ENGINE_MODE_USER          = 0
@@ -539,8 +541,8 @@ diff --git a/src/ibustypes.h b/src/ibustypes.h
 index 035d124..0a9d7b2 100644
 --- a/src/ibustypes.h
 +++ b/src/ibustypes.h
-@@ -144,6 +144,16 @@ typedef enum {
- } IBusOrientation;
+@@ -177,6 +177,16 @@ typedef enum {
+ } IBusBusRequestNameReply;
  
  /**
 + * IBusPreloadEngineMode:

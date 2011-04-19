@@ -1723,9 +1723,9 @@ index 0000000..0d57a1a
 +        layout_lang = xkbconfig.get_layout_lang()
 +        variant_desc = xkbconfig.get_variant_desc()
 +        for layout in layout_list.keys():
-+            if layout not in layout_lang:
-+                continue
-+            langs = layout_lang[layout]
++            langs = []
++            if layout in layout_lang:
++                langs = layout_lang[layout]
 +            for lang in langs:
 +                engine = ibus.XKBConfigRegistry.engine_desc_new(
 +                    lang,
