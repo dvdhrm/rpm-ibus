@@ -1,1 +1,25 @@
+From 92246e8ffd4d1f4534ac7b487d599e3b2fa30fc0 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Tue, 19 Apr 2011 14:22:04 +0900
+Subject: [PATCH] Call waitpid when ibus-daemon restarts.
+
+---
+ bus/ibusimpl.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
+index a7ae52b..0b3e90e 100644
+--- a/bus/ibusimpl.c
++++ b/bus/ibusimpl.c
+@@ -1678,6 +1678,8 @@ _ibus_exit (BusIBusImpl           *ibus,
+ 
+     g_dbus_method_invocation_return_value (invocation, NULL);
+ 
++    bus_ibus_impl_destroy (ibus);
++
+     /* Make sure the reply has been sent out before exit */
+     g_dbus_connection_flush_sync (g_dbus_method_invocation_get_connection (invocation),
+                                   NULL,
+-- 
+1.7.4.2
 
