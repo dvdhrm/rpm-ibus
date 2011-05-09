@@ -13,7 +13,7 @@
 
 Name:       ibus
 Version:    1.3.99.20110408
-Release:    2%{?dist}
+Release:    3%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -328,9 +328,11 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Wed Apr 20 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110408-2
+* Mon May 09 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110408-3
 - Added ibus-HEAD.patch
   Fixed Bug 697471 - ibus-gconf zombie when restart ibus from ibus panel.
+- Updated ibus-541492-xkb.patch
+  Fixed Bug 701202 - us(dvorak) does not show up in list
 
 * Tue Apr 19 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110408-1
 - Updated to 1.3.99.20110408

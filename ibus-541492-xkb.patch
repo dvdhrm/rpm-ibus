@@ -1,6 +1,6 @@
-From ab4b0cc4dca45cc950a72ec65664649b415d40f0 Mon Sep 17 00:00:00 2001
+From 3262b43c6c865ff2fe9214fa10181d34e9b0908f Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Thu, 10 Mar 2011 14:26:49 +0900
+Date: Mon, 9 May 2011 17:15:42 +0900
 Subject: [PATCH] Add XKB layouts
 
 ---
@@ -12,12 +12,12 @@ Subject: [PATCH] Add XKB layouts
  ibus/bus.py                |    3 +
  ibus/interface/iibus.py    |    3 +
  ibus/xkblayout.py.in       |  225 ++++++++++++++
- ibus/xkbxml.py.in          |  412 ++++++++++++++++++++++++++
+ ibus/xkbxml.py.in          |  413 ++++++++++++++++++++++++++
  setup/Makefile.am          |    1 +
  setup/enginecombobox.py    |    7 +-
  setup/main.py              |    3 +
  setup/setup.ui             |  609 ++++++++++++++++++++++++++++++++++++++-
- setup/xkbsetup.py          |  451 ++++++++++++++++++++++++++++
+ setup/xkbsetup.py          |  454 +++++++++++++++++++++++++++++
  src/ibusfactory.c          |   21 ++-
  src/ibusfactory.h          |    5 +-
  ui/gtk/panel.py            |   39 +++
@@ -31,7 +31,7 @@ Subject: [PATCH] Add XKB layouts
  xkb/xkblib.h               |   40 +++
  xkb/xkbxml.c               |  696 ++++++++++++++++++++++++++++++++++++++++++++
  xkb/xkbxml.h               |  189 ++++++++++++
- 27 files changed, 3799 insertions(+), 6 deletions(-)
+ 27 files changed, 3803 insertions(+), 6 deletions(-)
  create mode 100644 ibus/xkblayout.py.in
  create mode 100644 ibus/xkbxml.py.in
  create mode 100644 setup/xkbsetup.py
@@ -47,7 +47,7 @@ Subject: [PATCH] Add XKB layouts
  create mode 100644 xkb/xkbxml.h
 
 diff --git a/Makefile.am b/Makefile.am
-index 02b7163..6cbe82a 100644
+index 29c57e1..dbe0b6b 100644
 --- a/Makefile.am
 +++ b/Makefile.am
 @@ -42,6 +42,12 @@ DAEMON_DIRS =       \
@@ -72,7 +72,7 @@ index 02b7163..6cbe82a 100644
  	$(NULL)
  
 diff --git a/configure.ac b/configure.ac
-index def1986..1347991 100644
+index 8da8c6e..b3cdb0b 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -185,6 +185,57 @@ else
@@ -117,7 +117,7 @@ index def1986..1347991 100644
 +        [Set preload xkb layouts (default: us,fr,de,...)]),
 +    XKB_PRELOAD_LAYOUTS=$with_xkb_preload_layouts,
 +    [XKB_PRELOAD_LAYOUTS=""\
-+"us,us(chr),ad,al,am,ara,az,ba,bd,be,bg,br,bt,by,"\
++"us,us(chr),us(dvorak),ad,al,am,ara,az,ba,bd,be,bg,br,bt,by,"\
 +"de,dk,ca,ch,cn(tib),cz,ee,epo,es,et,fi,fo,fr,"\
 +"gb,ge,ge(dsb),ge(ru),ge(os),gh,gh(akan),gh(ewe),gh(fula),gh(ga),gh(hausa),"\
 +"gn,gr,hu,hr,ie,ie(CloGaelach),il,"\
@@ -133,7 +133,7 @@ index def1986..1347991 100644
  # GObject introspection
  GOBJECT_INTROSPECTION_CHECK([0.6.8])
  
-@@ -413,6 +464,7 @@ gconf/Makefile
+@@ -430,6 +481,7 @@ gconf/Makefile
  gconf/gconf.xml.in
  bindings/Makefile
  bindings/vala/Makefile
@@ -141,7 +141,7 @@ index def1986..1347991 100644
  ])
  
  AC_OUTPUT
-@@ -428,6 +480,7 @@ Build options:
+@@ -445,6 +497,7 @@ Build options:
    Build gtk2 immodule       $enable_gtk2
    Build gtk3 immodule       $enable_gtk3
    Build XIM agent server    $enable_xim
@@ -197,7 +197,7 @@ index b75295e..7ca4899 100644
        <applyto>/desktop/ibus/panel/use_custom_font</applyto>
        <owner>ibus</owner>
 diff --git a/ibus/Makefile.am b/ibus/Makefile.am
-index d1cd750..7f8590c 100644
+index c71df1b..508c98f 100644
 --- a/ibus/Makefile.am
 +++ b/ibus/Makefile.am
 @@ -58,12 +58,38 @@ nodist_ibus_PYTHON = \
@@ -251,10 +251,10 @@ index 7c8f8be..3c25605 100644
 +from xkbxml import *
  from _config import *
 diff --git a/ibus/bus.py b/ibus/bus.py
-index b915190..c01468c 100644
+index 5738fad..05ec49e 100644
 --- a/ibus/bus.py
 +++ b/ibus/bus.py
-@@ -157,6 +157,9 @@ class Bus(object.Object):
+@@ -160,6 +160,9 @@ class Bus(object.Object):
              data = serializable.deserialize_object(data)
          return data
  
@@ -511,10 +511,10 @@ index 0000000..7685776
 +        self.__default_option = self.get_option()
 diff --git a/ibus/xkbxml.py.in b/ibus/xkbxml.py.in
 new file mode 100644
-index 0000000..5f0a3ea
+index 0000000..d3d0ba2
 --- /dev/null
 +++ b/ibus/xkbxml.py.in
-@@ -0,0 +1,412 @@
+@@ -0,0 +1,413 @@
 +# vim:set et sts=4 sw=4:
 +#
 +# ibus - The Input Bus
@@ -592,7 +592,8 @@ index 0000000..5f0a3ea
 +                   self.__layout_label in self.__layoutlist_array:
 +                    self.__layoutlist_array[self.__layout_label].append(text)
 +            elif self.__current_node == "description":
-+                self.__variant_desc[self.__variant_label] = text
++                label =  "%s(%s)" % (self.__layout_label, self.__variant_label)
++                self.__variant_desc[label] = text
 +            elif self.__current_node == "iso639Id":
 +                label = self.__layout_label
 +                if label != None:
@@ -928,7 +929,7 @@ index 0000000..5f0a3ea
 +    test()
 +    test2()
 diff --git a/setup/Makefile.am b/setup/Makefile.am
-index 1730ec0..249856d 100644
+index 9618d7f..48b1fed 100644
 --- a/setup/Makefile.am
 +++ b/setup/Makefile.am
 @@ -28,6 +28,7 @@ ibussetup_PYTHON = \
@@ -992,7 +993,7 @@ index a22bb0c..7f4a040 100644
          engine = self.__combobox.get_active_engine()
          button = self.__builder.get_object("button_engine_add")
 diff --git a/setup/setup.ui b/setup/setup.ui
-index 0a69df8..cddae98 100644
+index 0a69df8..f1e6d0b 100644
 --- a/setup/setup.ui
 +++ b/setup/setup.ui
 @@ -117,7 +117,6 @@
@@ -1646,10 +1647,10 @@ index 0a69df8..cddae98 100644
  </interface>
 diff --git a/setup/xkbsetup.py b/setup/xkbsetup.py
 new file mode 100644
-index 0000000..0d57a1a
+index 0000000..74d5212
 --- /dev/null
 +++ b/setup/xkbsetup.py
-@@ -0,0 +1,451 @@
+@@ -0,0 +1,454 @@
 +# vim:set et sts=4 sw=4:
 +#
 +# ibus - The Input Bus
@@ -1736,15 +1737,18 @@ index 0000000..0d57a1a
 +                xkb_engines.append(engine)
 +            for variant in layout_list[layout]:
 +                label = "%s(%s)" % (layout, variant)
++                sub_langs = []
 +                if label in layout_lang:
-+                    langs = layout_lang[label]
-+                for lang in langs:
++                    sub_langs = layout_lang[label]
++                else:
++                    sub_langs = langs
++                for lang in sub_langs:
 +                    engine = ibus.XKBConfigRegistry.engine_desc_new(
 +                        lang,
 +                        layout,
 +                        layout_desc[layout],
 +                        variant,
-+                        variant_desc[variant])
++                        variant_desc[label])
 +                    xkb_engines.append(engine)
 +        return xkb_engines
 +
@@ -2182,10 +2186,10 @@ index 47c06e0..102081c 100644
  
  /**
 diff --git a/ui/gtk/panel.py b/ui/gtk/panel.py
-index 07b0fa2..d058b4e 100644
+index 90be1d5..de64920 100644
 --- a/ui/gtk/panel.py
 +++ b/ui/gtk/panel.py
-@@ -117,6 +117,22 @@ class Panel(ibus.PanelBase):
+@@ -132,6 +132,22 @@ class Panel(ibus.PanelBase):
          self.__config_load_show_im_name()
          # self.__bus.request_name(ibus.panel.IBUS_SERVICE_PANEL, 0)
  
@@ -2208,7 +2212,7 @@ index 07b0fa2..d058b4e 100644
      def set_cursor_location(self, x, y, w, h):
          self.__candidate_panel.set_cursor_location(x, y, w, h)
  
-@@ -201,14 +217,20 @@ class Panel(ibus.PanelBase):
+@@ -226,14 +242,20 @@ class Panel(ibus.PanelBase):
          if not enabled:
              self.__set_im_icon(ICON_KEYBOARD)
              self.__set_im_name(None)
@@ -2229,7 +2233,7 @@ index 07b0fa2..d058b4e 100644
          self.__language_bar.focus_in()
  
      def focus_out(self, ic):
-@@ -218,6 +240,8 @@ class Panel(ibus.PanelBase):
+@@ -243,6 +265,8 @@ class Panel(ibus.PanelBase):
          self.__language_bar.focus_out()
          self.__set_im_icon(ICON_KEYBOARD)
          self.__set_im_name(None)
@@ -2238,7 +2242,7 @@ index 07b0fa2..d058b4e 100644
  
      def state_changed(self):
          if not self.__focus_ic:
-@@ -230,14 +254,20 @@ class Panel(ibus.PanelBase):
+@@ -255,14 +279,20 @@ class Panel(ibus.PanelBase):
              self.reset()
              self.__set_im_icon(ICON_KEYBOARD)
              self.__set_im_name(None)
@@ -2259,7 +2263,7 @@ index 07b0fa2..d058b4e 100644
  
  
      def reset(self):
-@@ -517,3 +547,12 @@ class Panel(ibus.PanelBase):
+@@ -542,3 +572,12 @@ class Panel(ibus.PanelBase):
                                 flags=glib.SPAWN_DO_NOT_REAP_CHILD)[0]
          self.__setup_pid = pid
          glib.child_watch_add(self.__setup_pid, self.__child_watch_cb)
@@ -4235,5 +4239,5 @@ index 0000000..f4858fa
 +G_END_DECLS
 +#endif
 -- 
-1.7.4.1
+1.7.4.4
 
