@@ -1,7 +1,8 @@
-From 8e982ef7d76f40f3e516c2f2a96b2e4f68e65fc2 Mon Sep 17 00:00:00 2001
+From 231285d6d9e1b0b868edb842b46c30974a5c517a Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Tue, 19 Apr 2011 11:43:03 +0900
-Subject: [PATCH] Enable ibus-setup to show the frequent used languages only in IME list.
+Date: Wed, 25 May 2011 18:52:25 +0900
+Subject: [PATCH] Enable ibus-setup to show the frequently used languages
+ only in IME list.
 
 ---
  data/ibus.schemas.in    |  168 +++++++++++++++++++++++++++++++++++++++++++++++
@@ -189,7 +190,7 @@ index 39922a0..2e33b2c 100644
        <applyto>/desktop/ibus/panel/use_custom_font</applyto>
        <owner>ibus</owner>
 diff --git a/setup/enginecombobox.py b/setup/enginecombobox.py
-index 7383177..c5b194f 100644
+index 7383177..bff2407 100644
 --- a/setup/enginecombobox.py
 +++ b/setup/enginecombobox.py
 @@ -43,7 +43,10 @@ class EngineComboBox(gtk.ComboBox):
@@ -381,9 +382,9 @@ index 7383177..c5b194f 100644
 +                renderer.set_property("weight", pango.WEIGHT_NORMAL)
 +            elif engine < 0:
 +                if not self.__show_sub_lang:
-+                    renderer.set_property("text", _("Show all languages"))
++                    renderer.set_property("text", _("Show all input methods"))
 +                else:
-+                    renderer.set_property("text", _("Show frequent used languages only"))
++                    renderer.set_property("text", _("Show only input methods for your region"))
 +                renderer.set_property("weight", pango.WEIGHT_BOLD)
          else:
              renderer.set_property("sensitive", True)
@@ -424,5 +425,5 @@ index 9cdce02..5201139 100644
  
          engines = self.__bus.list_active_engines()
 -- 
-1.7.4.2
+1.7.4.4
 

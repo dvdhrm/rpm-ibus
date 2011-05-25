@@ -1,6 +1,6 @@
-From 3262b43c6c865ff2fe9214fa10181d34e9b0908f Mon Sep 17 00:00:00 2001
+From 161cbcc46feb27e52b6579fe4b0b328386f230e9 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Mon, 9 May 2011 17:15:42 +0900
+Date: Wed, 25 May 2011 18:51:13 +0900
 Subject: [PATCH] Add XKB layouts
 
 ---
@@ -511,7 +511,7 @@ index 0000000..7685776
 +        self.__default_option = self.get_option()
 diff --git a/ibus/xkbxml.py.in b/ibus/xkbxml.py.in
 new file mode 100644
-index 0000000..d3d0ba2
+index 0000000..57f54da
 --- /dev/null
 +++ b/ibus/xkbxml.py.in
 @@ -0,0 +1,413 @@
@@ -810,8 +810,8 @@ index 0000000..d3d0ba2
 +                        layout_desc=None,
 +                        variant=None,
 +                        variant_desc=None):
-+        if layout_desc != None and variant_desc != None:
-+            longname = layout_desc + " - " + variant_desc
++        if variant_desc != None:
++            longname = variant_desc
 +        elif layout != None and variant != None:
 +            longname = layout + " - " + variant
 +        elif layout_desc != None:
