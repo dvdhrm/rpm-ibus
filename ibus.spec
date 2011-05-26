@@ -13,7 +13,7 @@
 
 Name:       ibus
 Version:    1.3.99.20110408
-Release:    4%{?dist}
+Release:    5%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -328,7 +328,7 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Wed May 25 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110408-4
+* Thu May 26 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110408-5
 - Added ibus-HEAD.patch
   Fixed Bug 697471 - ibus-gconf zombie when restart ibus from ibus panel.
 - Updated ibus-541492-xkb.patch
