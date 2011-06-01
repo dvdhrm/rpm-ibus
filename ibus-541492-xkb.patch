@@ -1,12 +1,13 @@
-From 63051a74572fcd4caf496c87a3eebb058ba93bc0 Mon Sep 17 00:00:00 2001
+From b6b83e9484abad910271b15222d3f76f206a1ff6 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Thu, 26 May 2011 14:55:31 +0900
+Date: Wed, 1 Jun 2011 18:24:10 +0900
 Subject: [PATCH] Add XKB layouts
 
 ---
  Makefile.am                |    7 +
- configure.ac               |   53 ++++
+ configure.ac               |   56 ++++
  data/ibus.schemas.in       |   36 +++
+ ibus-1.0.pc.in             |    2 +
  ibus/Makefile.am           |   26 ++
  ibus/__init__.py           |    2 +
  ibus/bus.py                |    3 +
@@ -31,7 +32,7 @@ Subject: [PATCH] Add XKB layouts
  xkb/xkblib.h               |   40 +++
  xkb/xkbxml.c               |  696 ++++++++++++++++++++++++++++++++++++++++++++
  xkb/xkbxml.h               |  189 ++++++++++++
- 27 files changed, 3803 insertions(+), 6 deletions(-)
+ 28 files changed, 3808 insertions(+), 6 deletions(-)
  create mode 100644 ibus/xkblayout.py.in
  create mode 100644 ibus/xkbxml.py.in
  create mode 100644 setup/xkbsetup.py
@@ -72,10 +73,10 @@ index 29c57e1..dbe0b6b 100644
  	$(NULL)
  
 diff --git a/configure.ac b/configure.ac
-index 8da8c6e..b3cdb0b 100644
+index 8da8c6e..ce1526c 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -185,6 +185,57 @@ else
+@@ -185,6 +185,60 @@ else
      enable_xim="no (disabled, use --enable-xim to enable)"
  fi
  
@@ -96,9 +97,12 @@ index 8da8c6e..b3cdb0b 100644
 +        [XKB_LIBS="-lxkbfile"]
 +    )
 +    AC_DEFINE(HAVE_XKB, 1, [define to 1 if you have xkbfile])
++    HAVE_IBUS_XKB=true
 +else
 +    enable_xkb="no (disabled, use --enable-xkb to enable)"
++    HAVE_IBUS_XKB=false
 +fi
++AC_SUBST(HAVE_IBUS_XKB)
 +
 +# define XKB rules file
 +AC_ARG_WITH(xkb-rules-xml,
@@ -133,7 +137,7 @@ index 8da8c6e..b3cdb0b 100644
  # GObject introspection
  GOBJECT_INTROSPECTION_CHECK([0.6.8])
  
-@@ -430,6 +481,7 @@ gconf/Makefile
+@@ -430,6 +484,7 @@ gconf/Makefile
  gconf/gconf.xml.in
  bindings/Makefile
  bindings/vala/Makefile
@@ -141,7 +145,7 @@ index 8da8c6e..b3cdb0b 100644
  ])
  
  AC_OUTPUT
-@@ -445,6 +497,7 @@ Build options:
+@@ -445,6 +500,7 @@ Build options:
    Build gtk2 immodule       $enable_gtk2
    Build gtk3 immodule       $enable_gtk3
    Build XIM agent server    $enable_xim
@@ -196,6 +200,19 @@ index b75295e..7ca4899 100644
        <key>/schemas/desktop/ibus/panel/use_custom_font</key>
        <applyto>/desktop/ibus/panel/use_custom_font</applyto>
        <owner>ibus</owner>
+diff --git a/ibus-1.0.pc.in b/ibus-1.0.pc.in
+index 9f593ab..51eb67a 100644
+--- a/ibus-1.0.pc.in
++++ b/ibus-1.0.pc.in
+@@ -4,6 +4,8 @@ libdir=@libdir@
+ includedir=@includedir@
+ datadir=@datadir@
+ pkgdatadir=@datadir@/ibus
++have_ibus_xkb=@HAVE_IBUS_XKB@
++ibus_xkb=@libexecdir@/ibus-xkb
+ 
+ Name: IBus
+ Description: IBus Library
 diff --git a/ibus/Makefile.am b/ibus/Makefile.am
 index c71df1b..508c98f 100644
 --- a/ibus/Makefile.am
@@ -280,7 +297,7 @@ index 678d517..7de56fc 100644
  
 diff --git a/ibus/xkblayout.py.in b/ibus/xkblayout.py.in
 new file mode 100644
-index 0000000..7685776
+index 0000000..6097ed1
 --- /dev/null
 +++ b/ibus/xkblayout.py.in
 @@ -0,0 +1,225 @@
@@ -416,7 +433,7 @@ index 0000000..7685776
 +            self.__default_option = self.get_option()
 +        if (self.__time_lag_session_xkb_layout == True or \
 +            self.__time_lag_session_xkb_option == True ) and \
-+           (self.__time_lag_session_xkb_timer - time.time() \
++           (time.time() - self.__time_lag_session_xkb_timer \
 +            > XKB_SESSION_TIME_OUT):
 +            self.__time_lag_session_xkb_layout = False
 +            self.__time_lag_session_xkb_option = False

@@ -12,8 +12,8 @@
 %define gnome_icon_theme_legacy_version 2.91.6
 
 Name:       ibus
-Version:    1.3.99.20110408
-Release:    5%{?dist}
+Version:    1.3.99.20110419
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -21,7 +21,7 @@ URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
 %if %have_gjsfile
-Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/gnome-shell-ibus-plugins-20110317.tar.bz2
+Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/gnome-shell-ibus-plugins-20110601.tar.bz2
 %endif
 Source3:    https://www.transifex.net/projects/p/ibus/resource/master/l/da/download/ibus_master_da.po
 Patch0:     ibus-HEAD.patch
@@ -143,6 +143,10 @@ The ibus-devel-docs package contains developer documentation for ibus
 %setup -q
 %if %have_gjsfile
 bzcat %SOURCE2 | tar xf -
+sed -i \
+  -e "s|Config.IBUS_XKB|'/usr/libexec/ibus-xkb'|" \
+  -e "s|Config.HAVE_IBUS_XKB|true|" \
+  js/ui/status/ibus/xkbLayout.js
 %endif
 cp %SOURCE3 po/da.po
 %patch0 -p1
@@ -328,11 +332,13 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Thu May 26 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110408-5
+* Thu May 26 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110419-1
+- Updated to 1.3.99.20110419
 - Added ibus-HEAD.patch
   Fixed Bug 697471 - ibus-gconf zombie when restart ibus from ibus panel.
 - Updated ibus-541492-xkb.patch
   Fixed Bug 701202 - us(dvorak) does not show up in list
+  Updated ibus-1.0.pc for ibus-xkb
   Showed XKB variant descriptions only without layout descriptions.
 - Updated ibus-xx-setup-frequent-lang.patch
   Updated UI strings

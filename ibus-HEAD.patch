@@ -1,25 +1,228 @@
-From 92246e8ffd4d1f4534ac7b487d599e3b2fa30fc0 Mon Sep 17 00:00:00 2001
-From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Tue, 19 Apr 2011 14:22:04 +0900
-Subject: [PATCH] Call waitpid when ibus-daemon restarts.
+From 80e5bd0785ca91a70f0b5fe511a3bd8e143d8d05 Mon Sep 17 00:00:00 2001
+From: Takao Fujiwara <takao.fujiwara1@gmail.com>
+Date: Wed, 27 Apr 2011 07:48:50 -0400
+Subject: [PATCH] Fix the zombie process of ibus-gconf when ibus-daemon
+ restarts.
 
+- Fix the typo in bus_dbus_impl_destroy() (dbusimpl.c)
+- Modify bus_server_run() and _ibus_exit() (ibusimpl.c, server.c)
+  bus_ibus_impl_destroy() needs to be called so that waitpid()
+  prevents processes from becoming zombie.
+- Change the declaration of bus_server_quit(). (server.h)
+
+BUG=redhat#697471
+TEST=Linux desktop
+
+Review URL: http://codereview.appspot.com/4440059
+Patch from Takao Fujiwara <takao.fujiwara1@gmail.com>.
 ---
- bus/ibusimpl.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ bus/dbusimpl.c |    5 ++---
+ bus/ibusimpl.c |   40 +---------------------------------------
+ bus/server.c   |   50 +++++++++++++++++++++++++++++++++++++++++++++++++-
+ bus/server.h   |    3 ++-
+ src/ibusbus.c  |    8 +++++++-
+ 5 files changed, 61 insertions(+), 45 deletions(-)
 
+diff --git a/bus/dbusimpl.c b/bus/dbusimpl.c
+index d67a3ce..5616222 100644
+--- a/bus/dbusimpl.c
++++ b/bus/dbusimpl.c
+@@ -577,11 +577,10 @@ bus_dbus_impl_destroy (BusDBusImpl *dbus)
+     dbus->rules = NULL;
+ 
+     for (p = dbus->connections; p != NULL; p = p->next) {
+-        GDBusConnection *connection = G_DBUS_CONNECTION (p->data);
++        BusConnection *connection = BUS_CONNECTION (p->data);
+         g_signal_handlers_disconnect_by_func (connection,
+                 bus_dbus_impl_connection_destroy_cb, dbus);
+-        /* FIXME should handle result? */
+-        g_dbus_connection_close (connection, NULL, NULL, NULL);
++        ibus_object_destroy (IBUS_OBJECT (connection));
+         g_object_unref (connection);
+     }
+     g_list_free (dbus->connections);
 diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
-index a7ae52b..0b3e90e 100644
+index a7ae52b..b356b2c 100644
 --- a/bus/ibusimpl.c
 +++ b/bus/ibusimpl.c
-@@ -1678,6 +1678,8 @@ _ibus_exit (BusIBusImpl           *ibus,
+@@ -24,9 +24,7 @@
+ #include <sys/types.h>
+ #include <sys/wait.h>
+ #include <signal.h>
+-#include <stdlib.h>
+ #include <locale.h>
+-#include <string.h>
+ #include <strings.h>
+ #include "types.h"
+ #include "ibusimpl.h"
+@@ -937,7 +935,6 @@ bus_ibus_impl_destroy (BusIBusImpl *ibus)
+         ibus->fake_context = NULL;
+     }
  
-     g_dbus_method_invocation_return_value (invocation, NULL);
+-    bus_server_quit ();
+     IBUS_OBJECT_CLASS (bus_ibus_impl_parent_class)->destroy (IBUS_OBJECT (ibus));
+ }
  
-+    bus_ibus_impl_destroy (ibus);
-+
-     /* Make sure the reply has been sent out before exit */
+@@ -1682,43 +1679,8 @@ _ibus_exit (BusIBusImpl           *ibus,
      g_dbus_connection_flush_sync (g_dbus_method_invocation_get_connection (invocation),
                                    NULL,
+                                   NULL);
+-    bus_server_quit ();
+ 
+-    if (!restart) {
+-        exit (0);
+-    }
+-    else {
+-        extern gchar **g_argv;
+-        gchar *exe;
+-        gint fd;
+-
+-        exe = g_strdup_printf ("/proc/%d/exe", getpid ());
+-        exe = g_file_read_link (exe, NULL);
+-
+-        if (exe == NULL)
+-            exe = BINDIR "/ibus-daemon";
+-
+-        /* close all fds except stdin, stdout, stderr */
+-        for (fd = 3; fd <= sysconf (_SC_OPEN_MAX); fd ++) {
+-            close (fd);
+-        }
+-
+-        execv (exe, g_argv);
+-
+-        /* If the server binary is replaced while the server is running,
+-         * "readlink /proc/[pid]/exe" might return a path with " (deleted)"
+-         * suffix. */
+-        const gchar suffix[] = " (deleted)";
+-        if (g_str_has_suffix (exe, suffix)) {
+-            exe [strlen (exe) - sizeof (suffix) + 1] = '\0';
+-            execv (exe, g_argv);
+-        }
+-        g_warning ("execv %s failed!", g_argv[0]);
+-        exit (-1);
+-    }
+-
+-    /* should not reach here */
+-    g_assert_not_reached ();
++    bus_server_quit (restart);
+ }
+ 
+ /**
+diff --git a/bus/server.c b/bus/server.c
+index d180513..c2ab9a4 100644
+--- a/bus/server.c
++++ b/bus/server.c
+@@ -21,6 +21,8 @@
+  */
+ #include "server.h"
+ #include <gio/gio.h>
++#include <stdlib.h>
++#include <string.h>
+ #include "dbusimpl.h"
+ #include "ibusimpl.h"
+ #include "option.h"
+@@ -30,6 +32,40 @@ static GMainLoop *mainloop = NULL;
+ static BusDBusImpl *dbus = NULL;
+ static BusIBusImpl *ibus = NULL;
+ static gchar *address = NULL;
++static gboolean _restart = FALSE;
++
++static void
++_restart_server (void)
++{
++    extern gchar **g_argv;
++    gchar *exe;
++    gint fd;
++
++    exe = g_strdup_printf ("/proc/%d/exe", getpid ());
++    exe = g_file_read_link (exe, NULL);
++
++    if (exe == NULL)
++        exe = BINDIR "/ibus-daemon";
++
++    /* close all fds except stdin, stdout, stderr */
++    for (fd = 3; fd <= sysconf (_SC_OPEN_MAX); fd ++) {
++        close (fd);
++    }
++
++    _restart = FALSE;
++    execv (exe, g_argv);
++
++    /* If the server binary is replaced while the server is running,
++     * "readlink /proc/[pid]/exe" might return a path with " (deleted)"
++     * suffix. */
++    const gchar suffix[] = " (deleted)";
++    if (g_str_has_suffix (exe, suffix)) {
++        exe [strlen (exe) - sizeof (suffix) + 1] = '\0';
++        execv (exe, g_argv);
++    }
++    g_warning ("execv %s failed!", g_argv[0]);
++    exit (-1);
++}
+ 
+ /**
+  * bus_new_connection_cb:
+@@ -112,11 +148,23 @@ bus_server_run (void)
+     mainloop = NULL;
+     g_free (address);
+     address = NULL;
++
++    /* When _ibus_exit() is called, bus_ibus_impl_destroy() needs
++     * to be called so that waitpid() prevents the processes from
++     * becoming the daemons. So we run execv() after
++     * ibus_object_destroy(ibus) is called here. */
++    if (_restart) {
++        _restart_server ();
++
++        /* should not reach here */
++        g_assert_not_reached ();
++    }
+ }
+ 
+ void
+-bus_server_quit (void)
++bus_server_quit (gboolean restart)
+ {
++    _restart = restart;
+     if (mainloop)
+         g_main_loop_quit (mainloop);
+ }
+diff --git a/bus/server.h b/bus/server.h
+index 6dfd79a..e1cb3ec 100644
+--- a/bus/server.h
++++ b/bus/server.h
+@@ -43,10 +43,11 @@ void         bus_server_run         (void);
+ 
+ /**
+  * bus_server_quit:
++ * @restart: TRUE if ibus-daemon restarts.
+  *
+  * Quit the glib main loop.
+  */
+-void         bus_server_quit        (void);
++void         bus_server_quit        (gboolean restart);
+ 
+ /**
+  * bus_server_get_address:
+diff --git a/src/ibusbus.c b/src/ibusbus.c
+index 0e9418e..39ad784 100644
+--- a/src/ibusbus.c
++++ b/src/ibusbus.c
+@@ -236,7 +236,13 @@ _connection_closed_cb (GDBusConnection  *connection,
+                        IBusBus          *bus)
+ {
+     if (error) {
+-        g_warning ("_connection_closed_cb: %s", error->message);
++        /* We replaced g_warning with g_debug here because
++         * currently when ibus-daemon restarts, GTK client calls this and
++         * _g_dbus_worker_do_read_cb() sets the error message:
++         * "Underlying GIOStream returned 0 bytes on an async read"
++         * http://git.gnome.org/browse/glib/tree/gio/gdbusprivate.c#n693
++         * However we think the error message is almost harmless. */
++        g_debug ("_connection_closed_cb: %s", error->message);
+     }
+ 
+     g_assert (bus->priv->connection == connection);
 -- 
-1.7.4.2
+1.7.4.4
 
