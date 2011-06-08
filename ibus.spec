@@ -13,7 +13,7 @@
 
 Name:       ibus
 Version:    1.3.99.20110419
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -29,6 +29,9 @@ Patch1:     ibus-435880-surrounding-text.patch
 Patch2:     ibus-541492-xkb.patch
 Patch3:     ibus-530711-preload-sys.patch
 Patch4:     ibus-xx-setup-frequent-lang.patch
+
+# Workaround for oxygen-gtk icon theme until bug 699103 is fixed.
+Patch91:    ibus-711632-fedora-fallback-icon.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -159,6 +162,8 @@ cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
 %endif
 %patch3 -p1 -b .preload-sys
 %patch4 -p1 -b .setup-frequent-lang
+
+%patch91 -p1 -b .fallback-icon
 
 %build
 %if %have_libxkbfile
@@ -332,6 +337,10 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Jun 08 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110419-2
+- Added ibus-711632-fedora-fallback-icon.patch
+  Fixed SEGV with no icon in oxygen-gtk icon theme.
+
 * Thu May 26 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110419-1
 - Updated to 1.3.99.20110419
 - Added ibus-HEAD.patch
