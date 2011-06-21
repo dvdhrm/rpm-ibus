@@ -1,0 +1,331 @@
+From ec02d646dccd213e1309011160d9d73a26174044 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Mon, 20 Jun 2011 19:10:21 +0900
+Subject: [PATCH] Add icon_symbol property in IBusEngineDesc.
+
+---
+ bus/engineproxy.c         |   22 +++++++++++++++
+ bus/ibusimpl.c            |   33 ++++++++++++++++++++++
+ bus/ibusimpl.h            |    4 +++
+ ibus/engine.py            |    3 ++
+ ibus/interface/iengine.py |    3 ++
+ src/ibusenginedesc.c      |   66 +++++++++++++++++++++++++++++++++++++++++++++
+ src/ibusenginedesc.h      |   10 +++++++
+ 7 files changed, 141 insertions(+), 0 deletions(-)
+
+diff --git a/bus/engineproxy.c b/bus/engineproxy.c
+index f74af12..5c0cbb2 100644
+--- a/bus/engineproxy.c
++++ b/bus/engineproxy.c
+@@ -591,6 +591,28 @@ bus_engine_proxy_g_signal (GDBusProxy  *proxy,
+         return;
+     }
+ 
++    if (g_strcmp0 (signal_name, "SetIconSymbol") == 0) {
++        const gchar *name = NULL;
++        gchar *icon_symbol = NULL;
++        GValue value = { 0, };
++
++        name = ibus_engine_desc_get_name (engine->desc);
++        g_return_if_fail (name != NULL);
++        g_variant_get (parameters, "(s)", &icon_symbol);
++        g_return_if_fail (icon_symbol != NULL);
++
++        g_value_init (&value, G_TYPE_STRING);
++        g_value_set_string (&value, icon_symbol);
++        g_object_set_property (G_OBJECT (engine->desc), "icon_symbol", &value);
++        g_value_unset (&value);
++
++        bus_ibus_impl_set_icon_symbol_with_engine_name (BUS_DEFAULT_IBUS,
++                                                        name,
++                                                        icon_symbol);
++        g_free (icon_symbol);
++        return;
++    }
++
+     g_return_if_reached ();
+ }
+ 
+diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
+index b356b2c..38d6d11 100644
+--- a/bus/ibusimpl.c
++++ b/bus/ibusimpl.c
+@@ -2342,3 +2342,36 @@ bus_ibus_impl_get_focused_input_context (BusIBusImpl *ibus)
+ 
+     return ibus->focused_context;
+ }
++
++void
++bus_ibus_impl_set_icon_symbol_with_engine_name (BusIBusImpl *ibus,
++                                                const gchar *name,
++                                                const gchar *icon_symbol)
++{
++    IBusEngineDesc *desc = NULL;
++    GValue value = { 0, };
++
++    g_assert (BUS_IS_IBUS_IMPL (ibus));
++    g_assert (name != NULL);
++    g_assert (icon_symbol != NULL);
++
++    desc = bus_ibus_impl_get_engine_desc (ibus, name);
++
++    if (desc == NULL) {
++        return;
++    }
++
++    g_value_init (&value, G_TYPE_STRING);
++    g_value_set_string (&value, icon_symbol);
++    g_object_set_property (G_OBJECT (desc), "icon_symbol", &value);
++    g_value_unset (&value);
++
++    /* Update status icon.
++     * "enabled" signal is caught by ibus->panel and ibus->panel calls
++     * StateChanged dbus method. */
++    if (ibus->panel && ibus->focused_context) {
++        if (bus_input_context_is_enabled (ibus->focused_context)) {
++            bus_input_context_enable (ibus->focused_context);
++        }
++    }
++}
+diff --git a/bus/ibusimpl.h b/bus/ibusimpl.h
+index 42edbf8..4f37cbc 100644
+--- a/bus/ibusimpl.h
++++ b/bus/ibusimpl.h
+@@ -99,6 +99,10 @@ gboolean         bus_ibus_impl_is_embed_preedit_text
+                                                     (BusIBusImpl        *ibus);
+ BusInputContext *bus_ibus_impl_get_focused_input_context
+                                                     (BusIBusImpl        *ibus);
++void             bus_ibus_impl_set_icon_symbol_with_engine_name
++                                                    (BusIBusImpl        *ibus,
++                                                     const gchar        *name,
++                                                     const gchar        *icon_symbol);
+ 
+ G_END_DECLS
+ #endif
+diff --git a/ibus/engine.py b/ibus/engine.py
+index fe5dd98..e827408 100644
+--- a/ibus/engine.py
++++ b/ibus/engine.py
+@@ -176,6 +176,9 @@ class EngineBase(object.Object):
+         self.__proxy = None
+         super(EngineBase,self).do_destroy()
+ 
++    def set_icon_symbol(self, icon_symbol):
++        return self.__proxy.SetIconSymbol(icon_symbol)
++
+ 
+ class EngineProxy(interface.IEngine):
+     def __init__(self, engine, conn, object_path):
+diff --git a/ibus/interface/iengine.py b/ibus/interface/iengine.py
+index 9e0d981..7cefcdf 100644
+--- a/ibus/interface/iengine.py
++++ b/ibus/interface/iengine.py
+@@ -157,3 +157,6 @@ class IEngine(dbus.service.Object):
+ 
+     @signal()
+     def RequireSurroundingText(self): pass
++
++    @signal(signature="s")
++    def SetIconSymbol(self, icon_symbol): pass
+diff --git a/src/ibusenginedesc.c b/src/ibusenginedesc.c
+index ca5ef60..d3800e1 100644
+--- a/src/ibusenginedesc.c
++++ b/src/ibusenginedesc.c
+@@ -22,6 +22,7 @@
+ #include <stdlib.h>
+ #include "ibusenginedesc.h"
+ #include "ibusxml.h"
++#include "ibusenumtypes.h"
+ 
+ enum {
+     LAST_SIGNAL,
+@@ -39,6 +40,7 @@ enum {
+     PROP_LAYOUT,
+     PROP_RANK,
+     PROP_HOTKEYS,
++    PROP_ICON_SYMBOL,
+ };
+ 
+ 
+@@ -54,6 +56,7 @@ struct _IBusEngineDescPrivate {
+     gchar      *layout;
+     guint       rank;
+     gchar      *hotkeys;
++    gchar      *icon_symbol;
+ };
+ 
+ #define IBUS_ENGINE_DESC_GET_PRIVATE(o)  \
+@@ -232,6 +235,19 @@ ibus_engine_desc_class_init (IBusEngineDescClass *class)
+                         "The hotkeys of engine description",
+                         "",
+                         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
++
++    /**
++     * IBusEngineDesc:icon_symbol:
++     *
++     * The symbol chars of engine description instead of icon image
++     */
++    g_object_class_install_property (gobject_class,
++                    PROP_ICON_SYMBOL,
++                    g_param_spec_string ("icon_symbol",
++                        "description icon_symbol",
++                        "The icon symbol chars of engine description",
++                        "",
++                        G_PARAM_READWRITE | G_PARAM_CONSTRUCT));
+ }
+ 
+ static void
+@@ -249,6 +265,7 @@ ibus_engine_desc_init (IBusEngineDesc *desc)
+     desc->priv->layout = NULL;
+     desc->priv->rank = 0;
+     desc->priv->hotkeys = NULL;
++    desc->priv->icon_symbol = NULL;
+ }
+ 
+ static void
+@@ -263,6 +280,7 @@ ibus_engine_desc_destroy (IBusEngineDesc *desc)
+     g_free (desc->priv->icon);
+     g_free (desc->priv->layout);
+     g_free (desc->priv->hotkeys);
++    g_free (desc->priv->icon_symbol);
+ 
+     IBUS_OBJECT_CLASS (ibus_engine_desc_parent_class)->destroy (IBUS_OBJECT (desc));
+ }
+@@ -313,6 +331,10 @@ ibus_engine_desc_set_property (IBusEngineDesc *desc,
+         g_assert (desc->priv->hotkeys == NULL);
+         desc->priv->hotkeys = g_value_dup_string (value);
+         break;
++    case PROP_ICON_SYMBOL:
++        g_free (desc->priv->icon_symbol);
++        desc->priv->icon_symbol = g_value_dup_string (value);
++        break;
+     default:
+         G_OBJECT_WARN_INVALID_PROPERTY_ID (desc, prop_id, pspec);
+     }
+@@ -355,6 +377,9 @@ ibus_engine_desc_get_property (IBusEngineDesc *desc,
+     case PROP_HOTKEYS:
+         g_value_set_string (value, ibus_engine_desc_get_hotkeys (desc));
+         break;
++    case PROP_ICON_SYMBOL:
++        g_value_set_string (value, ibus_engine_desc_get_icon_symbol (desc));
++        break;
+     default:
+         G_OBJECT_WARN_INVALID_PROPERTY_ID (desc, prop_id, pspec);
+     }
+@@ -382,9 +407,28 @@ ibus_engine_desc_serialize (IBusEngineDesc  *desc,
+     g_variant_builder_add (builder, "u", desc->priv->rank);
+     g_variant_builder_add (builder, "s", NOTNULL (desc->priv->hotkeys));
+ #undef NOTNULL
++
++    /* append extra properties */
++    GVariantBuilder array;
++    g_variant_builder_init (&array, G_VARIANT_TYPE ("a{sv}"));
++    g_variant_builder_add (&array, "{sv}", "icon_symbol", g_variant_new_string (desc->priv->icon_symbol));
++    g_variant_builder_add (builder, "v", g_variant_builder_end (&array));
++
+     return TRUE;
+ }
+ 
++static gboolean
++ibus_engine_desc_deserialize_property (IBusEngineDesc *desc,
++                                       const gchar    *name,
++                                       GVariant       *variant)
++{
++    if (g_strcmp0 (name, "icon_symbol") == 0) {
++        g_variant_get (variant, "s", &desc->priv->icon_symbol);
++        return TRUE;
++    }
++    return FALSE;
++}
++
+ static gint
+ ibus_engine_desc_deserialize (IBusEngineDesc *desc,
+                               GVariant       *variant)
+@@ -405,6 +449,23 @@ ibus_engine_desc_deserialize (IBusEngineDesc *desc,
+     g_variant_get_child (variant, retval++, "u", &desc->priv->rank);
+     g_variant_get_child (variant, retval++, "s", &desc->priv->hotkeys);
+ 
++    /* extract extra properties */
++    GVariantIter iter;
++    GVariant *child, *array;
++
++    g_variant_get_child (variant, retval++, "v", &array);
++    g_variant_iter_init (&iter, array);
++    while ((child = g_variant_iter_next_value (&iter))) {
++        gchar *name;
++        GVariant *value;
++        g_variant_get (child, "{sv}", &name, &value);
++        if (ibus_engine_desc_deserialize_property (desc, name, value))
++            retval++;
++        g_free (name);
++        g_variant_unref (value);
++        g_variant_unref (child);
++    }
++
+     return retval;
+ }
+ 
+@@ -428,6 +489,7 @@ ibus_engine_desc_copy (IBusEngineDesc       *dest,
+     dest->priv->layout           = g_strdup (src->priv->layout);
+     dest->priv->rank             = src->priv->rank;
+     dest->priv->hotkeys          = g_strdup (src->priv->hotkeys);
++    dest->priv->icon_symbol      = g_strdup (src->priv->icon_symbol);
+     return TRUE;
+ }
+ 
+@@ -465,6 +527,7 @@ ibus_engine_desc_output (IBusEngineDesc *desc,
+     OUTPUT_ENTRY_1(icon);
+     OUTPUT_ENTRY_1(layout);
+     OUTPUT_ENTRY_1(hotkeys);
++    OUTPUT_ENTRY_1(icon_symbol);
+     g_string_append_indent (output, indent + 1);
+     g_string_append_printf (output, "<rank>%u</rank>\n", desc->priv->rank);
+ #undef OUTPUT_ENTRY
+@@ -498,6 +561,7 @@ ibus_engine_desc_parse_xml_node (IBusEngineDesc *desc,
+         PARSE_ENTRY_1(icon);
+         PARSE_ENTRY_1(layout);
+         PARSE_ENTRY_1(hotkeys);
++        PARSE_ENTRY_1(icon_symbol);
+ #undef PARSE_ENTRY
+ #undef PARSE_ENTRY_1
+         if (g_strcmp0 (sub_node->name , "rank") == 0) {
+@@ -526,6 +590,7 @@ IBUS_ENGINE_DESC_GET_PROPERTY (icon, const gchar *)
+ IBUS_ENGINE_DESC_GET_PROPERTY (layout, const gchar *)
+ IBUS_ENGINE_DESC_GET_PROPERTY (rank, guint)
+ IBUS_ENGINE_DESC_GET_PROPERTY (hotkeys, const gchar *)
++IBUS_ENGINE_DESC_GET_PROPERTY (icon_symbol, const gchar *)
+ #undef IBUS_ENGINE_DESC_GET_PROPERTY
+ 
+ IBusEngineDesc *
+@@ -573,6 +638,7 @@ ibus_engine_desc_new_varargs (const gchar *first_property_name, ...)
+     g_assert (desc->priv->icon);
+     g_assert (desc->priv->layout);
+     g_assert (desc->priv->hotkeys);
++    g_assert (desc->priv->icon_symbol);
+ 
+     return desc;
+ }
+diff --git a/src/ibusenginedesc.h b/src/ibusenginedesc.h
+index 9718b15..e3194c3 100644
+--- a/src/ibusenginedesc.h
++++ b/src/ibusenginedesc.h
+@@ -249,6 +249,16 @@ guint            ibus_engine_desc_get_rank      (IBusEngineDesc *info);
+ const gchar     *ibus_engine_desc_get_hotkeys   (IBusEngineDesc *info);
+ 
+ /**
++ * ibus_engine_desc_get_icon_symbol:
++ * @info: An IBusEngineDesc
++ * @returns: icon_symbol property in IBusEngineDesc
++ *
++ * Return the icon_symbol property in IBusEngineDesc. It should not be freed.
++ */
++const gchar     *ibus_engine_desc_get_icon_symbol
++                                                (IBusEngineDesc *info);
++
++/**
+  * ibus_engine_desc_output:
+  * @info: An IBusEngineDesc
+  * @output: XML-formatted Input method engine description.
+-- 
+1.7.4.4
+

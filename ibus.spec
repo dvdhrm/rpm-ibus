@@ -13,7 +13,7 @@
 
 Name:       ibus
 Version:    1.3.99.20110419
-Release:    2%{?dist}
+Release:    3%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -21,14 +21,16 @@ URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
 %if %have_gjsfile
-Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/gnome-shell-ibus-plugins-20110601.tar.bz2
+Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/gnome-shell-ibus-plugins-20110621.tar.bz2
 %endif
 Source3:    https://www.transifex.net/projects/p/ibus/resource/master/l/da/download/ibus_master_da.po
+Source4:    http://ueno.fedorapeople.org/ibus-indicator/ibus-indicator.tar.bz2
 Patch0:     ibus-HEAD.patch
-Patch1:     ibus-435880-surrounding-text.patch
-Patch2:     ibus-541492-xkb.patch
-Patch3:     ibus-530711-preload-sys.patch
-Patch4:     ibus-xx-setup-frequent-lang.patch
+Patch1:     ibus-530711-preload-sys.patch
+Patch2:     ibus-xx-icon-symbol.patch
+Patch3:     ibus-541492-xkb.patch
+Patch4:     ibus-xx-bridge-hotkey.patch
+Patch5:     ibus-xx-setup-frequent-lang.patch
 
 # Workaround for oxygen-gtk icon theme until bug 699103 is fixed.
 Patch91:    ibus-711632-fedora-fallback-icon.patch
@@ -121,6 +123,21 @@ Requires(post): glib2 >= %{glib_ver}
 %description gtk3
 This package contains ibus im module for gtk3
 
+%package gnome3
+Summary:    IBus gnome-shell-extension for GNOME3
+Group:      System Environment/Libraries
+Requires:   %{name} = %{version}-%{release}
+Requires:   %{name}-libs = %{version}-%{release}
+Requires:   gnome-shell
+
+%description gnome3
+This is a transitional package which allows users to try out new IBus
+GUI for GNOME3 in development.  Note that this package will be marked
+as obsolete once the integration has completed in the GNOME3 upstream.
+
+%description gnome3
+This package contains ibus im module for gtk3
+
 %package devel
 Summary:    Development tools for ibus
 Group:      Development/Libraries
@@ -150,18 +167,19 @@ sed -i \
   -e "s|Config.IBUS_XKB|'/usr/libexec/ibus-xkb'|" \
   -e "s|Config.HAVE_IBUS_XKB|true|" \
   js/ui/status/ibus/xkbLayout.js
+bzcat %SOURCE4 | tar xf -
 %endif
 cp %SOURCE3 po/da.po
 %patch0 -p1
-# start surrounding patch
-%patch1 -p1 -b .surrounding
 cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
-# end surrounding patch
+%patch1 -p1 -b .preload-sys
+%patch2 -p1 -b .icon-symbol
 %if %have_libxkbfile
-%patch2 -p1 -b .xkb
+%patch3 -p1 -b .xkb
 %endif
-%patch3 -p1 -b .preload-sys
-%patch4 -p1 -b .setup-frequent-lang
+mv data/ibus.schemas.in data/ibus.schemas.in.in
+%patch4 -p1 -b .bridge-key
+%patch5 -p1 -b .setup-frequent-lang
 
 %patch91 -p1 -b .fallback-icon
 
@@ -180,6 +198,7 @@ automake -a -c -f
     --disable-gtk-doc \
     --with-no-snooper-apps='gnome-do,Do.*,firefox.*,.*chrome.*,.*chromium.*' \
     --enable-surrounding-text \
+    --enable-bridge-hotkey \
     --enable-introspection
 
 # make -C po update-gmo
@@ -215,19 +234,11 @@ desktop-file-install --delete-original          \
   $RPM_BUILD_ROOT%{_datadir}/applications/*
 
 %if %have_gjsfile
-cp -R js/ui/status/ibus $RPM_BUILD_ROOT%{_datadir}/ibus/ui/gjs-g-s
-cat >> $RPM_BUILD_ROOT%{_datadir}/ibus/ui/gjs-g-s/README <<_EOF
-IBus Panel for GNOME-Shell
---------------------------
-
-This is an alpha version of IBus Panel for GNOME-Shell.
-These files under this directory are prepared for the test purpose.
-It is planned to integrate the files into gnome-shell finally.
-Please refer the installation:
-https://fedoraproject.org/wiki/I18N/InputMethods#GNOME-Shell
-Bug Report:
-https://bugzilla.redhat.com/show_bug.cgi?id=657165
-_EOF
+# https://bugzilla.redhat.com/show_bug.cgi?id=657165
+install -dm 755 $RPM_BUILD_ROOT%{_datadir}/gnome-shell
+cp -R js $RPM_BUILD_ROOT%{_datadir}/gnome-shell
+install -dm 755 $RPM_BUILD_ROOT%{_datadir}/gnome-shell/extensions
+cp -R ibus-indicator@example.com $RPM_BUILD_ROOT%{_datadir}/gnome-shell/extensions
 %endif
 
 # FIXME: no version number
@@ -323,6 +334,11 @@ fi
 %defattr(-,root,root,-)
 %{_libdir}/gtk-3.0/%{gtk3_binary_version}/immodules/im-ibus.so
 
+%files gnome3
+%defattr(-,root,root,-)
+%{_datadir}/gnome-shell/js/ui/status/ibus
+%{_datadir}/gnome-shell/extensions/ibus-indicator@example.com
+
 %files devel
 %defattr(-,root,root,-)
 %{_libdir}/lib*.so
@@ -337,9 +353,14 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Wed Jun 08 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110419-2
+* Mon Jun 20 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110419-3
+- Updated ibus-HEAD.patch for upstream.
+- Removed ibus-435880-surrounding-text.patch as upstream.
 - Added ibus-711632-fedora-fallback-icon.patch
   Fixed SEGV with no icon in oxygen-gtk icon theme.
+- Added ibus-xx-icon-symbol.patch
+- Added ibus-xx-bridge-hotkey.patch
+- Added transitional ibus-gnome3 package.
 
 * Thu May 26 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110419-1
 - Updated to 1.3.99.20110419

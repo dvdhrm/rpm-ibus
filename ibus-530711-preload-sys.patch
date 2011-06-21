@@ -1,12 +1,13 @@
-From 047452beffd7cb429bf4dfeb2371f120cc8041a6 Mon Sep 17 00:00:00 2001
+From 7f81445b3e6613d14f64253506a309095a37c8d7 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Fri, 11 Mar 2011 16:07:09 +0900
+Date: Mon, 20 Jun 2011 19:04:42 +0900
 Subject: [PATCH] Reload preload engines until users customize the list.
 
 The idea is, if users don't customize the preload_engines with ibus-setup,
 users would prefer to load the system default engines again by login.
 The gconf value 'preload_engine_mode' is
-IBUS_PRELOAD_ENGINE_MODE_LANG_RELATIVE by default.
+IBUS_PRELOAD_ENGINE_MODE_USER by default but set
+IBUS_PRELOAD_ENGINE_MODE_LANG_RELATIVE for the initial login.
 If preload_engine_mode is IBUS_PRELOAD_ENGINE_MODE_LANG_RELATIVE,
 ibus-daemon loads the system preload engines by langs.
 If preload_engine_mode is IBUS_PRELOAD_ENGINE_MODE_USER,
@@ -15,22 +16,20 @@ On the other hand, if users enable the customized engine checkbutton
 on ibus-setup, ibus-setup sets 'preload_engine_mode' as
 IBUS_PRELOAD_ENGINE_MODE_USER and users can customize the value
 'preload_engines'.
-Loading system default may spend the startup time. If you mind it,
-your dist may like to put TRUE in 'use_local_preload_engines' value.
 ---
- bus/ibusimpl.c       |  286 +++++++++++++++++++++++++++++++++++---------------
- data/ibus.schemas.in |   13 +++
+ bus/ibusimpl.c       |  402 +++++++++++++++++++++++++++++++++++++++-----------
+ data/ibus.schemas.in |   13 ++
  ibus/common.py       |    6 +
- setup/main.py        |   37 ++++++-
+ setup/main.py        |   70 ++++++++-
  setup/setup.ui       |   21 +++-
  src/ibustypes.h      |   10 ++
- 6 files changed, 279 insertions(+), 94 deletions(-)
+ 6 files changed, 427 insertions(+), 95 deletions(-)
 
 diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
-index 8d4ec36..0caa8c7 100644
+index a7ae52b..bb4b8ae 100644
 --- a/bus/ibusimpl.c
 +++ b/bus/ibusimpl.c
-@@ -144,6 +144,9 @@ static void     bus_ibus_impl_set_previo
+@@ -144,6 +144,9 @@ static void     bus_ibus_impl_set_previous_engine
  static void     bus_ibus_impl_set_preload_engines
                                                  (BusIBusImpl        *ibus,
                                                   GVariant           *value);
@@ -40,10 +39,28 @@ index 8d4ec36..0caa8c7 100644
  static void     bus_ibus_impl_set_use_sys_layout
                                                  (BusIBusImpl        *ibus,
                                                   GVariant           *value);
-@@ -284,6 +287,142 @@ _panel_destroy_cb (BusPanelProxy *panel,
-     g_object_unref (panel);
+@@ -285,6 +288,259 @@ _panel_destroy_cb (BusPanelProxy *panel,
  }
  
+ static void
++_config_set_value_done (GObject      *object,
++                        GAsyncResult *res,
++                        gpointer      user_data)
++{
++    IBusConfig *config = (IBusConfig *) object;
++    GVariant *value = (GVariant *) user_data;
++    GError *error = NULL;
++
++    g_assert (IBUS_IS_CONFIG (config));
++
++    if (!ibus_config_set_value_async_finish (config, res, &error)) {
++        if (error) {
++            g_error_free (error);
++        }
++    }
++    g_variant_unref (value);
++}
++
 +#ifndef OS_CHROMEOS
 +static gint
 +_engine_desc_cmp (IBusEngineDesc *desc1,
@@ -59,12 +76,29 @@ index 8d4ec36..0caa8c7 100644
 +_get_config_preload_engine_mode (BusIBusImpl *ibus)
 +{
 +    GVariant *variant = NULL;
-+    gint preload_engine_mode = IBUS_PRELOAD_ENGINE_MODE_LANG_RELATIVE;
++    gint preload_engine_mode = IBUS_PRELOAD_ENGINE_MODE_USER;
 +
 +    g_assert (BUS_IS_IBUS_IMPL (ibus));
 +
 +    if (ibus->config == NULL) {
 +        return preload_engine_mode;
++    }
++
++    variant = ibus_config_get_value (ibus->config, "general",
++                                     "preload_engines");
++    if (variant == NULL) {
++        /* Set LANG_RELATIVE mode for the initial login */
++        preload_engine_mode = IBUS_PRELOAD_ENGINE_MODE_LANG_RELATIVE;
++        variant = g_variant_ref_sink (g_variant_new ("i", preload_engine_mode));
++        ibus_config_set_value_async (ibus->config, "general",
++                                     "preload_engine_mode", variant,
++                                     -1,
++                                     NULL,
++                                     _config_set_value_done,
++                                     variant);
++        return preload_engine_mode;
++    } else {
++        g_variant_unref (variant);
 +    }
 +
 +    variant = ibus_config_get_value (ibus->config, "general",
@@ -79,6 +113,82 @@ index 8d4ec36..0caa8c7 100644
 +    return preload_engine_mode;
 +}
 +#endif
++
++static int
++_compare_engine_list_value (GVariant *value_a, GVariant *value_b)
++{
++    GVariant *value;
++    GVariantIter iter;
++    const gchar *engine_name = NULL;
++    gchar *concat_engine_names;
++    gchar *concat_engine_names_a = NULL;
++    gchar *concat_engine_names_b = NULL;
++    int retval = 0;
++
++    value = value_a;
++    concat_engine_names = NULL;
++    if (value != NULL && g_variant_classify (value) == G_VARIANT_CLASS_ARRAY) {
++        g_variant_iter_init (&iter, value);
++        while (g_variant_iter_loop (&iter, "&s", &engine_name)) {
++            gchar *tmp = g_strdup_printf ("%s::%s",
++                                          concat_engine_names ? concat_engine_names : "",
++                                          engine_name ? engine_name : "");
++            g_free (concat_engine_names);
++            concat_engine_names = tmp;
++        }
++    }
++    concat_engine_names_a = concat_engine_names;
++
++    value = value_b;
++    concat_engine_names = NULL;
++    if (value != NULL && g_variant_classify (value) == G_VARIANT_CLASS_ARRAY) {
++        g_variant_iter_init (&iter, value);
++        while (g_variant_iter_loop (&iter, "&s", &engine_name)) {
++            gchar *tmp = g_strdup_printf ("%s::%s",
++                                          concat_engine_names ? concat_engine_names : "",
++                                          engine_name ? engine_name : "");
++            g_free (concat_engine_names);
++            concat_engine_names = tmp;
++        }
++    }
++    concat_engine_names_b = concat_engine_names;
++
++    retval = g_strcmp0 (concat_engine_names_a, concat_engine_names_b);
++    g_free (concat_engine_names_a);
++    g_free (concat_engine_names_b);
++    return retval;
++}
++
++static void
++_preload_engines_config_get_value_done (GObject      *object,
++                                        GAsyncResult *res,
++                                        gpointer      user_data)
++{
++    IBusConfig *config = (IBusConfig *) object;
++    GVariant *new_value = (GVariant *) user_data;
++    GVariant *value = NULL;
++    GError *error = NULL;
++
++    g_assert (IBUS_IS_CONFIG (config));
++
++    value = ibus_config_get_value_async_finish (config, res, &error);
++    if (error) {
++        g_error_free (error);
++    }
++    if (_compare_engine_list_value (value, new_value) != 0) {
++        ibus_config_set_value_async (config, "general",
++                                     "preload_engines", new_value,
++                                     -1,
++                                     NULL,
++                                     _config_set_value_done,
++                                     new_value);
++    } else if (new_value) {
++        g_variant_unref (new_value);
++    }
++    if (value) {
++        g_variant_unref (value);
++    }
++}
 +
 +static void
 +_set_preload_engines (BusIBusImpl *ibus,
@@ -103,11 +213,16 @@ index 8d4ec36..0caa8c7 100644
 +        }
 +
 +        if (engine_list != NULL &&
-+            ibus->config != NULL &&
-+            ibus_config_get_value (ibus->config, "general",
-+                                   "preload_engines") == NULL) {
-+            ibus_config_set_value (ibus->config, "general",
-+                                   "preload_engines", value);
++            ibus->config != NULL) {
++            /* sync function will effects the startup performance.
++             * We'd always like to save the value so that ibus-setup
++             * get the updated engine list. */
++            ibus_config_get_value_async (ibus->config, "general",
++                                         "preload_engines",
++                                         -1,
++                                         NULL,
++                                         _preload_engines_config_get_value_done,
++                                         g_variant_ref_sink (value));
 +        } else {
 +            /* We don't update preload_engines with an empty string for safety.
 +             * Just unref the floating value. */
@@ -180,10 +295,11 @@ index 8d4ec36..0caa8c7 100644
 +}
 +#endif
 +
- static void
++static void
  bus_ibus_impl_set_hotkey (BusIBusImpl *ibus,
                            GQuark       hotkey,
-@@ -394,35 +533,50 @@ static void
+                           GVariant    *value)
+@@ -394,35 +650,50 @@ static void
  bus_ibus_impl_set_preload_engines (BusIBusImpl *ibus,
                                     GVariant    *value)
  {
@@ -220,14 +336,14 @@ index 8d4ec36..0caa8c7 100644
 +/**
 + * bus_ibus_impl_set_preload_engine_mode:
 + *
-+ * A function to be called when "preload_engines_mode" config is updated.
++ * A function to be called when "preload_engine_mode" config is updated.
 + */
 +static void
 +bus_ibus_impl_set_preload_engine_mode (BusIBusImpl *ibus,
 +                                       GVariant    *value)
 +{
 +#ifndef OS_CHROMEOS
-+    gint preload_engine_mode = IBUS_PRELOAD_ENGINE_MODE_LANG_RELATIVE;
++    gint preload_engine_mode = IBUS_PRELOAD_ENGINE_MODE_USER;
  
 -    if (ibus->engine_list) {
 -        BusComponent *component = bus_component_from_engine_desc ((IBusEngineDesc *) ibus->engine_list->data);
@@ -256,7 +372,7 @@ index 8d4ec36..0caa8c7 100644
  }
  
  /**
-@@ -503,89 +657,48 @@ bus_ibus_impl_set_use_global_engine (Bus
+@@ -503,89 +774,47 @@ bus_ibus_impl_set_use_global_engine (BusIBusImpl *ibus,
      }
  }
  
@@ -279,7 +395,8 @@ index 8d4ec36..0caa8c7 100644
 + * The idea is, if users don't customize the preload_engines with ibus-setup,
 + * users would prefer to load the system default engines again by login.
 + * The gconf value 'preload_engine_mode' is
-+ * IBUS_PRELOAD_ENGINE_MODE_USER by default.
++ * IBUS_PRELOAD_ENGINE_MODE_USER by default but set
++ * IBUS_PRELOAD_ENGINE_MODE_LANG_RELATIVE for the initial login.
 + * If preload_engine_mode is IBUS_PRELOAD_ENGINE_MODE_LANG_RELATIVE,
 + * ibus-daemon loads the system preload engines by langs.
 + * If preload_engine_mode is IBUS_PRELOAD_ENGINE_MODE_USER,
@@ -288,8 +405,6 @@ index 8d4ec36..0caa8c7 100644
 + * on ibus-setup, ibus-setup sets 'preload_engine_mode' as
 + * IBUS_PRELOAD_ENGINE_MODE_USER and users can customize the value
 + * 'preload_engines'.
-+ * Loading system default may spend the startup time. If you mind it,
-+ * your dist may like to put TRUE in 'use_local_preload_engines' value.
   */
  static void
  bus_ibus_impl_set_default_preload_engines (BusIBusImpl *ibus)
@@ -298,7 +413,7 @@ index 8d4ec36..0caa8c7 100644
 -    g_assert (BUS_IS_IBUS_IMPL (ibus));
 -
      static gboolean done = FALSE;
-+    gint preload_engine_mode = IBUS_PRELOAD_ENGINE_MODE_LANG_RELATIVE;
++    gint preload_engine_mode = IBUS_PRELOAD_ENGINE_MODE_USER;
 +
 +    g_assert (BUS_IS_IBUS_IMPL (ibus));
  
@@ -369,16 +484,16 @@ index 8d4ec36..0caa8c7 100644
  #endif
  }
  
-@@ -601,6 +714,7 @@ const static struct {
+@@ -601,6 +830,7 @@ const static struct {
      { "general/hotkey", "next_engine_in_menu",   bus_ibus_impl_set_next_engine_in_menu },
      { "general/hotkey", "previous_engine",       bus_ibus_impl_set_previous_engine },
      { "general", "preload_engines",              bus_ibus_impl_set_preload_engines },
-+    { "general", "preload_engines_mode",         bus_ibus_impl_set_preload_engine_mode },
++    { "general", "preload_engine_mode",          bus_ibus_impl_set_preload_engine_mode },
      { "general", "use_system_keyboard_layout",   bus_ibus_impl_set_use_sys_layout },
      { "general", "use_global_engine",            bus_ibus_impl_set_use_global_engine },
      { "general", "embed_preedit_text",           bus_ibus_impl_set_embed_preedit_text },
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 7ca4899..39922a0 100644
+index 7ca4899..d4334e1 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
 @@ -13,6 +13,19 @@
@@ -389,7 +504,7 @@ index 7ca4899..39922a0 100644
 +      <applyto>/desktop/ibus/general/preload_engine_mode</applyto>
 +      <owner>ibus</owner>
 +      <type>int</type>
-+      <default>1</default>
++      <default>0</default>
 +      <locale name="C">
 +        <short>Preload engine mode</short>
 +           <long>Preload engines are loaded with this mode.
@@ -402,7 +517,7 @@ index 7ca4899..39922a0 100644
        <applyto>/desktop/ibus/general/hotkey/trigger</applyto>
        <owner>ibus</owner>
 diff --git a/ibus/common.py b/ibus/common.py
-index e105f18..20c0710 100644
+index 6483aae..127ed93 100644
 --- a/ibus/common.py
 +++ b/ibus/common.py
 @@ -40,6 +40,8 @@ __all__ = (
@@ -426,10 +541,18 @@ index e105f18..20c0710 100644
      pass
  
 diff --git a/setup/main.py b/setup/main.py
-index 7f4a040..9cdce02 100644
+index 7f4a040..192fb88 100644
 --- a/setup/main.py
 +++ b/setup/main.py
-@@ -213,15 +213,22 @@ class Setup(object):
+@@ -92,6 +92,7 @@ class Setup(object):
+         # keyboard shortcut
+         # trigger
+         self.__config = self.__bus.get_config()
++        self.__config.connect("value-changed", self.__config_value_changed_cb)
+         shortcuts = self.__config.get_value(
+                         "general/hotkey", "trigger",
+                         ibus.CONFIG_GENERAL_SHORTCUT_TRIGGER_DEFAULT)
+@@ -213,15 +214,22 @@ class Setup(object):
          self.__checkbutton_use_global_engine.connect("toggled", self.__checkbutton_use_global_engine_toggled_cb)
  
          # init engine page
@@ -457,7 +580,7 @@ index 7f4a040..9cdce02 100644
  
          self.__treeview = self.__builder.get_object("treeview_engines")
          self.__treeview.set_engines(engines)
-@@ -265,6 +272,13 @@ class Setup(object):
+@@ -265,6 +273,26 @@ class Setup(object):
              engine_names = map(lambda e: e.name, engines)
              self.__config.set_list("general", "preload_engines", engine_names, "s")
  
@@ -468,10 +591,23 @@ index 7f4a040..9cdce02 100644
 +        engines = [tmp_dict[name] for name in engine_names if name in tmp_dict]
 +        return engines
 +
++    def __compare_descs(self, engines_a, engines_b):
++        engines = engines_a
++        concat_engine_names = ""
++        for engine in engines:
++            concat_engine_names = "%s::%s" % (concat_engine_names, engine.name)
++        concat_engine_names_a = concat_engine_names
++        engines = engines_b
++        concat_engine_names = ""
++        for engine in engines:
++            concat_engine_names = "%s::%s" % (concat_engine_names, engine.name)
++        concat_engine_names_b = concat_engine_names
++        return concat_engine_names_a == concat_engine_names_b
++
      def __button_engine_add_cb(self, button):
          engine = self.__combobox.get_active_engine()
          self.__treeview.append_engine(engine)
-@@ -276,6 +290,19 @@ class Setup(object):
+@@ -276,6 +304,32 @@ class Setup(object):
              about.run()
              about.destroy()
  
@@ -483,6 +619,19 @@ index 7f4a040..9cdce02 100644
 +            self.__builder.get_object("hbox_customize_active_input_methods").set_sensitive(True)
 +            self.__treeview.notify("engines")
 +        else:
++            message = _("The list of your saved input methods will be " \
++                        "cleared immediately and the list will be " \
++                        "configured by the login language every time. " \
++                        "Do you agree with this?")
++            dlg = gtk.MessageDialog(type = gtk.MESSAGE_QUESTION,
++                    buttons = gtk.BUTTONS_YES_NO,
++                    message_format = message)
++            id = dlg.run()
++            dlg.destroy()
++            self.__flush_gtk_events()
++            if id != gtk.RESPONSE_YES:
++                button.set_active(True)
++                return
 +            self.__config.set_value("general",
 +                                    "preload_engine_mode",
 +                                    ibus.common.PRELOAD_ENGINE_MODE_LANG_RELATIVE)
@@ -491,6 +640,19 @@ index 7f4a040..9cdce02 100644
      def __init_bus(self):
          try:
              self.__bus = ibus.Bus()
+@@ -466,7 +520,11 @@ class Setup(object):
+         self.__config.set_value("general", "use_global_engine", value)
+ 
+     def __config_value_changed_cb(self, bus, section, name, value):
+-        pass
++        if section == 'general' and name == 'preload_engines':
++            engines = self.__get_engine_descs_from_names(value)
++            current_engines = self.__treeview.get_engines()
++            if self.__compare_descs(engines, current_engines) == False:
++                self.__treeview.set_engines(engines)
+ 
+     def __config_reloaded_cb(self, bus):
+         pass
 diff --git a/setup/setup.ui b/setup/setup.ui
 index f1e6d0b..562c091 100644
 --- a/setup/setup.ui
@@ -538,11 +700,11 @@ index f1e6d0b..562c091 100644
                      </child>
                    </object>
 diff --git a/src/ibustypes.h b/src/ibustypes.h
-index 035d124..0a9d7b2 100644
+index 6a31847..14b44fc 100644
 --- a/src/ibustypes.h
 +++ b/src/ibustypes.h
-@@ -177,6 +177,16 @@ typedef enum {
- } IBusBusRequestNameReply;
+@@ -186,6 +186,16 @@ typedef enum {
+ } IBusError;
  
  /**
 + * IBusPreloadEngineMode:
@@ -559,5 +721,5 @@ index 035d124..0a9d7b2 100644
   * @x: x coordinate.
   * @y: y coordinate.
 -- 
-1.7.4.1
+1.7.4.4
 
