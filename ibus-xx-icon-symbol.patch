@@ -1,6 +1,6 @@
-From ec02d646dccd213e1309011160d9d73a26174044 Mon Sep 17 00:00:00 2001
+From 1a7d35e5a29bec75dcc98e934d39cfdb3950ae48 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Mon, 20 Jun 2011 19:10:21 +0900
+Date: Wed, 22 Jun 2011 12:21:55 +0900
 Subject: [PATCH] Add icon_symbol property in IBusEngineDesc.
 
 ---
@@ -8,10 +8,11 @@ Subject: [PATCH] Add icon_symbol property in IBusEngineDesc.
  bus/ibusimpl.c            |   33 ++++++++++++++++++++++
  bus/ibusimpl.h            |    4 +++
  ibus/engine.py            |    3 ++
+ ibus/enginedesc.py        |   18 +++++++++---
  ibus/interface/iengine.py |    3 ++
  src/ibusenginedesc.c      |   66 +++++++++++++++++++++++++++++++++++++++++++++
  src/ibusenginedesc.h      |   10 +++++++
- 7 files changed, 141 insertions(+), 0 deletions(-)
+ 8 files changed, 155 insertions(+), 4 deletions(-)
 
 diff --git a/bus/engineproxy.c b/bus/engineproxy.c
 index f74af12..5c0cbb2 100644
@@ -116,6 +117,72 @@ index fe5dd98..e827408 100644
  
  class EngineProxy(interface.IEngine):
      def __init__(self, engine, conn, object_path):
+diff --git a/ibus/enginedesc.py b/ibus/enginedesc.py
+index e8a8982..f6b4110 100644
+--- a/ibus/enginedesc.py
++++ b/ibus/enginedesc.py
+@@ -31,7 +31,7 @@ from serializable import *
+ class EngineDesc(Serializable):
+     __gtype_name__ = "PYIBusEngineDesc"
+     __NAME__ = "IBusEngineDesc"
+-    def __init__(self, name="", longname="", description="", language="", license="", author="", icon="", layout="", hotkeys="", rank=0):
++    def __init__(self, name="", longname="", description="", language="", license="", author="", icon="", layout="", hotkeys="", rank=0, icon_symbol=""):
+         super(EngineDesc, self).__init__()
+         self.__name = name
+         self.__longname = longname
+@@ -43,6 +43,7 @@ class EngineDesc(Serializable):
+         self.__layout = layout
+         self.__rank = rank
+         self.__hotkeys = hotkeys
++        self.__icon_symbol = icon_symbol
+ 
+     def get_name(self):
+         return self.__name
+@@ -74,6 +75,9 @@ class EngineDesc(Serializable):
+     def get_hotkeys(self):
+         return self.__hotkeys
+ 
++    def get_icon_symbol(self):
++        return self.__icon_symbol
++
+     name        = property(get_name)
+     longname    = property(get_longname)
+     description = property(get_description)
+@@ -84,6 +88,7 @@ class EngineDesc(Serializable):
+     layout      = property(get_layout)
+     rank        = property(get_rank)
+     hotkeys     = property(get_hotkeys)
++    icon_symbol = property(get_icon_symbol)
+ 
+     def serialize(self, struct):
+         super(EngineDesc, self).serialize(struct)
+@@ -98,7 +103,9 @@ class EngineDesc(Serializable):
+         struct.append(dbus.UInt32(self.__rank))
+         struct.append(dbus.String(self.__hotkeys))
+         # New properties of EngineDesc will use dict for serialize
+-        struct.append(dbus.Array({}, signature=None))
++        extension = dbus.Dictionary(signature="sv")
++        extension[dbus.String('icon_symbol')] = dbus.String(self.__icon_symbol)
++        struct.append(extension)
+ 
+     def deserialize(self, struct):
+         super(EngineDesc, self).deserialize(struct)
+@@ -113,10 +120,13 @@ class EngineDesc(Serializable):
+         self.__rank = struct.pop(0)
+         self.__hotkeys = struct.pop(0)
+         # New properties of EngineDesc will use dict for serialize
+-        #value = struct.pop(0)
++        l = struct.pop(0)
++        for key, value in l.items():
++            if key == 'icon_symbol':
++                self.__icon_symbol= unicode(value)
+ 
+ def test():
+-    engine = EngineDesc("Hello", "", "", "", "", "", "", "", "")
++    engine = EngineDesc("Hello", "", "", "", "", "", "", "", "", 0, "")
+     value = serialize_object(engine)
+     engine = deserialize_object(value)
+ 
 diff --git a/ibus/interface/iengine.py b/ibus/interface/iengine.py
 index 9e0d981..7cefcdf 100644
 --- a/ibus/interface/iengine.py
