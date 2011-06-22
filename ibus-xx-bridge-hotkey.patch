@@ -1,12 +1,12 @@
-From a3a7b364410511b3a17f2b1566ba4c4c4f0de2cf Mon Sep 17 00:00:00 2001
+From faaea227c58ec17d392ec4ecdf3851e1a52ecd00 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Tue, 21 Jun 2011 17:00:54 +0900
+Date: Wed, 22 Jun 2011 19:26:21 +0900
 Subject: [PATCH] Add a bridge hotkey which use prev-next engines instead
  of on-off.
 
 ---
  bus/Makefile.am            |   20 ++--
- bus/ibusimpl.c             |  244 ++++++++++++++++++++++++++++----------
+ bus/ibusimpl.c             |  250 +++++++++++++++++++++++++++++----------
  bus/registry.c             |   35 ++++++
  configure.ac               |   31 +++++
  data/Makefile.am           |    6 +-
@@ -14,6 +14,7 @@ Subject: [PATCH] Add a bridge hotkey which use prev-next engines instead
  data/ibus.schemas.in.in    |  286 ++++++++++++++++++++++++++++++++++++++++++++
  ibus/_config.py.in         |    6 +
  ibus/inputcontext.py       |    4 +
+ setup/enginetreeview.py    |    3 +
  src/Makefile.am            |    1 +
  src/ibusbus.c              |    6 +
  src/ibusbus.h              |    9 ++
@@ -24,7 +25,7 @@ Subject: [PATCH] Add a bridge hotkey which use prev-next engines instead
  xkb/Makefile.am            |    2 +
  xkb/ibus-engine-xkb-main.c |    8 ++
  xkb/xkbxml.c               |    8 +-
- 19 files changed, 677 insertions(+), 361 deletions(-)
+ 20 files changed, 686 insertions(+), 361 deletions(-)
  delete mode 100644 data/ibus.schemas.in
  create mode 100644 data/ibus.schemas.in.in
 
@@ -60,7 +61,7 @@ index 074b456..0efaa1b 100644
  AM_LDADD =                  \
  	@GOBJECT2_LIBS@         \
 diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
-index 38d6d11..3b2d539 100644
+index 38d6d11..65a034b 100644
 --- a/bus/ibusimpl.c
 +++ b/bus/ibusimpl.c
 @@ -20,6 +20,10 @@
@@ -114,7 +115,7 @@ index 38d6d11..3b2d539 100644
  static void
  _config_set_value_done (GObject      *object,
                          GAsyncResult *res,
-@@ -475,8 +505,17 @@ _set_preload_engines (BusIBusImpl *ibus,
+@@ -475,8 +505,21 @@ _set_preload_engines (BusIBusImpl *ibus,
          g_variant_unref (value);
      }
  
@@ -125,7 +126,11 @@ index 38d6d11..3b2d539 100644
 +        IBusEngineDesc *engine = bus_registry_find_engine_by_name (ibus->registry,
 +                                                                   DEFAULT_BRIDGE_ENGINE_NAME);
 +        g_assert (engine != NULL);
-+        engine_list = g_list_append (engine_list, engine);
++        if (g_list_length (engine_list) > 0) {
++            engine_list = g_list_insert (engine_list, engine, 1);
++        } else {
++            engine_list = g_list_append (engine_list, engine);
++        }
 +        ibus->engine_list = engine_list;
 +    }
 +#endif
@@ -133,7 +138,17 @@ index 38d6d11..3b2d539 100644
  
      if (ibus->engine_list) {
          BusComponent *component = bus_component_from_engine_desc ((IBusEngineDesc *) ibus->engine_list->data);
-@@ -1182,28 +1221,110 @@ _ibus_get_address (BusIBusImpl          
+@@ -573,7 +616,9 @@ bus_ibus_impl_set_trigger (BusIBusImpl *
+ {
+     GQuark hotkey = g_quark_from_static_string ("trigger");
+     if (value != NULL) {
++#if !USE_BRIDGE_HOTKEY
+         bus_ibus_impl_set_hotkey (ibus, hotkey, value);
++#endif
+     }
+ #ifndef OS_CHROMEOS
+     else {
+@@ -1182,28 +1227,110 @@ _ibus_get_address (BusIBusImpl          
                                             g_variant_new ("(s)", bus_server_get_address ()));
  }
  
@@ -261,7 +276,7 @@ index 38d6d11..3b2d539 100644
  }
  
  /**
-@@ -1216,7 +1337,39 @@ _context_request_engine_cb (BusInputCont
+@@ -1216,7 +1343,39 @@ _context_request_engine_cb (BusInputCont
                              const gchar     *engine_name,
                              BusIBusImpl     *ibus)
  {
@@ -302,7 +317,7 @@ index 38d6d11..3b2d539 100644
  }
  
  /**
-@@ -2357,6 +2510,11 @@ bus_ibus_impl_filter_keyboard_shortcuts 
+@@ -2357,6 +2516,11 @@ bus_ibus_impl_filter_keyboard_shortcuts 
           * the same hotkey, then we should switch to the next engine with the
           * same hotkey in the list. Otherwise, we just switch to the first
           * engine in the list. */
@@ -314,7 +329,7 @@ index 38d6d11..3b2d539 100644
          GList *p = engine_list;
          for (; p->next != NULL; p = p->next) {
              if (current_engine_desc == (IBusEngineDesc *) p->data) {
-@@ -2364,9 +2522,14 @@ bus_ibus_impl_filter_keyboard_shortcuts 
+@@ -2364,9 +2528,14 @@ bus_ibus_impl_filter_keyboard_shortcuts 
                  break;
              }
          }
@@ -329,7 +344,7 @@ index 38d6d11..3b2d539 100644
          }
  
          return TRUE;
-@@ -2470,14 +2633,6 @@ static void
+@@ -2470,14 +2639,6 @@ static void
  _add_engine_hotkey (IBusEngineDesc *engine, BusIBusImpl *ibus)
  {
      const gchar *hotkeys;
@@ -344,7 +359,7 @@ index 38d6d11..3b2d539 100644
  
      if (!engine) {
          return;
-@@ -2489,40 +2644,7 @@ _add_engine_hotkey (IBusEngineDesc *engi
+@@ -2489,40 +2650,7 @@ _add_engine_hotkey (IBusEngineDesc *engi
          return;
      }
  
@@ -592,6 +607,20 @@ index ceeb56d..2694fa3 100644
      def introspect(self):
          return self.__context.Introspect()
  
+diff --git a/setup/enginetreeview.py b/setup/enginetreeview.py
+index f620361..727cf89 100644
+--- a/setup/enginetreeview.py
++++ b/setup/enginetreeview.py
+@@ -210,6 +210,9 @@ class EngineTreeView(gtk.TreeView):
+             return
+         row = self.__model[iter]
+         engine = row[0]
++        if ibus.use_bridge_hotkey() and \
++           ibus.DEFAULT_BRIDGE_ENGINE_NAME == engine.name:
++            return
+         self.__engines.remove(engine)
+         index = row.path[0]
+         self.__model.remove(iter)
 diff --git a/src/Makefile.am b/src/Makefile.am
 index 6454522..443b0db 100644
 --- a/src/Makefile.am
