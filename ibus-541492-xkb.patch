@@ -1,6 +1,6 @@
-From 7fab90a9962d3b4f8eff40cf08939873575d153e Mon Sep 17 00:00:00 2001
+From 14986cb38f431d132332b2e8f9da1ca2b8a5d10e Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Tue, 21 Jun 2011 11:34:52 +0900
+Date: Wed, 29 Jun 2011 16:52:08 +0900
 Subject: [PATCH] Add XKB layouts
 
 ---
@@ -12,7 +12,7 @@ Subject: [PATCH] Add XKB layouts
  ibus/__init__.py           |    2 +
  ibus/bus.py                |    3 +
  ibus/interface/iibus.py    |    3 +
- ibus/xkblayout.py.in       |  225 ++++++++++++++++
+ ibus/xkblayout.py.in       |  215 ++++++++++++++++
  ibus/xkbxml.py.in          |  413 ++++++++++++++++++++++++++++++
  setup/Makefile.am          |    1 +
  setup/enginecombobox.py    |    7 +-
@@ -36,7 +36,7 @@ Subject: [PATCH] Add XKB layouts
  xkb/xkblib.h               |   41 +++
  xkb/xkbxml.c               |  335 ++++++++++++++++++++++++
  xkb/xkbxml.h               |  110 ++++++++
- 32 files changed, 4018 insertions(+), 6 deletions(-)
+ 32 files changed, 4008 insertions(+), 6 deletions(-)
  create mode 100644 ibus/xkblayout.py.in
  create mode 100644 ibus/xkbxml.py.in
  create mode 100644 setup/xkbsetup.py
@@ -303,10 +303,10 @@ index 678d517..7de56fc 100644
  
 diff --git a/ibus/xkblayout.py.in b/ibus/xkblayout.py.in
 new file mode 100644
-index 0000000..637f6c1
+index 0000000..4cb3ffd
 --- /dev/null
 +++ b/ibus/xkblayout.py.in
-@@ -0,0 +1,225 @@
+@@ -0,0 +1,215 @@
 +# vim:set et sts=4 sw=4:
 +#
 +# ibus - The Input Bus
@@ -360,22 +360,12 @@ index 0000000..637f6c1
 +
 +
 +    def __get_model_from_layout(self, layout):
-+        layout_array = layout.split(',')
-+        option_array = []
-+        is_bracket = False
-+        for i, l in enumerate(layout_array):
-+            option_array.append("")
-+            left_bracket = l.find('(')
-+            right_bracket = l.find(')')
-+            if left_bracket >= 0 and right_bracket > left_bracket:
-+                is_bracket = True
-+                layout_array[i] = l[:left_bracket]
-+                option_array[i] = l[left_bracket + 1:right_bracket]
-+        if is_bracket == False:
-+            return (layout, "default")
-+        layout = ','.join(layout_array)
-+        option = ','.join(option_array)
-+        return (layout, option)
++        left_bracket = layout.find('(')
++        right_bracket = layout.find(')')
++        if left_bracket >= 0 and right_bracket > left_bracket:
++            return (layout[:left_bracket], \
++                    layout[left_bracket + 1:right_bracket])
++        return (layout, "default")
 +
 +    def __get_output_from_cmdline(self, arg, string):
 +        exec_command = "%s %s" % (self.__command, arg)
@@ -4506,5 +4496,5 @@ index 0000000..56811ef
 +G_END_DECLS
 +#endif
 -- 
-1.7.4.4
+1.7.5.4
 

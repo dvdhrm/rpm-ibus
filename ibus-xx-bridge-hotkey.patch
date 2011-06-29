@@ -1,12 +1,12 @@
-From faaea227c58ec17d392ec4ecdf3851e1a52ecd00 Mon Sep 17 00:00:00 2001
+From b58e9d7673d255f86f5224b527457c0132eea3c8 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 22 Jun 2011 19:26:21 +0900
+Date: Wed, 29 Jun 2011 16:54:45 +0900
 Subject: [PATCH] Add a bridge hotkey which use prev-next engines instead
  of on-off.
 
 ---
  bus/Makefile.am            |   20 ++--
- bus/ibusimpl.c             |  250 +++++++++++++++++++++++++++++----------
+ bus/ibusimpl.c             |  255 ++++++++++++++++++++++++++++++----------
  bus/registry.c             |   35 ++++++
  configure.ac               |   31 +++++
  data/Makefile.am           |    6 +-
@@ -14,18 +14,19 @@ Subject: [PATCH] Add a bridge hotkey which use prev-next engines instead
  data/ibus.schemas.in.in    |  286 ++++++++++++++++++++++++++++++++++++++++++++
  ibus/_config.py.in         |    6 +
  ibus/inputcontext.py       |    4 +
- setup/enginetreeview.py    |    3 +
- src/Makefile.am            |    1 +
- src/ibusbus.c              |    6 +
- src/ibusbus.h              |    9 ++
+ setup/enginecombobox.py    |    3 +
+ setup/enginetreeview.py    |   16 ++-
+ src/Makefile.am            |   18 ++--
+ src/ibusbus.c              |   12 ++
+ src/ibusbus.h              |   18 +++
  src/ibusenginedesc.c       |    4 +
  src/ibushotkey.c           |   11 ++
  src/ibushotkey.h           |   11 ++
- ui/gtk/panel.py            |   60 +++++++++-
+ ui/gtk/panel.py            |  151 ++++++++++++++++++++---
  xkb/Makefile.am            |    2 +
  xkb/ibus-engine-xkb-main.c |    8 ++
  xkb/xkbxml.c               |    8 +-
- 20 files changed, 686 insertions(+), 361 deletions(-)
+ 21 files changed, 804 insertions(+), 387 deletions(-)
  delete mode 100644 data/ibus.schemas.in
  create mode 100644 data/ibus.schemas.in.in
 
@@ -61,7 +62,7 @@ index 074b456..0efaa1b 100644
  AM_LDADD =                  \
  	@GOBJECT2_LIBS@         \
 diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
-index 38d6d11..65a034b 100644
+index b356b2c..f3ca330 100644
 --- a/bus/ibusimpl.c
 +++ b/bus/ibusimpl.c
 @@ -20,6 +20,10 @@
@@ -75,16 +76,18 @@ index 38d6d11..65a034b 100644
  #include <unistd.h>
  #include <sys/types.h>
  #include <sys/wait.h>
-@@ -79,6 +83,8 @@ struct _BusIBusImpl {
+@@ -79,6 +83,10 @@ struct _BusIBusImpl {
      /* engine-specific hotkeys */
      IBusHotkeyProfile *engines_hotkey_profile;
      GHashTable      *hotkey_to_engines_map;
 +
++#if USE_BRIDGE_HOTKEY
 +    IBusEngineDesc *prev_hotkey_engine;
++#endif
  };
  
  struct _BusIBusImplClass {
-@@ -285,6 +291,30 @@ _panel_destroy_cb (BusPanelProxy *panel,
+@@ -285,6 +293,30 @@ _panel_destroy_cb (BusPanelProxy *panel,
      g_object_unref (panel);
  }
  
@@ -115,7 +118,7 @@ index 38d6d11..65a034b 100644
  static void
  _config_set_value_done (GObject      *object,
                          GAsyncResult *res,
-@@ -475,8 +505,21 @@ _set_preload_engines (BusIBusImpl *ibus,
+@@ -475,8 +507,21 @@ _set_preload_engines (BusIBusImpl *ibus,
          g_variant_unref (value);
      }
  
@@ -138,7 +141,7 @@ index 38d6d11..65a034b 100644
  
      if (ibus->engine_list) {
          BusComponent *component = bus_component_from_engine_desc ((IBusEngineDesc *) ibus->engine_list->data);
-@@ -573,7 +616,9 @@ bus_ibus_impl_set_trigger (BusIBusImpl *
+@@ -573,7 +618,9 @@ bus_ibus_impl_set_trigger (BusIBusImpl *
  {
      GQuark hotkey = g_quark_from_static_string ("trigger");
      if (value != NULL) {
@@ -148,7 +151,7 @@ index 38d6d11..65a034b 100644
      }
  #ifndef OS_CHROMEOS
      else {
-@@ -1182,28 +1227,110 @@ _ibus_get_address (BusIBusImpl          
+@@ -1182,28 +1229,110 @@ _ibus_get_address (BusIBusImpl          
                                             g_variant_new ("(s)", bus_server_get_address ()));
  }
  
@@ -276,7 +279,7 @@ index 38d6d11..65a034b 100644
  }
  
  /**
-@@ -1216,7 +1343,39 @@ _context_request_engine_cb (BusInputCont
+@@ -1216,7 +1345,39 @@ _context_request_engine_cb (BusInputCont
                              const gchar     *engine_name,
                              BusIBusImpl     *ibus)
  {
@@ -317,7 +320,7 @@ index 38d6d11..65a034b 100644
  }
  
  /**
-@@ -2357,6 +2516,11 @@ bus_ibus_impl_filter_keyboard_shortcuts 
+@@ -2357,6 +2518,11 @@ bus_ibus_impl_filter_keyboard_shortcuts 
           * the same hotkey, then we should switch to the next engine with the
           * same hotkey in the list. Otherwise, we just switch to the first
           * engine in the list. */
@@ -329,22 +332,24 @@ index 38d6d11..65a034b 100644
          GList *p = engine_list;
          for (; p->next != NULL; p = p->next) {
              if (current_engine_desc == (IBusEngineDesc *) p->data) {
-@@ -2364,9 +2528,14 @@ bus_ibus_impl_filter_keyboard_shortcuts 
+@@ -2364,8 +2530,16 @@ bus_ibus_impl_filter_keyboard_shortcuts 
                  break;
              }
          }
 +#endif
  
-         if (current_engine_desc != new_engine_desc) {
++#if USE_BRIDGE_HOTKEY
++        if (current_engine_desc != new_engine_desc ||
++            g_strcmp0 (ibus_engine_desc_get_name (new_engine_desc),
++                       DEFAULT_BRIDGE_ENGINE_NAME) == 0) {
 +            ibus->prev_hotkey_engine = current_engine_desc;
++#else
+         if (current_engine_desc != new_engine_desc) {
++#endif
              bus_ibus_impl_set_context_engine_from_desc (ibus, context, new_engine_desc);
-+        } else {
-+            g_warning ("The engine %s is registered twice in hotkeys",
-+                       ibus_engine_desc_get_name (current_engine_desc));
          }
  
-         return TRUE;
-@@ -2470,14 +2639,6 @@ static void
+@@ -2470,14 +2644,6 @@ static void
  _add_engine_hotkey (IBusEngineDesc *engine, BusIBusImpl *ibus)
  {
      const gchar *hotkeys;
@@ -359,7 +364,7 @@ index 38d6d11..65a034b 100644
  
      if (!engine) {
          return;
-@@ -2489,40 +2650,7 @@ _add_engine_hotkey (IBusEngineDesc *engi
+@@ -2489,40 +2655,7 @@ _add_engine_hotkey (IBusEngineDesc *engi
          return;
      }
  
@@ -607,37 +612,88 @@ index ceeb56d..2694fa3 100644
      def introspect(self):
          return self.__context.Introspect()
  
+diff --git a/setup/enginecombobox.py b/setup/enginecombobox.py
+index 7383177..247facc 100644
+--- a/setup/enginecombobox.py
++++ b/setup/enginecombobox.py
+@@ -64,6 +64,9 @@ class EngineComboBox(gtk.ComboBox):
+         self.__model.set(iter1, 0, 0)
+         lang = {}
+         for e in engines:
++            if ibus.use_bridge_hotkey() and \
++               e.name == ibus.DEFAULT_BRIDGE_ENGINE_NAME:
++                continue
+             l = ibus.get_language_name(e.language)
+             if l not in lang:
+                 lang[l] = []
 diff --git a/setup/enginetreeview.py b/setup/enginetreeview.py
-index f620361..727cf89 100644
+index f620361..0e50ad5 100644
 --- a/setup/enginetreeview.py
 +++ b/setup/enginetreeview.py
-@@ -210,6 +210,9 @@ class EngineTreeView(gtk.TreeView):
-             return
-         row = self.__model[iter]
-         engine = row[0]
-+        if ibus.use_bridge_hotkey() and \
-+           ibus.DEFAULT_BRIDGE_ENGINE_NAME == engine.name:
-+            return
-         self.__engines.remove(engine)
-         index = row.path[0]
-         self.__model.remove(iter)
+@@ -162,6 +162,14 @@ class EngineTreeView(gtk.TreeView):
+             return row[0]
+         elif property.name == "engines":
+             engines = [ r[0] for r in self.__model if r[0] != None]
++            for i, e in enumerate(self.__engines):
++                if ibus.use_bridge_hotkey() and \
++                   e.name == ibus.DEFAULT_BRIDGE_ENGINE_NAME:
++                    if i < len(engines):
++                        engines.insert(i, e)
++                    else:
++                        engines.append(e)
++                    break
+             return engines
+         else:
+             raise AttributeError, 'unknown property %s' % property.name
+@@ -172,8 +180,12 @@ class EngineTreeView(gtk.TreeView):
+         for e in engines:
+             if e in self.__engines:
+                 continue
+-            iter = self.__model.append(None)
+-            self.__model.set(iter, 0, e)
++            if ibus.use_bridge_hotkey() and \
++               e.name == ibus.DEFAULT_BRIDGE_ENGINE_NAME:
++                pass
++            else:
++                iter = self.__model.append(None)
++                self.__model.set(iter, 0, e)
+             self.__engines.add(e)
+         self.__emit_changed()
+ 
 diff --git a/src/Makefile.am b/src/Makefile.am
-index 6454522..443b0db 100644
+index 6454522..319df3c 100644
 --- a/src/Makefile.am
 +++ b/src/Makefile.am
-@@ -46,6 +46,7 @@ AM_CPPFLAGS =                                   \
-     -DIBUS_DATA_DIR=\"$(pkgdatadir)\"           \
-     -DIBUS_COMPILATION                          \
-     -DISOCODES_PREFIX=\"$(ISOCODES_PREFIX)\"    \
-+    -DUSE_BRIDGE_HOTKEY=$(USE_BRIDGE_HOTKEY)    \
+@@ -38,14 +38,16 @@ INTROSPECTION_GIRS =
+ CLEANFILES =
+ 
+ # C preprocessor flags
+-AM_CPPFLAGS =                                   \
+-    -DG_LOG_DOMAIN=\"IBUS\"                     \
+-    @GLIB2_CFLAGS@                              \
+-    @GOBJECT2_CFLAGS@                           \
+-    @GIO2_CFLAGS@                               \
+-    -DIBUS_DATA_DIR=\"$(pkgdatadir)\"           \
+-    -DIBUS_COMPILATION                          \
+-    -DISOCODES_PREFIX=\"$(ISOCODES_PREFIX)\"    \
++AM_CPPFLAGS =                                                           \
++    -DG_LOG_DOMAIN=\"IBUS\"                                             \
++    @GLIB2_CFLAGS@                                                      \
++    @GOBJECT2_CFLAGS@                                                   \
++    @GIO2_CFLAGS@                                                       \
++    -DIBUS_DATA_DIR=\"$(pkgdatadir)\"                                   \
++    -DIBUS_COMPILATION                                                  \
++    -DISOCODES_PREFIX=\"$(ISOCODES_PREFIX)\"                            \
++    -DUSE_BRIDGE_HOTKEY=$(USE_BRIDGE_HOTKEY)                            \
++    -DDEFAULT_BRIDGE_ENGINE_NAME=\"$(DEFAULT_BRIDGE_ENGINE_NAME)\"      \
      $(NULL)
  
  # ibus library
 diff --git a/src/ibusbus.c b/src/ibusbus.c
-index 39ad784..5a8f9a9 100644
+index 39ad784..abc4331 100644
 --- a/src/ibusbus.c
 +++ b/src/ibusbus.c
-@@ -1902,3 +1902,9 @@ ibus_bus_call_async (IBusBus            *bus,
+@@ -1902,3 +1902,15 @@ ibus_bus_call_async (IBusBus            *bus,
                              (GAsyncReadyCallback) ibus_bus_call_async_done,
                              simple);
  }
@@ -647,11 +703,17 @@ index 39ad784..5a8f9a9 100644
 +{
 +    return (USE_BRIDGE_HOTKEY == 1) ? TRUE : FALSE;
 +}
++
++gchar *
++ibus_bus_get_default_bridge_engine_name (IBusBus *bus)
++{
++    return g_strdup (DEFAULT_BRIDGE_ENGINE_NAME);
++}
 diff --git a/src/ibusbus.h b/src/ibusbus.h
-index 77d3916..4bdf760 100644
+index 77d3916..f560671 100644
 --- a/src/ibusbus.h
 +++ b/src/ibusbus.h
-@@ -971,5 +971,14 @@ void         ibus_bus_set_watch_ibus_signal
+@@ -971,5 +971,23 @@ void         ibus_bus_set_watch_ibus_signal
   */
  IBusConfig  *ibus_bus_get_config        (IBusBus        *bus);
  
@@ -664,13 +726,22 @@ index 77d3916..4bdf760 100644
 + */
 +gboolean     ibus_bus_use_bridge_hotkey (IBusBus *bus);
 +
++/**
++ * ibus_bus_get_default_bridge_engine_name:
++ * @bus: An #IBusBus.
++ * @returns: A default bridge engine name.
++ *
++ * Return A default bridge engine name. Need to be freed.
++ */
++gchar       *ibus_bus_get_default_bridge_engine_name (IBusBus *bus);
++
  G_END_DECLS
  #endif
 diff --git a/src/ibusenginedesc.c b/src/ibusenginedesc.c
-index d3800e1..a9e68be 100644
+index fa3a768..3d6100e 100644
 --- a/src/ibusenginedesc.c
 +++ b/src/ibusenginedesc.c
-@@ -233,7 +233,11 @@ ibus_engine_desc_class_init (IBusEngineDescClass *class)
+@@ -232,7 +232,11 @@ ibus_engine_desc_class_init (IBusEngineDescClass *class)
                      g_param_spec_string ("hotkeys",
                          "description hotkeys",
                          "The hotkeys of engine description",
@@ -723,22 +794,25 @@ index 9a341f6..92ec6af 100644
  G_END_DECLS
  #endif
 diff --git a/ui/gtk/panel.py b/ui/gtk/panel.py
-index de64920..7f2edcd 100644
+index de64920..1dae2b1 100644
 --- a/ui/gtk/panel.py
 +++ b/ui/gtk/panel.py
-@@ -133,6 +133,11 @@ class Panel(ibus.PanelBase):
+@@ -133,6 +133,14 @@ class Panel(ibus.PanelBase):
          # self.__bus.request_name(ibus.panel.IBUS_SERVICE_PANEL, 0)
  
          # init xkb
 +        self.__default_layout = 'default'
 +        self.__default_model = 'default'
 +        self.__default_option = 'default'
-+        self.__disabled_engine = None
++        self.__disabled_engines = None
++        self.__disabled_engines_id = -1
++        self.__disabled_engines_prev_id = -1
++        self.__disabled_engines_swapped = 0
 +
          self.__xkblayout = ibus.XKBLayout(self.__config)
          use_xkb = self.__config.get_value("general", "use_system_keyboard_layout", False)
          if not use_xkb:
-@@ -142,11 +147,18 @@ class Panel(ibus.PanelBase):
+@@ -142,11 +150,18 @@ class Panel(ibus.PanelBase):
              value = 'default'
          if value != 'default':
              self.__xkblayout.set_default_layout(value)
@@ -757,7 +831,7 @@ index de64920..7f2edcd 100644
  
      def set_cursor_location(self, x, y, w, h):
          self.__candidate_panel.set_cursor_location(x, y, w, h)
-@@ -233,6 +245,41 @@ class Panel(ibus.PanelBase):
+@@ -233,12 +248,57 @@ class Panel(ibus.PanelBase):
      def __set_im_name(self, name):
          self.__language_bar.set_im_name(name)
  
@@ -766,64 +840,131 @@ index de64920..7f2edcd 100644
 +        default_model = self.__default_model
 +        if default_layout == 'default':
 +            default_layout = self.__xkblayout.get_default_layout()[0]
-+            default_model = None
++            default_model = self.__xkblayout.get_default_layout()[1]
 +        if default_model == 'default':
 +            default_model = self.__xkblayout.get_default_layout()[1]
 +        layouts = default_layout.split(',')
-+        group = self.__xkblayout.get_group()
-+        layout = layouts[group]
-+        model = None
++        models = None
 +        if default_model != None and default_model != '':
 +            models = default_model.split(',')
-+            if group < models.length:
-+                model = models[group]
-+        registry = ibus.XKBConfigRegistry()
-+        langs = registry.get_layout_lang()[layout]
-+        lang = 'en'
-+        im_icon = layout[:2]
-+        if langs != None:
-+            im_icon = langs[0][:2]
-+            lang = str(langs[0])
-+        if self.__disabled_engine == None:
-+            self.__disabled_engine = registry.engine_desc_new(lang,
-+                                                              self.__default_layout,
-+                                                              'Default Layout',
-+                                                              default_model,
-+                                                              None)
-+        if self.__focus_ic != None:
-+            prev_engine = self.__focus_ic.get_engine()
-+        if prev_engine == None or \
-+           prev_engine.name != self.__disabled_engine.name:
++        if self.__disabled_engines == None or self.__disabled_engines == []:
++            self.__disabled_engines = []
++            for i, layout in enumerate(layouts):
++                registry = ibus.XKBConfigRegistry()
++                langs = registry.get_layout_lang()[layout]
++                lang = 'en'
++                if langs != None:
++                    lang = str(langs[0])
++                model = None
++                if i == 0:
++                    layout = default_layout
++                    model = default_model
++                elif i < len(models):
++                    model = models[i]
++                if model == '':
++                    model = None
++                model_desc = _("Default Layout")
++                if model != None:
++                    model_desc = model_desc + " (" + model + ")"
++                engine = registry.engine_desc_new(lang,
++                                                  layout,
++                                                  _("Default Layout"),
++                                                  model,
++                                                  model_desc)
++                self.__disabled_engines.append(engine)
++            self.__disabled_engines_id = self.__xkblayout.get_group()
++        if self.__focus_ic == None:
++            return
++        if not self.__focus_ic.is_enabled():
 +            self.__focus_ic.set_bridge_engine()
 +
      def focus_in(self, ic):
          self.reset()
          self.__focus_ic = ibus.InputContext(self.__bus, ic)
-@@ -240,6 +287,9 @@ class Panel(ibus.PanelBase):
+         enabled = self.__focus_ic.is_enabled()
          self.__language_bar.set_enabled(enabled)
  
++        if ibus.use_bridge_hotkey():
++            self.__set_default_layout_engine()
          if not enabled:
-+            if ibus.use_bridge_hotkey():
-+                self.__set_default_layout_engine()
-+
              self.__set_im_icon(ICON_KEYBOARD)
              self.__set_im_name(None)
-             if self.__bus.get_use_sys_layout():
-@@ -453,7 +503,12 @@ class Panel(ibus.PanelBase):
+@@ -250,7 +310,7 @@ class Panel(ibus.PanelBase):
+                 self.__set_im_icon(engine.icon)
+                 self.__set_im_name(engine.longname)
+                 if self.__bus.get_use_sys_layout():
+-                    self.__xkblayout.set_layout(self.__engine_get_layout_wrapper(engine))
++                    self.__xkblayout.set_layout(self.__engine_get_layout_wrapper(engine, False))
+             else:
+                 self.__set_im_icon(ICON_KEYBOARD)
+                 self.__set_im_name(None)
+@@ -287,7 +347,7 @@ class Panel(ibus.PanelBase):
+                 self.__set_im_icon(engine.icon)
+                 self.__set_im_name(engine.longname)
+                 if self.__bus.get_use_sys_layout():
+-                    self.__xkblayout.set_layout(self.__engine_get_layout_wrapper(engine))
++                    self.__xkblayout.set_layout(self.__engine_get_layout_wrapper(engine, True))
+             else:
+                 self.__set_im_icon(ICON_KEYBOARD)
+                 self.__set_im_name(None)
+@@ -443,6 +503,21 @@ class Panel(ibus.PanelBase):
+     #     menu.set_take_focus(False)
+     #     return menu
+ 
++    def __add_engine_in_menu(self, menu, engine, is_bold, size):
++        language = engine.language
++        lang = ibus.get_language_name(language)
++        item = gtk.ImageMenuItem("%s - %s" % (lang, engine.longname))
++        if is_bold:
++            for widget in item.get_children():
++                if isinstance(widget, gtk.Label):
++                    widget.set_markup("<b>%s</b>" % widget.get_text())
++        if engine.icon:
++            item.set_image(_icon.IconWidget(engine.icon, size[0]))
++        else:
++            item.set_image(_icon.IconWidget(ICON_ENGINE, size[0]))
++        item.connect("activate", self.__im_menu_item_activate_cb, engine)
++        menu.add(item)
++
+     def __create_im_menu(self):
+         engines = self.__bus.list_active_engines()
+         current_engine = \
+@@ -453,25 +528,31 @@ class Panel(ibus.PanelBase):
          size = gtk.icon_size_lookup(gtk.ICON_SIZE_MENU)
          menu = gtk.Menu()
          for i, engine in enumerate(engines):
 -            lang = ibus.get_language_name(engine.language)
-+            language = engine.language
+-            item = gtk.ImageMenuItem("%s - %s" % (lang, engine.longname))
+-            if current_engine and current_engine.name == engine.name:
+-                for widget in item.get_children():
+-                    if isinstance(widget, gtk.Label):
+-                        widget.set_markup("<b>%s</b>" % widget.get_text())
+-            if engine.icon:
+-                item.set_image(_icon.IconWidget(engine.icon, size[0]))
+-            else:
+-                item.set_image(_icon.IconWidget(ICON_ENGINE, size[0]))
+-            item.connect("activate", self.__im_menu_item_activate_cb, engine)
+-            menu.add(item)
 +            if ibus.use_bridge_hotkey() and \
 +                engine.name == ibus.DEFAULT_BRIDGE_ENGINE_NAME and \
-+                self.__disabled_engine != None:
-+                language = self.__disabled_engine.language
-+            lang = ibus.get_language_name(language)
-             item = gtk.ImageMenuItem("%s - %s" % (lang, engine.longname))
-             if current_engine and current_engine.name == engine.name:
-                 for widget in item.get_children():
-@@ -471,7 +526,8 @@ class Panel(ibus.PanelBase):
++                self.__disabled_engines != None:
++                for j, kb_engine in enumerate(self.__disabled_engines):
++                    kb_engine.is_bridge = True
++                    kb_engine.disabled_engines_id = j
++                    is_bold = True if (current_engine != None and \
++                            current_engine.name == engine.name and \
++                            j == self.__disabled_engines_id) else False
++                    self.__add_engine_in_menu(menu, kb_engine,
++                                              is_bold,
++                                              size)
++                continue
++            engine.is_bridge = False
++            is_bold = True if (current_engine != None and \
++                    current_engine.name == engine.name) else False
++            self.__add_engine_in_menu(menu, engine, is_bold, size)
+ 
+         item = gtk.ImageMenuItem(_("Turn off input method"))
+         item.set_image(_icon.IconWidget("gtk-close", size[0]))
          item.connect("activate", self.__im_menu_item_activate_cb, None)
          if self.__focus_ic == None or not self.__focus_ic.is_enabled():
              item.set_sensitive(False)
@@ -833,6 +974,64 @@ index de64920..7f2edcd 100644
  
          menu.show_all()
          menu.set_take_focus(False)
+@@ -523,8 +604,25 @@ class Panel(ibus.PanelBase):
+         if not self.__focus_ic:
+             return
+         if engine:
+-            self.__focus_ic.set_engine(engine)
++            if ibus.use_bridge_hotkey() and engine.is_bridge:
++                engines = self.__bus.list_active_engines()
++                current_engine = \
++                    (self.__focus_ic != None and self.__focus_ic.get_engine()) or \
++                    (engines and engines[0]) or \
++                    None
++                if current_engine and \
++                   current_engine.name == ibus.DEFAULT_BRIDGE_ENGINE_NAME:
++                    self.__disabled_engines_prev_id = self.__disabled_engines_id
++                    self.__disabled_engines_swapped = 0
++                else:
++                    self.__disabled_engines_prev_id = -1
++                self.__disabled_engines_id = engine.disabled_engines_id
++                self.__focus_ic.set_bridge_engine()
++            else:
++                self.__disabled_engines_prev_id = -1
++                self.__focus_ic.set_engine(engine)
+         else:
++            self.__disabled_engines_prev_id = -1
+             self.__focus_ic.disable()
+ 
+     def __sys_menu_item_activate_cb(self, item, command):
+@@ -573,11 +671,28 @@ class Panel(ibus.PanelBase):
+         self.__setup_pid = pid
+         glib.child_watch_add(self.__setup_pid, self.__child_watch_cb)
+ 
+-    def __engine_get_layout_wrapper(self, engine):
++    def __engine_get_layout_wrapper(self, engine, changed_state):
++        if ibus.use_bridge_hotkey() and \
++           self.__disabled_engines_id >= 0 and \
++           self.__disabled_engines != None and \
++           self.__disabled_engines_id < len(self.__disabled_engines):
++            if changed_state and self.__disabled_engines_prev_id != -1:
++                # state_changed is always called twice because we change
++                # the engine. So the first two calls are ignored here.
++                if self.__disabled_engines_swapped < 2:
++                    self.__disabled_engines_swapped = \
++                            self.__disabled_engines_swapped + 1
++                else:
++                    x = self.__disabled_engines_prev_id
++                    self.__disabled_engines_prev_id = self.__disabled_engines_id
++                    self.__disabled_engines_id = x
++                    self.__disabled_engines_swapped = 1
++            retval = self.__disabled_engines[self.__disabled_engines_id].layout
++            return retval
+         # This code is for the back compatibility.
+         # Should we remove the codes after all IM engines are changed
+         # to "default" layout?
+-        if engine.name != None and engine.name.startswith("xkb:layout:"):
++        elif engine.name != None and engine.name.startswith("xkb:layout:"):
+             return engine.layout
+         else:
+             return "default"
 diff --git a/xkb/Makefile.am b/xkb/Makefile.am
 index ad9cdd9..c4d5afb 100644
 --- a/xkb/Makefile.am
@@ -899,5 +1098,5 @@ index 2ce7bcf..de6648f 100644
  
      g_free (name);
 -- 
-1.7.4.4
+1.7.5.4
 

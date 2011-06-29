@@ -204,12 +204,24 @@ index 7383177..bff2407 100644
  
          renderer = gtk.CellRendererPixbuf()
          renderer.set_property("xalign", 0)
-@@ -57,18 +60,51 @@ class EngineComboBox(gtk.ComboBox):
+@@ -57,21 +60,51 @@ class EngineComboBox(gtk.ComboBox):
          self.pack_start(renderer, True)
          self.set_cell_data_func(renderer, self.__name_cell_data_cb)
  
 -    def set_engines(self, engines):
 -        self.__model = gtk.TreeStore(gobject.TYPE_PYOBJECT)
+-
+-        iter1 = self.__model.append(None)
+-        self.__model.set(iter1, 0, 0)
+-        lang = {}
+-        for e in engines:
+-            if ibus.use_bridge_hotkey() and \
+-               e.name == ibus.DEFAULT_BRIDGE_ENGINE_NAME:
+-                continue
+-            l = ibus.get_language_name(e.language)
+-            if l not in lang:
+-                lang[l] = []
+-            lang[l].append(e)
 +    def __gconf_get_lang_list_from_locale(self):
 +        common_list = ['en', 'Other']
 +        if  self.__config == None:
@@ -244,15 +256,7 @@ index 7383177..bff2407 100644
 +        if lang_list == None:
 +            return [loc] + common_list
 +        return lang_list + common_list
- 
--        iter1 = self.__model.append(None)
--        self.__model.set(iter1, 0, 0)
--        lang = {}
--        for e in engines:
--            l = ibus.get_language_name(e.language)
--            if l not in lang:
--                lang[l] = []
--            lang[l].append(e)
++
 +    def __has_engine_in_lang_list(self, engine, lang_list):
 +        retval = False
 +        for lang in lang_list:
@@ -266,7 +270,7 @@ index 7383177..bff2407 100644
          keys = lang.keys()
          keys.sort(locale.strcoll)
          #add "Others" to the end of the combo box
-@@ -76,29 +112,86 @@ class EngineComboBox(gtk.ComboBox):
+@@ -79,29 +112,89 @@ class EngineComboBox(gtk.ComboBox):
              keys.remove(ibus.get_language_name("Other"))
              keys += [ibus.get_language_name("Other")]
          for l in keys:
@@ -287,13 +291,17 @@ index 7383177..bff2407 100644
 +
 +    def set_engines(self, engines):
 +        self.__model = gtk.TreeStore(gobject.TYPE_PYOBJECT)
-+
+ 
+-        self.set_model(self.__model)
 +        iter1 = self.__model.append(None)
 +        self.__model.set(iter1, 0, 0)
 +        lang_list = self.__gconf_get_lang_list_from_locale()
 +        lang = {}
 +        sub_lang = {}
 +        for e in engines:
++            if ibus.use_bridge_hotkey() and \
++               e.name == ibus.DEFAULT_BRIDGE_ENGINE_NAME:
++                continue
 +            l = ibus.get_language_name(e.language)
 +            if lang_list == None or \
 +                self.__has_engine_in_lang_list(e, lang_list):
@@ -318,8 +326,7 @@ index 7383177..bff2407 100644
 +        self.__model_append_langs(self.__all_model, sub_lang, False)
 +
 +        self.__toggle_sub_lang()
- 
--        self.set_model(self.__model)
++
 +    def __toggle_sub_lang(self):
 +        self.set_model(None)
 +        if self.__show_sub_lang:
@@ -361,7 +368,7 @@ index 7383177..bff2407 100644
          else:
              renderer.set_property("visible", True)
              renderer.set_property("sensitive", True)
-@@ -110,7 +203,8 @@ class EngineComboBox(gtk.ComboBox):
+@@ -113,7 +206,8 @@ class EngineComboBox(gtk.ComboBox):
              renderer.set_property("pixbuf", pixbuf)
  
      def __name_cell_data_cb(self, celllayout, renderer, model, iter):
@@ -371,7 +378,7 @@ index 7383177..bff2407 100644
  
          if isinstance (engine, str) or isinstance (engine, unicode):
              renderer.set_property("sensitive", False)
-@@ -118,8 +212,15 @@ class EngineComboBox(gtk.ComboBox):
+@@ -121,8 +215,15 @@ class EngineComboBox(gtk.ComboBox):
              renderer.set_property("weight", pango.WEIGHT_NORMAL)
          elif isinstance(engine, int):
              renderer.set_property("sensitive", True)
@@ -389,7 +396,7 @@ index 7383177..bff2407 100644
          else:
              renderer.set_property("sensitive", True)
              renderer.set_property("text", engine.longname)
-@@ -134,13 +235,21 @@ class EngineComboBox(gtk.ComboBox):
+@@ -137,13 +238,21 @@ class EngineComboBox(gtk.ComboBox):
              if i == 0 or i == -1:
                  return None
              iter = self.get_active_iter()

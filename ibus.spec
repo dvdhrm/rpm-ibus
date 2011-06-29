@@ -13,7 +13,7 @@
 
 Name:       ibus
 Version:    1.3.99.20110419
-Release:    5%{?dist}
+Release:    6%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -21,7 +21,7 @@ URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
 %if %have_gjsfile
-Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/gnome-shell-ibus-plugins-20110622.tar.bz2
+Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/gnome-shell-ibus-plugins-20110629.tar.bz2
 %endif
 Source3:    https://www.transifex.net/projects/p/ibus/resource/master/l/da/download/ibus_master_da.po
 Source4:    http://ueno.fedorapeople.org/ibus-indicator/ibus-indicator.tar.bz2
@@ -135,9 +135,6 @@ This is a transitional package which allows users to try out new IBus
 GUI for GNOME3 in development.  Note that this package will be marked
 as obsolete once the integration has completed in the GNOME3 upstream.
 
-%description gnome3
-This package contains ibus im module for gtk3
-
 %package devel
 Summary:    Development tools for ibus
 Group:      Development/Libraries
@@ -167,6 +164,10 @@ sed -i \
   -e "s|Config.IBUS_XKB|'/usr/libexec/ibus-xkb'|" \
   -e "s|Config.HAVE_IBUS_XKB|true|" \
   js/ui/status/ibus/xkbLayout.js
+sed -i \
+  -e "s|imports.misc.config.IBUS_PREFIX|'/usr'|" \
+  -e "s|imports.misc.config.IBUS_PKGDATADIR|'/usr/share/ibus'|" \
+  js/ui/status/ibus/panel.js
 bzcat %SOURCE4 | tar xf -
 %endif
 cp %SOURCE3 po/da.po
@@ -353,7 +354,7 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Mon Jun 20 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110419-5
+* Mon Jun 20 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110419-6
 - Updated ibus-HEAD.patch for upstream.
 - Removed ibus-435880-surrounding-text.patch as upstream.
 - Added ibus-711632-fedora-fallback-icon.patch
