@@ -1,6 +1,6 @@
-From b58e9d7673d255f86f5224b527457c0132eea3c8 Mon Sep 17 00:00:00 2001
+From bbf124332b8ba43f369be86ba3a6411fe66556d1 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 29 Jun 2011 16:54:45 +0900
+Date: Thu, 30 Jun 2011 11:46:02 +0900
 Subject: [PATCH] Add a bridge hotkey which use prev-next engines instead
  of on-off.
 
@@ -22,11 +22,11 @@ Subject: [PATCH] Add a bridge hotkey which use prev-next engines instead
  src/ibusenginedesc.c       |    4 +
  src/ibushotkey.c           |   11 ++
  src/ibushotkey.h           |   11 ++
- ui/gtk/panel.py            |  151 ++++++++++++++++++++---
+ ui/gtk/panel.py            |  157 +++++++++++++++++++++---
  xkb/Makefile.am            |    2 +
  xkb/ibus-engine-xkb-main.c |    8 ++
  xkb/xkbxml.c               |    8 +-
- 21 files changed, 804 insertions(+), 387 deletions(-)
+ 21 files changed, 810 insertions(+), 387 deletions(-)
  delete mode 100644 data/ibus.schemas.in
  create mode 100644 data/ibus.schemas.in.in
 
@@ -794,7 +794,7 @@ index 9a341f6..92ec6af 100644
  G_END_DECLS
  #endif
 diff --git a/ui/gtk/panel.py b/ui/gtk/panel.py
-index de64920..1dae2b1 100644
+index de64920..5839238 100644
 --- a/ui/gtk/panel.py
 +++ b/ui/gtk/panel.py
 @@ -133,6 +133,14 @@ class Panel(ibus.PanelBase):
@@ -1001,13 +1001,25 @@ index de64920..1dae2b1 100644
              self.__focus_ic.disable()
  
      def __sys_menu_item_activate_cb(self, item, command):
-@@ -573,11 +671,28 @@ class Panel(ibus.PanelBase):
+@@ -573,11 +671,34 @@ class Panel(ibus.PanelBase):
          self.__setup_pid = pid
          glib.child_watch_add(self.__setup_pid, self.__child_watch_cb)
  
 -    def __engine_get_layout_wrapper(self, engine):
 +    def __engine_get_layout_wrapper(self, engine, changed_state):
-+        if ibus.use_bridge_hotkey() and \
+         # This code is for the back compatibility.
+         # Should we remove the codes after all IM engines are changed
+         # to "default" layout?
+-        if engine.name != None and engine.name.startswith("xkb:layout:"):
++        if engine.name != None and engine.name.startswith("xkb:layout:") and \
++           not ibus.use_bridge_hotkey():
++            return engine.layout
++        elif engine.name != None and \
++             engine.name.startswith("xkb:layout:") and \
++             ibus.use_bridge_hotkey() and \
++             engine.name != ibus.DEFAULT_BRIDGE_ENGINE_NAME:
+             return engine.layout
++        elif ibus.use_bridge_hotkey() and \
 +           self.__disabled_engines_id >= 0 and \
 +           self.__disabled_engines != None and \
 +           self.__disabled_engines_id < len(self.__disabled_engines):
@@ -1024,12 +1036,6 @@ index de64920..1dae2b1 100644
 +                    self.__disabled_engines_swapped = 1
 +            retval = self.__disabled_engines[self.__disabled_engines_id].layout
 +            return retval
-         # This code is for the back compatibility.
-         # Should we remove the codes after all IM engines are changed
-         # to "default" layout?
--        if engine.name != None and engine.name.startswith("xkb:layout:"):
-+        elif engine.name != None and engine.name.startswith("xkb:layout:"):
-             return engine.layout
          else:
              return "default"
 diff --git a/xkb/Makefile.am b/xkb/Makefile.am
