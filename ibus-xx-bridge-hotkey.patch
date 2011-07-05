@@ -1,12 +1,12 @@
-From 0242d89ec9d4d3d92d335e50b8aa6c16ff950438 Mon Sep 17 00:00:00 2001
+From 2ae147c6d4b15b4aa40a915e86d04fb795d3024b Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Tue, 5 Jul 2011 12:00:31 +0900
+Date: Tue, 5 Jul 2011 13:51:11 +0900
 Subject: [PATCH] Add a bridge hotkey which use prev-next engines instead
  of on-off.
 
 ---
  bus/Makefile.am            |   20 ++-
- bus/ibusimpl.c             |  356 ++++++++++++++++++++++++++++++++++++--------
+ bus/ibusimpl.c             |  357 ++++++++++++++++++++++++++++++++++++--------
  bus/registry.c             |   35 +++++
  configure.ac               |   31 ++++
  data/Makefile.am           |    6 +-
@@ -25,12 +25,12 @@ Subject: [PATCH] Add a bridge hotkey which use prev-next engines instead
  xkb/Makefile.am            |    2 +
  xkb/ibus-engine-xkb-main.c |    8 +
  xkb/xkbxml.c               |    8 +-
- 20 files changed, 938 insertions(+), 388 deletions(-)
+ 20 files changed, 939 insertions(+), 388 deletions(-)
  delete mode 100644 data/ibus.schemas.in
  create mode 100644 data/ibus.schemas.in.in
 
 diff --git a/bus/Makefile.am b/bus/Makefile.am
-index 074b456..0efaa1b 100644
+index b356b2c..f9417ad 100644
 --- a/bus/Makefile.am
 +++ b/bus/Makefile.am
 @@ -29,15 +29,17 @@ INCLUDES =                \
@@ -412,7 +412,7 @@ index b356b2c..ffea37a 100644
          /* Find out what engine we should switch to. If the current engine has
           * the same hotkey, then we should switch to the next engine with the
           * same hotkey in the list. Otherwise, we just switch to the first
-@@ -2364,8 +2597,31 @@ bus_ibus_impl_filter_keyboard_shortcuts 
+@@ -2364,8 +2597,32 @@ bus_ibus_impl_filter_keyboard_shortcuts 
                  break;
              }
          }
@@ -428,7 +428,8 @@ index b356b2c..ffea37a 100644
 +             * the current engine is the defualt bridge engine,
 +             * the current engine is also not included in engine_list.
 +             * So the engine is added here. */
-+            if (g_list_find (engine_list, current_engine_desc) == NULL &&
++            if (current_engine_desc != NULL &&
++                g_list_find (engine_list, current_engine_desc) == NULL &&
 +                g_strcmp0 (ibus_engine_desc_get_name (current_engine_desc),
 +                           DEFAULT_BRIDGE_ENGINE_NAME) == 0) {
 +                engine_list = g_list_append (engine_list, current_engine_desc);
@@ -444,7 +445,7 @@ index b356b2c..ffea37a 100644
              bus_ibus_impl_set_context_engine_from_desc (ibus, context, new_engine_desc);
          }
  
-@@ -2470,59 +2726,39 @@ static void
+@@ -2470,59 +2727,39 @@ static void
  _add_engine_hotkey (IBusEngineDesc *engine, BusIBusImpl *ibus)
  {
      const gchar *hotkeys;
