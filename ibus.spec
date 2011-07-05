@@ -13,7 +13,7 @@
 
 Name:       ibus
 Version:    1.3.99.20110419
-Release:    7%{?dist}
+Release:    8%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -354,7 +354,7 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Mon Jun 20 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110419-7
+* Mon Jun 20 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110419-8
 - Updated ibus-HEAD.patch for upstream.
 - Removed ibus-435880-surrounding-text.patch as upstream.
 - Added ibus-711632-fedora-fallback-icon.patch

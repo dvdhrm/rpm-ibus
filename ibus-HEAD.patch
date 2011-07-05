@@ -967,3 +967,28 @@ index 29b8f1d..6da342a 100644
 -- 
 1.7.4.4
 
+From a25187a315e9dfbb36a3e4a4f8e96f18e2cc6e0d Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Tue, 5 Jul 2011 12:15:55 +0900
+Subject: [PATCH] Fix SEGV in ibus_keymap_lookup_keysym
+
+---
+ bus/engineproxy.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/bus/engineproxy.c b/bus/engineproxy.c
+index 95e9e0b..a49d6fd 100644
+--- a/bus/engineproxy.c
++++ b/bus/engineproxy.c
+@@ -907,7 +907,7 @@ bus_engine_proxy_process_key_event (BusEngineProxy      *engine,
+         if (keymap == NULL)
+             keymap = BUS_DEFAULT_KEYMAP;
+         if (keymap != NULL) {
+-            guint t = ibus_keymap_lookup_keysym (engine->keymap, keycode, state);
++            guint t = ibus_keymap_lookup_keysym (keymap, keycode, state);
+             if (t != IBUS_VoidSymbol) {
+                 keyval = t;
+             }
+-- 
+1.7.5.4
+
