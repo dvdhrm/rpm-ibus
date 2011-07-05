@@ -992,3 +992,77 @@ index 95e9e0b..a49d6fd 100644
 -- 
 1.7.5.4
 
+From 83d4b3ac538320bfb8e872dd9282ca5bbedf4652 Mon Sep 17 00:00:00 2001
+From: Peng Huang <shawn.p.huang@gmail.com>
+Date: Mon, 4 Jul 2011 03:27:23 +0800
+Subject: [PATCH] Fix BusEngineProxy instance leak.
+
+BUG=none
+TEST=manually with / without global-engine setting
+
+Review URL: http://codereview.appspot.com/4662043
+---
+ bus/engineproxy.c  |    9 ---------
+ bus/inputcontext.c |    5 +----
+ 2 files changed, 1 insertions(+), 13 deletions(-)
+
+diff --git a/bus/engineproxy.c b/bus/engineproxy.c
+index f74af12..95e9e0b 100644
+--- a/bus/engineproxy.c
++++ b/bus/engineproxy.c
+@@ -397,15 +397,6 @@ bus_engine_proxy_real_destroy (IBusProxy *proxy)
+ {
+     BusEngineProxy *engine = (BusEngineProxy *)proxy;
+ 
+-    g_dbus_proxy_call ((GDBusProxy *)proxy,
+-                       "org.freedesktop.IBus.Service.Destroy",
+-                       NULL,
+-                       G_DBUS_CALL_FLAGS_NONE,
+-                       -1,
+-                       NULL,
+-                       NULL,
+-                       NULL);
+-
+     if (engine->desc) {
+         g_object_unref (engine->desc);
+         engine->desc = NULL;
+diff --git a/bus/inputcontext.c b/bus/inputcontext.c
+index 1567c5f..2164e7c 100644
+--- a/bus/inputcontext.c
++++ b/bus/inputcontext.c
+@@ -1020,8 +1020,6 @@ _ic_set_engine (BusInputContext       *context,
+                             NULL,
+                             (GAsyncReadyCallback)_ic_set_engine_done,
+                             invocation);
+-
+-    g_object_unref (desc);
+ }
+ 
+ /**
+@@ -2091,7 +2089,6 @@ bus_input_context_enable (BusInputContext *context)
+                             NULL, /* we do not cancel the call. */
+                             NULL, /* use the default callback function. */
+                             NULL);
+-            g_object_unref (desc);
+         }
+     }
+ 
+@@ -2192,7 +2189,6 @@ bus_input_context_unset_engine (BusInputContext *context)
+         for (i = 0; engine_signals[i].name != NULL; i++) {
+             g_signal_handlers_disconnect_by_func (context->engine, engine_signals[i].callback, context);
+         }
+-        /* Do not destroy the engine anymore, because of global engine feature */
+         g_object_unref (context->engine);
+         context->engine = NULL;
+     }
+@@ -2291,6 +2287,7 @@ new_engine_cb (GObject             *obj,
+         }
+         else {
+             bus_input_context_set_engine (data->context, engine);
++            g_object_unref (engine);
+             bus_input_context_enable (data->context);
+             g_simple_async_result_set_op_res_gboolean (data->simple, TRUE);
+         }
+-- 
+1.7.5.4
+
