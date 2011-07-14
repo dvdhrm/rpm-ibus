@@ -199,6 +199,7 @@ automake -a -c -f
     --disable-gtk-doc \
     --with-no-snooper-apps='gnome-do,Do.*,firefox.*,.*chrome.*,.*chromium.*' \
     --enable-surrounding-text \
+    --enable-bridge-hotkey \
     --enable-introspection
 
 # make -C po update-gmo
