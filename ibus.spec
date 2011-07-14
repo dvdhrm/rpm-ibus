@@ -13,7 +13,7 @@
 
 Name:       ibus
 Version:    1.3.99.20110419
-Release:    10%{?dist}
+Release:    11%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -21,10 +21,9 @@ URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
 %if %have_gjsfile
-Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/gnome-shell-ibus-plugins-20110708.tar.bz2
+Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/ibus-gjs-1.3.99.20110714.tar.gz
 %endif
 Source3:    https://www.transifex.net/projects/p/ibus/resource/master/l/da/download/ibus_master_da.po
-Source4:    http://ueno.fedorapeople.org/ibus-indicator/ibus-indicator.tar.bz2
 Patch0:     ibus-HEAD.patch
 Patch1:     ibus-530711-preload-sys.patch
 Patch2:     ibus-xx-icon-symbol.patch
@@ -159,16 +158,7 @@ The ibus-devel-docs package contains developer documentation for ibus
 %prep
 %setup -q
 %if %have_gjsfile
-bzcat %SOURCE2 | tar xf -
-sed -i \
-  -e "s|Config.IBUS_XKB|'/usr/libexec/ibus-xkb'|" \
-  -e "s|Config.HAVE_IBUS_XKB|true|" \
-  js/ui/status/ibus/xkbLayout.js
-sed -i \
-  -e "s|imports.misc.config.IBUS_PREFIX|'/usr'|" \
-  -e "s|imports.misc.config.IBUS_PKGDATADIR|'/usr/share/ibus'|" \
-  js/ui/status/ibus/panel.js
-bzcat %SOURCE4 | tar xf -
+zcat %SOURCE2 | tar xf -
 %endif
 cp %SOURCE3 po/da.po
 %patch0 -p1
@@ -185,6 +175,14 @@ mv data/ibus.schemas.in data/ibus.schemas.in.in
 %patch91 -p1 -b .fallback-icon
 
 %build
+%if %have_gjsfile
+d=`basename %SOURCE2 .tar.gz`
+cd $d
+%configure
+make %{?_smp_mflags}
+cd ..
+%endif
+
 %if %have_libxkbfile
 aclocal -I m4
 autoheader
@@ -236,10 +234,11 @@ desktop-file-install --delete-original          \
 
 %if %have_gjsfile
 # https://bugzilla.redhat.com/show_bug.cgi?id=657165
-install -dm 755 $RPM_BUILD_ROOT%{_datadir}/gnome-shell
-cp -R js $RPM_BUILD_ROOT%{_datadir}/gnome-shell
-install -dm 755 $RPM_BUILD_ROOT%{_datadir}/gnome-shell/extensions
-cp -R ibus-indicator@example.com $RPM_BUILD_ROOT%{_datadir}/gnome-shell/extensions
+d=`basename %SOURCE2 .tar.gz`
+cd $d
+make DESTDIR=$RPM_BUILD_ROOT install
+rm -f $RPM_BUILD_ROOT%{_datadir}/locale/*/LC_MESSAGES/ibus-gjs.mo
+cd ..
 %endif
 
 # FIXME: no version number
@@ -354,7 +353,7 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Fri Jul 08 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110419-10
+* Fri Jul 08 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110419-11
 - Updated ibus-HEAD.patch for upstream.
 - Removed ibus-435880-surrounding-text.patch as upstream.
 - Added ibus-711632-fedora-fallback-icon.patch
