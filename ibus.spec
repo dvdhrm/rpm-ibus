@@ -4,6 +4,13 @@
 
 %define have_libxkbfile 1
 %define have_gjsfile 1
+
+%if 0%{?fedora} > 15
+%define have_bridge_hotkey 1
+%else
+%define have_bridge_hotkey 0
+%endif
+
 %define ibus_api_version 1.0
 
 %define glib_ver %([ -a %{_libdir}/pkgconfig/glib-2.0.pc ] && pkg-config --modversion glib-2.0 | cut -d. -f 1,2 || echo -n "999")
@@ -197,6 +204,9 @@ automake -a -c -f
     --disable-gtk-doc \
     --with-no-snooper-apps='gnome-do,Do.*,firefox.*,.*chrome.*,.*chromium.*' \
     --enable-surrounding-text \
+%if %have_bridge_hotkey
+    --enable-bridge-hotkey \
+%endif
     --enable-introspection
 
 # make -C po update-gmo
