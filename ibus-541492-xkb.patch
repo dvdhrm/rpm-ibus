@@ -1,6 +1,6 @@
-From 14986cb38f431d132332b2e8f9da1ca2b8a5d10e Mon Sep 17 00:00:00 2001
+From a253acde0935efae4bbc8aa59ca47ab273b9907b Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 29 Jun 2011 16:52:08 +0900
+Date: Fri, 5 Aug 2011 20:22:42 +0900
 Subject: [PATCH] Add XKB layouts
 
 ---
@@ -12,8 +12,8 @@ Subject: [PATCH] Add XKB layouts
  ibus/__init__.py           |    2 +
  ibus/bus.py                |    3 +
  ibus/interface/iibus.py    |    3 +
- ibus/xkblayout.py.in       |  215 ++++++++++++++++
- ibus/xkbxml.py.in          |  413 ++++++++++++++++++++++++++++++
+ ibus/xkblayout.py.in       |  230 +++++++++++++++++
+ ibus/xkbxml.py.in          |  416 ++++++++++++++++++++++++++++++
  setup/Makefile.am          |    1 +
  setup/enginecombobox.py    |    7 +-
  setup/main.py              |    3 +
@@ -21,22 +21,20 @@ Subject: [PATCH] Add XKB layouts
  setup/xkbsetup.py          |  454 +++++++++++++++++++++++++++++++++
  src/Makefile.am            |    5 +
  src/ibus.h                 |    1 +
- src/ibusfactory.c          |   21 ++-
- src/ibusfactory.h          |    5 +-
  src/ibusxkbxml.c           |  440 ++++++++++++++++++++++++++++++++
  src/ibusxkbxml.h           |  172 +++++++++++++
- ui/gtk/panel.py            |   39 +++
+ ui/gtk/panel.py            |   41 +++
  xkb/Makefile.am            |  104 ++++++++
- xkb/ibus-engine-xkb-main.c |  397 +++++++++++++++++++++++++++++
+ xkb/ibus-engine-xkb-main.c |  413 ++++++++++++++++++++++++++++++
  xkb/ibus-engine-xkb-main.h |   46 ++++
  xkb/ibus-xkb-main.c        |  112 ++++++++
  xkb/xkblayout.xml.in       |   16 ++
  xkb/xkblayoutconfig.xml.in |    6 +
  xkb/xkblib.c               |  327 ++++++++++++++++++++++++
  xkb/xkblib.h               |   41 +++
- xkb/xkbxml.c               |  335 ++++++++++++++++++++++++
- xkb/xkbxml.h               |  110 ++++++++
- 32 files changed, 4008 insertions(+), 6 deletions(-)
+ xkb/xkbxml.c               |  339 ++++++++++++++++++++++++
+ xkb/xkbxml.h               |  113 ++++++++
+ 30 files changed, 4027 insertions(+), 4 deletions(-)
  create mode 100644 ibus/xkblayout.py.in
  create mode 100644 ibus/xkbxml.py.in
  create mode 100644 setup/xkbsetup.py
@@ -54,7 +52,7 @@ Subject: [PATCH] Add XKB layouts
  create mode 100644 xkb/xkbxml.h
 
 diff --git a/Makefile.am b/Makefile.am
-index 7be558b..59fbabb 100644
+index ff0fabc..056ddfc 100644
 --- a/Makefile.am
 +++ b/Makefile.am
 @@ -42,6 +42,12 @@ DAEMON_DIRS =       \
@@ -79,7 +77,7 @@ index 7be558b..59fbabb 100644
  	$(NULL)
  
 diff --git a/configure.ac b/configure.ac
-index 5544dfa..85e5e30 100644
+index c3bd423..4c20ae7 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -185,6 +185,60 @@ else
@@ -143,7 +141,7 @@ index 5544dfa..85e5e30 100644
  # GObject introspection
  GOBJECT_INTROSPECTION_CHECK([0.6.8])
  
-@@ -430,6 +484,7 @@ gconf/Makefile
+@@ -451,6 +505,7 @@ bindings/Makefile
  gconf/gconf.xml.in
  bindings/Makefile
  bindings/vala/Makefile
@@ -151,7 +149,7 @@ index 5544dfa..85e5e30 100644
  ])
  
  AC_OUTPUT
-@@ -445,6 +500,7 @@ Build options:
+@@ -466,6 +521,7 @@ Build options:
    Build gtk2 immodule       $enable_gtk2
    Build gtk3 immodule       $enable_gtk3
    Build XIM agent server    $enable_xim
@@ -160,10 +158,10 @@ index 5544dfa..85e5e30 100644
    Build gconf modules       $enable_gconf
    Build memconf modules     $enable_memconf
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index b75295e..7ca4899 100644
+index 663358c..8979515 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
-@@ -190,6 +190,42 @@
+@@ -191,6 +191,42 @@
        </locale>
      </schema>
      <schema>
@@ -303,10 +301,10 @@ index 678d517..7de56fc 100644
  
 diff --git a/ibus/xkblayout.py.in b/ibus/xkblayout.py.in
 new file mode 100644
-index 0000000..4cb3ffd
+index 0000000..11fce12
 --- /dev/null
 +++ b/ibus/xkblayout.py.in
-@@ -0,0 +1,215 @@
+@@ -0,0 +1,230 @@
 +# vim:set et sts=4 sw=4:
 +#
 +# ibus - The Input Bus
@@ -331,7 +329,7 @@ index 0000000..4cb3ffd
 +# Boston, MA  02111-1307  USA
 +
 +__all__ = (
-+        "XKBLayout",
++        'XKBLayout',
 +    )
 +
 +import os, sys, time
@@ -354,8 +352,8 @@ index 0000000..4cb3ffd
 +        self.__time_lag_session_xkb_timer = time.time()
 +        self.__xkb_latin_layouts = []
 +        if config != None:
-+            self.__xkb_latin_layouts = list(self.__config.get_value("general",
-+                                                                    "xkb_latin_layouts",
++            self.__xkb_latin_layouts = list(self.__config.get_value('general',
++                                                                    'xkb_latin_layouts',
 +                                                                    []))
 +
 +
@@ -363,12 +361,20 @@ index 0000000..4cb3ffd
 +        left_bracket = layout.find('(')
 +        right_bracket = layout.find(')')
 +        if left_bracket >= 0 and right_bracket > left_bracket:
-+            return (layout[:left_bracket], \
++            return (layout[:left_bracket] + layout[right_bracket + 1:], \
 +                    layout[left_bracket + 1:right_bracket])
-+        return (layout, "default")
++        return (layout, 'default')
++
++    def __get_option_from_layout(self, layout):
++        left_bracket = layout.find('[')
++        right_bracket = layout.find(']')
++        if left_bracket >= 0 and right_bracket > left_bracket:
++            return (layout[:left_bracket] + layout[right_bracket + 1:], \
++                    layout[left_bracket + 1:right_bracket])
++        return (layout, 'default')
 +
 +    def __get_output_from_cmdline(self, arg, string):
-+        exec_command = "%s %s" % (self.__command, arg)
++        exec_command = '%s %s' % (self.__command, arg)
 +        retval = None
 +        for line in os.popen(exec_command).readlines():
 +            line = line.strip()
@@ -385,24 +391,24 @@ index 0000000..4cb3ffd
 +    def get_layout(self):
 +        if not self.__use_xkb:
 +            return None
-+        return self.__get_output_from_cmdline("--get", "layout: ")
++        return self.__get_output_from_cmdline('--get', 'layout: ')
 +
 +    def get_model(self):
 +        if not self.__use_xkb:
 +            return None
-+        return self.__get_output_from_cmdline("--get", "model: ")
++        return self.__get_output_from_cmdline('--get', 'model: ')
 +
 +    def get_option(self):
 +        if not self.__use_xkb:
 +            return None
-+        return self.__get_output_from_cmdline("--get", "option: ")
++        return self.__get_output_from_cmdline('--get', 'option: ')
 +
 +    def get_group(self):
 +        if not self.__use_xkb:
 +            return 0
-+        return int(self.__get_output_from_cmdline("--get-group", "group: "))
++        return int(self.__get_output_from_cmdline('--get-group', 'group: '))
 +
-+    def set_layout(self, layout="default", model="default", option="default"):
++    def set_layout(self, layout='default', model='default', option='default'):
 +        if not self.__use_xkb:
 +            return
 +        if layout == None:
@@ -427,24 +433,31 @@ index 0000000..4cb3ffd
 +            > XKB_SESSION_TIME_OUT):
 +            self.__time_lag_session_xkb_layout = False
 +            self.__time_lag_session_xkb_option = False
-+        if layout == "default":
++        if layout == 'default':
 +            layout = self.__default_layout
 +        else:
 +            self.__time_lag_session_xkb_layout = False
 +        if model != None:
 +            model = str(model)
-+            if model == "default":
++            if model == 'default':
 +                (layout, model) = self.__get_model_from_layout(layout)
-+            if model == "default":
++            if model == 'default':
 +                model = self.__default_model
 +            else:
 +                self.__time_lag_session_xkb_layout = False
 +        if option != None:
 +            option = str(option)
-+            if option == "default":
++            if option == 'default':
++                (layout, engine_option) = self.__get_option_from_layout(layout)
++                if engine_option != None and engine_option != 'default':
++                    option = self.__default_option
++                    if option == None:
++                        option = engine_option
++                    else:
++                        option = '%s,%s' % (option, engine_option)
++                    self.__time_lag_session_xkb_option = False
++            if option == 'default':
 +                option = self.__default_option
-+            else:
-+                self.__time_lag_session_xkb_option = False
 +        need_us_layout = False
 +        for latin_layout in self.__xkb_latin_layouts:
 +            latin_layout = str(latin_layout)
@@ -455,9 +468,9 @@ index 0000000..4cb3ffd
 +                need_us_layout = True
 +                break
 +        if need_us_layout:
-+            layout = layout + ",us"
++            layout = layout + ',us'
 +            if model != None:
-+                model = model + ","
++                model = model + ','
 +        if layout == self.get_layout() and \
 +           model == self.get_model() and \
 +           option == self.get_option():
@@ -465,25 +478,25 @@ index 0000000..4cb3ffd
 +        args = []
 +        args.append(self.__command)
 +        args.append(os.path.basename(self.__command))
-+        args.append("--layout")
++        args.append('--layout')
 +        args.append(layout)
 +        if model != None:
-+            args.append("--model")
++            args.append('--model')
 +            args.append(model)
 +        if option != None:
-+            args.append("--option")
++            args.append('--option')
 +            args.append(option)
 +        pid = os.spawnl(os.P_NOWAIT, *args)
 +        os.waitpid(pid, 0)
 +
-+    def set_default_layout(self, layout="default", model="default"):
++    def set_default_layout(self, layout='default', model='default'):
 +        if not self.__use_xkb:
 +            return
 +        if layout == None:
-+            print >> sys.stderr, "ibus.xkblayout: None layout"
++            print >> sys.stderr, 'ibus.xkblayout: None layout'
 +            return
 +        if model == None:
-+            print >> sys.stderr, "ibus.xkblayout: None model"
++            print >> sys.stderr, 'ibus.xkblayout: None model'
 +            return
 +        if layout == 'default':
 +            self.__default_layout = self.get_layout()
@@ -498,11 +511,11 @@ index 0000000..4cb3ffd
 +            else:
 +                self.__default_model = model
 +
-+    def set_default_option(self, option="default"):
++    def set_default_option(self, option='default'):
 +        if not self.__use_xkb:
 +            return
 +        if option == None:
-+            print >> sys.stderr, "ibus.xkblayout: None option"
++            print >> sys.stderr, 'ibus.xkblayout: None option'
 +            return
 +        if option == 'default':
 +            self.__default_option = self.get_option()
@@ -524,10 +537,10 @@ index 0000000..4cb3ffd
 +        self.__default_option = self.get_option()
 diff --git a/ibus/xkbxml.py.in b/ibus/xkbxml.py.in
 new file mode 100644
-index 0000000..7e5a44e
+index 0000000..16f47df
 --- /dev/null
 +++ b/ibus/xkbxml.py.in
-@@ -0,0 +1,413 @@
+@@ -0,0 +1,416 @@
 +# vim:set et sts=4 sw=4:
 +#
 +# ibus - The Input Bus
@@ -552,8 +565,8 @@ index 0000000..7e5a44e
 +# Boston, MA  02111-1307  USA
 +
 +__all__ = (
-+        "XKBConfigRegistry",
-+        "XKBLayoutConfig",
++        'XKBConfigRegistry',
++        'XKBLayoutConfig',
 +    )
 +
 +import os
@@ -569,7 +582,7 @@ index 0000000..7e5a44e
 +except ImportError:
 +    get_user_config_dir = lambda : None
 +
-+XKB_RULES_XML_FILE = "@XKB_RULES_XML_FILE@"
++XKB_RULES_XML_FILE = '@XKB_RULES_XML_FILE@'
 +
 +class XKBConfigRegistryHandler(XMLFilterBase):
 +    def __init__(self, parser=None, root='root'):
@@ -599,18 +612,18 @@ index 0000000..7e5a44e
 +        if not self.__layout:
 +            return
 +        if self.__variant:
-+            if self.__current_node == "name":
++            if self.__current_node == 'name':
 +                self.__variant_label = text
 +                if self.__layout_label != None and \
 +                   self.__layout_label in self.__layoutlist_array:
 +                    self.__layoutlist_array[self.__layout_label].append(text)
-+            elif self.__current_node == "description":
-+                label =  "%s(%s)" % (self.__layout_label, self.__variant_label)
++            elif self.__current_node == 'description':
++                label =  '%s(%s)' % (self.__layout_label, self.__variant_label)
 +                self.__variant_desc[label] = text
-+            elif self.__current_node == "iso639Id":
++            elif self.__current_node == 'iso639Id':
 +                label = self.__layout_label
 +                if label != None:
-+                    label = "%s(%s)" % (label, self.__variant_label)
++                    label = '%s(%s)' % (label, self.__variant_label)
 +                else:
 +                    label = self.__variant_label
 +                if label not in self.__layout_lang:
@@ -619,12 +632,12 @@ index 0000000..7e5a44e
 +            else:
 +                pass
 +        else:
-+            if self.__current_node == "name":
++            if self.__current_node == 'name':
 +                self.__layout_label = text
 +                self.__layoutlist_array[self.__layout_label] = []
-+            elif self.__current_node == "description":
++            elif self.__current_node == 'description':
 +                self.__layout_desc[self.__layout_label] = text
-+            elif self.__current_node == "iso639Id":
++            elif self.__current_node == 'iso639Id':
 +                if self.__layout_label not in self.__layout_lang:
 +                    self.__layout_lang[self.__layout_label] = []
 +                self.__layout_lang[self.__layout_label].append(text)
@@ -635,60 +648,60 @@ index 0000000..7e5a44e
 +        if not self.__group:
 +            return
 +        if self.__option:
-+            if self.__current_node == "name":
++            if self.__current_node == 'name':
 +                self.__option_label = text
 +                if self.__group_label != None and \
 +                   self.__group_label in self.__optionlist_array:
 +                    self.__optionlist_array[self.__group_label].append(text)
-+            elif self.__current_node == "description":
++            elif self.__current_node == 'description':
 +                self.__option_desc[self.__option_label] = text
 +            else:
 +                pass
 +        else:
-+            if self.__current_node == "name":
++            if self.__current_node == 'name':
 +                self.__group_label = text
 +                self.__optionlist_array[self.__group_label] = []
-+            elif self.__current_node == "description":
++            elif self.__current_node == 'description':
 +                self.__option_group_desc[self.__group_label] = text
 +            else:
 +                pass
 +
 +    def startElement(self, name, attrs):
 +        self.__current_node = name
-+        if name == "layoutList":
++        if name == 'layoutList':
 +            self.__layoutlist = True
-+        elif name == "layout":
++        elif name == 'layout':
 +            self.__layout = True
 +            self.__layout_label = None
-+        elif name == "variantList":
++        elif name == 'variantList':
 +            self.__variantlist = True
-+        elif name == "variant":
++        elif name == 'variant':
 +            self.__variant = True
 +            self.__variant_label = None
-+        elif name == "optionList":
++        elif name == 'optionList':
 +            self.__optionlist = True
-+        elif name == "option":
++        elif name == 'option':
 +            self.__option = True
 +            self.__option_label = None
-+        elif name == "group":
++        elif name == 'group':
 +            self.__group = True
 +            self.__group_label = None
 +
 +    def endElement(self, name):
 +        self.__current_node = self.__root
-+        if name == "layoutList":
++        if name == 'layoutList':
 +            self.__layoutlist = False
-+        elif name == "layout":
++        elif name == 'layout':
 +            self.__layout = False
-+        elif name == "variantList":
++        elif name == 'variantList':
 +            self.__variantlist = False
-+        elif name == "variant":
++        elif name == 'variant':
 +            self.__variant = False
-+        elif name == "optionList":
++        elif name == 'optionList':
 +            self.__optionlist = False
-+        elif name == "option":
++        elif name == 'option':
 +            self.__option = False
-+        elif name == "group":
++        elif name == 'group':
 +            self.__group = False
 +
 +    def characters(self, text):
@@ -744,18 +757,18 @@ index 0000000..7e5a44e
 +
 +    def startElement(self, name, attrs):
 +        self.__current_node = name
-+        if name == "xkblayout":
++        if name == 'xkblayout':
 +            self.__xkblayout = True
-+        if name == "config":
++        if name == 'config':
 +            self.__config = True
 +        if self.__downstream != None:
 +            self.__downstream.startElement(name, {})
 +
 +    def endElement(self, name):
 +        self.__current_node = self.__root
-+        if name == "xkblayout":
++        if name == 'xkblayout':
 +            self.__xkblayout = False
-+        if name == "config":
++        if name == 'config':
 +            self.__config = False
 +        if self.__downstream != None:
 +            self.__downstream.endElement(name)
@@ -765,7 +778,7 @@ index 0000000..7e5a44e
 +            return
 +        if not self.__xkblayout or not self.__config:
 +            return
-+        if self.__current_node == "preload_layouts":
++        if self.__current_node == 'preload_layouts':
 +            if self.__preload_layouts == None:
 +                self.__preload_layouts = text.split(',')
 +                self.__preload_layouts.sort()
@@ -787,7 +800,7 @@ index 0000000..7e5a44e
 +        try:
 +            parser.parse(f)
 +        except SAXParseException:
-+            print "ERROR: invalid file format", file_path
++            print 'ERROR: invalid file format', file_path
 +        finally:
 +            f.close()
 +
@@ -822,39 +835,42 @@ index 0000000..7e5a44e
 +                        layout,
 +                        layout_desc=None,
 +                        variant=None,
-+                        variant_desc=None):
++                        variant_desc=None,
++                        name_prefix='xkb:layout:'):
 +        if variant_desc != None:
 +            longname = variant_desc
 +        elif layout != None and variant != None:
-+            longname = layout + " - " + variant
++            longname = layout + ' - ' + variant
 +        elif layout_desc != None:
 +            longname = layout_desc
 +        else:
 +            longname = layout
 +        if variant != None:
-+            name = "xkb:layout:" + layout + ":" + variant
-+            desc = "XKB " + layout + "(" + variant + ") keyboard layout"
-+            engine_layout = layout + "(" + variant + ")"
++            name = name_prefix + layout + ':' + variant
++            desc = 'XKB ' + layout + '(' + variant + ') keyboard layout'
++            engine_layout = layout + '(' + variant + ')'
 +        else:
-+            name = "xkb:layout:" + layout
-+            desc = "XKB " + layout + " keyboard layout"
++            name = name_prefix + layout
++            desc = 'XKB ' + layout + ' keyboard layout'
 +            engine_layout = layout
 +
++        icon = 'ibus-engine'
++
 +        engine = enginedesc.EngineDesc(name, longname, desc, lang,
-+                                       "LGPL2.1",
-+                                       "Takao Fujiwara <takao.fujiwara1@gmail.com>",
-+                                       "ibus-engine",
++                                       'LGPL2.1',
++                                       'Takao Fujiwara <takao.fujiwara1@gmail.com>',
++                                       icon,
 +                                       engine_layout)
 +        return engine
 +
 +class XKBLayoutConfig():
 +    def __init__(self,
-+                 system_config="@datadir@/ibus/xkb/xkblayoutconfig.xml"):
++                 system_config='@datadir@/ibus/xkb/xkblayoutconfig.xml'):
 +        self.__user_config = get_user_config_dir()
 +        if self.__user_config == None:
-+            self.__user_config = os.environ['HOME'] + "/.config"
++            self.__user_config = os.environ['HOME'] + '/.config'
 +        self.__user_config = self.__user_config + \
-+            "/ibus/xkb/xkblayoutconfig.xml"
++            '/ibus/xkb/xkblayoutconfig.xml'
 +        self.__system_config = system_config
 +        self.__filter_handler = None
 +        self.__load()
@@ -876,7 +892,7 @@ index 0000000..7e5a44e
 +        try:
 +            parser.parse(f)
 +        except SAXParseException:
-+            print "ERROR: invalid file format", self.__user_config
++            print 'ERROR: invalid file format', self.__user_config
 +        finally:
 +            f.close()
 +
@@ -910,35 +926,35 @@ index 0000000..7e5a44e
 +    variant_desc = xkbconfig.get_variant_desc()
 +    for layout in layout_list.keys():
 +        if layout not in layout_lang:
-+            print "layout name:", layout, "NO-LANG description:", layout_desc[layout]
++            print 'layout name:', layout, 'NO-LANG description:', layout_desc[layout]
 +            continue
 +        lang = layout_lang[layout]
-+        print "layout name:", layout, "lang:", lang, "description:", layout_desc[layout]
++        print 'layout name:', layout, 'lang:', lang, 'description:', layout_desc[layout]
 +        for variant in layout_list[layout]:
-+            label = "%s(%s)" % (layout, variant)
++            label = '%s(%s)' % (layout, variant)
 +            if label in layout_lang:
 +                lang = layout_lang[label]
-+            print "  variant name:", variant, "lang:", lang, "description:", variant_desc[variant]
++            print '  variant name:', variant, 'lang:', lang, 'description:', variant_desc[variant]
 +
 +    option_list = xkbconfig.get_option_list()
 +    option_group_desc = xkbconfig.get_option_group_desc()
 +    option_desc = xkbconfig.get_option_desc()
 +    for option_group in option_list.keys():
-+        print "option group name:", option_group, "description:", option_group_desc[option_group]
++        print 'option group name:', option_group, 'description:', option_group_desc[option_group]
 +        for option in option_list[option_group]:
-+            print "  option name:", option, "description:", option_desc[option]
++            print '  option name:', option, 'description:', option_desc[option]
 +
 +def test2():
-+    xkblayoutconfig = XKBLayoutConfig("../xkb/xkblayoutconfig.xml")
++    xkblayoutconfig = XKBLayoutConfig('../xkb/xkblayoutconfig.xml')
 +    list = xkblayoutconfig.get_preload_layouts()
 +    print list
 +    if list == None:
 +        list = []
-+    list.append("gb(test)")
++    list.append('gb(test)')
 +    list.sort()
 +    #xkblayoutconfig.save_preload_layouts(list)
 +
-+if __name__ == "__main__":
++if __name__ == '__main__':
 +    test()
 +    test2()
 diff --git a/setup/Makefile.am b/setup/Makefile.am
@@ -2146,86 +2162,6 @@ index c408f3d..6bb9ff5 100644
  #include <ibusxml.h>
  #include <ibusenginedesc.h>
  #include <ibusobservedpath.h>
-diff --git a/src/ibusfactory.c b/src/ibusfactory.c
-index 11d9a6d..7770216 100644
---- a/src/ibusfactory.c
-+++ b/src/ibusfactory.c
-@@ -21,6 +21,7 @@
-  */
- #include "ibusfactory.h"
- #include "ibusengine.h"
-+#include "ibusmarshalers.h"
- #include "ibusshare.h"
- #include "ibusinternal.h"
- 
-@@ -28,6 +29,7 @@
-    (G_TYPE_INSTANCE_GET_PRIVATE ((o), IBUS_TYPE_FACTORY, IBusFactoryPrivate))
- 
- enum {
-+    LOOKUP_ENGINE_NAME,
-     LAST_SIGNAL,
- };
- 
-@@ -42,6 +44,8 @@ struct _IBusFactoryPrivate {
-     GHashTable     *engine_table;
- };
- 
-+static guint            factory_signals[LAST_SIGNAL] = { 0 };
-+
- /* functions prototype */
- static void      ibus_factory_destroy        (IBusFactory        *factory);
- static void      ibus_factory_set_property   (IBusFactory        *engine,
-@@ -113,6 +117,17 @@ ibus_factory_class_init (IBusFactoryClass *class)
-     ibus_service_class_add_interfaces (IBUS_SERVICE_CLASS (class), introspection_xml);
- 
-     g_type_class_add_private (class, sizeof (IBusFactoryPrivate));
-+
-+    factory_signals[LOOKUP_ENGINE_NAME] =
-+        g_signal_new (I_("lookup-engine-name"),
-+            G_TYPE_FROM_CLASS (gobject_class),
-+            G_SIGNAL_RUN_LAST,
-+            G_STRUCT_OFFSET (IBusFactoryClass, lookup_engine_name),
-+            NULL, NULL,
-+            _ibus_marshal_VOID__STRING,
-+            G_TYPE_NONE,
-+            1,
-+            G_TYPE_STRING);
- }
- 
- static void
-@@ -190,8 +205,12 @@ ibus_factory_service_method_call (IBusService           *service,
- 
-     if (g_strcmp0 (method_name, "CreateEngine") == 0) {
-         gchar *engine_name = NULL;
-+        GType engine_type;
-+
-         g_variant_get (parameters, "(&s)", &engine_name);
--        GType engine_type = (GType )g_hash_table_lookup (factory->priv->engine_table, engine_name);
-+        g_signal_emit (factory, factory_signals[LOOKUP_ENGINE_NAME],
-+                       0, engine_name);
-+        engine_type = (GType) g_hash_table_lookup (factory->priv->engine_table, engine_name);
- 
-         if (engine_type == G_TYPE_INVALID) {
-             gchar *error_message = g_strdup_printf ("Can not fond engine %s", engine_name);
-diff --git a/src/ibusfactory.h b/src/ibusfactory.h
-index 47c06e0..102081c 100644
---- a/src/ibusfactory.h
-+++ b/src/ibusfactory.h
-@@ -127,10 +127,13 @@ struct _IBusFactoryClass {
-     IBusServiceClass parent;
- 
-     /* signals */
-+    void        (* lookup_engine_name)
-+                                    (IBusFactory    *factory,
-+                                     const gchar    *engine_name);
- 
-     /*< private >*/
-     /* padding */
--    gpointer pdummy[8];
-+    gpointer pdummy[7];
- };
- 
- /**
 diff --git a/src/ibusxkbxml.c b/src/ibusxkbxml.c
 new file mode 100644
 index 0000000..c630eb9
@@ -2851,7 +2787,7 @@ index 0000000..6986b5c
 +G_END_DECLS
 +#endif
 diff --git a/ui/gtk/panel.py b/ui/gtk/panel.py
-index 90be1d5..de64920 100644
+index 90be1d5..8804634 100644
 --- a/ui/gtk/panel.py
 +++ b/ui/gtk/panel.py
 @@ -132,6 +132,22 @@ class Panel(ibus.PanelBase):
@@ -2928,7 +2864,7 @@ index 90be1d5..de64920 100644
  
  
      def reset(self):
-@@ -542,3 +572,12 @@ class Panel(ibus.PanelBase):
+@@ -542,3 +572,14 @@ class Panel(ibus.PanelBase):
                                 flags=glib.SPAWN_DO_NOT_REAP_CHILD)[0]
          self.__setup_pid = pid
          glib.child_watch_add(self.__setup_pid, self.__child_watch_cb)
@@ -2938,6 +2874,8 @@ index 90be1d5..de64920 100644
 +        # Should we remove the codes after all IM engines are changed
 +        # to "default" layout?
 +        if engine.name != None and engine.name.startswith("xkb:layout:"):
++            return engine.layout
++        elif engine.layout != None and engine.layout.startswith("default"):
 +            return engine.layout
 +        else:
 +            return "default"
@@ -3053,10 +2991,10 @@ index 0000000..ad9cdd9
 +endif
 diff --git a/xkb/ibus-engine-xkb-main.c b/xkb/ibus-engine-xkb-main.c
 new file mode 100644
-index 0000000..5d748cc
+index 0000000..a2f131c
 --- /dev/null
 +++ b/xkb/ibus-engine-xkb-main.c
-@@ -0,0 +1,397 @@
+@@ -0,0 +1,413 @@
 +/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
 +/* vim:set et sts=4: */
 +/* bus - The Input Bus
@@ -3083,7 +3021,6 @@ index 0000000..5d748cc
 +#include <config.h>
 +#endif
 +
-+#include <gconf/gconf-client.h>
 +#include <ibus.h>
 +#include <stdlib.h>
 +
@@ -3210,34 +3147,48 @@ index 0000000..5d748cc
 +    ibus_quit ();
 +}
 +
-+static void
-+_factory_lookup_engine_name_cb (IBusFactory *factory,
-+                                const gchar *engine_name,
-+                                gpointer     data)
++IBusEngine *
++_factory_create_engine_cb (IBusFactory *factory,
++                           const gchar *engine_name,
++                           gpointer     data)
 +{
-+    static GList *engine_list = NULL;
-+    GList *list;
-+    gboolean has_name = FALSE;
++#if 0
++    static GHashTable *engine_table = NULL;
++#endif
++    IBusEngine *engine = NULL;
++    gchar *object_path = NULL;
++    static int id = 0;
 +
-+    g_return_if_fail (engine_name != NULL);
++    g_return_val_if_fail (engine_name != NULL, NULL);
 +
 +    if (g_strcmp0 (engine_name, "xkb:layout:us") == 0) {
-+        return;
-+    }
-+    list = engine_list;
-+    while (list) {
-+        if (g_strcmp0 (list->data, engine_name) == 0) {
-+            has_name = TRUE;
-+            break;
-+        }
-+        list = list->next;
-+    }
-+    if (has_name) {
-+        return;
++        return NULL;
 +    }
 +
-+    ibus_factory_add_engine (factory, engine_name, IBUS_TYPE_XKB_ENGINE);
-+    engine_list = g_list_append (engine_list, (gpointer) g_strdup (engine_name));
++    /* FIXME: Do we always need a new object path for the same engine name? */
++#if 0
++    if (engine_table == NULL) {
++        engine_table = g_hash_table_new_full (g_str_hash,
++                                              g_str_equal,
++                                              g_free,
++                                              NULL);
++    }
++
++    if ((engine = (IBusEngine *) g_hash_table_lookup (engine_table,
++                                                      engine_name))) {
++        return engine;
++    }
++#endif
++
++    object_path = g_strdup_printf ("/org/freedesktop/IBus/XKBEngine/%d",
++                                   ++id);
++    engine = ibus_engine_new (engine_name,
++                              object_path,
++                              ibus_service_get_connection (IBUS_SERVICE (factory)));
++#if 0
++    g_hash_table_insert (engine_table, g_strdup (engine_name), engine);
++#endif
++    return engine;
 +}
 +
 +static void
@@ -3263,14 +3214,15 @@ index 0000000..5d748cc
 +                                                         "us",
 +                                                         "USA",
 +                                                         NULL,
++                                                         NULL,
 +                                                         NULL));
 +
 +    factory = ibus_factory_new (ibus_bus_get_connection (bus));
 +
 +    ibus_factory_add_engine (factory, "xkb:layout:us", IBUS_TYPE_XKB_ENGINE);
 +
-+    g_signal_connect (G_OBJECT (factory), "lookup-engine-name",
-+                      G_CALLBACK (_factory_lookup_engine_name_cb),
++    g_signal_connect (G_OBJECT (factory), "create-engine",
++                      G_CALLBACK (_factory_create_engine_cb),
 +                      NULL);
 +    if (ibus) {
 +        ibus_bus_request_name (bus, "org.freedesktop.IBus.XKB", 0);
@@ -3370,6 +3322,7 @@ index 0000000..5d748cc
 +                                                   (const gchar *) keys->data,
 +                                                   desc,
 +                                                   NULL,
++                                                   NULL,
 +                                                   NULL);
 +            ibus_component_add_engine (component, engine);
 +            }
@@ -3405,7 +3358,8 @@ index 0000000..5d748cc
 +                                                       (const gchar *) keys->data,
 +                                                       desc,
 +                                                       (const gchar *) variants->data,
-+                                                       (const gchar *) g_hash_table_lookup (variant_desc, variants->data));
++                                                       (const gchar *) g_hash_table_lookup (variant_desc, variants->data),
++                                                       NULL);
 +                    ibus_component_add_engine (component, engine);
 +                }
 +            }
@@ -4040,10 +3994,10 @@ index 0000000..15e5d18
 +#endif
 diff --git a/xkb/xkbxml.c b/xkb/xkbxml.c
 new file mode 100644
-index 0000000..2ce7bcf
+index 0000000..ad10c28
 --- /dev/null
 +++ b/xkb/xkbxml.c
-@@ -0,0 +1,335 @@
+@@ -0,0 +1,339 @@
 +/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
 +/* vim:set et sts=4: */
 +/* bus - The Input Bus
@@ -4312,7 +4266,8 @@ index 0000000..2ce7bcf
 +                          const gchar *layout,
 +                          const gchar *layout_desc,
 +                          const gchar *variant,
-+                          const gchar *variant_desc)
++                          const gchar *variant_desc,
++                          const gchar *name_prefix)
 +{
 +    IBusEngineDesc *engine;
 +    gchar *name = NULL;
@@ -4322,6 +4277,9 @@ index 0000000..2ce7bcf
 +
 +    g_return_val_if_fail (lang != NULL && layout != NULL, NULL);
 +
++    if (name_prefix == NULL) {
++        name_prefix = "xkb:layout:";
++    }
 +    if (variant_desc) {
 +        longname = g_strdup (variant_desc);
 +    } else if (layout && variant) {
@@ -4332,11 +4290,11 @@ index 0000000..2ce7bcf
 +        longname = g_strdup (layout);
 +    }
 +    if (variant) {
-+        name = g_strdup_printf ("xkb:layout:%s:%s", layout, variant);
++        name = g_strdup_printf ("%s%s:%s", name_prefix, layout, variant);
 +        desc = g_strdup_printf ("XKB %s(%s) keyboard layout", layout, variant);
 +        engine_layout = g_strdup_printf ("%s(%s)", layout, variant);
 +    } else {
-+        name = g_strdup_printf ("xkb:layout:%s", layout);
++        name = g_strdup_printf ("%s%s", name_prefix, layout);
 +        desc = g_strdup_printf ("XKB %s keyboard layout", layout);
 +        engine_layout = g_strdup (layout);
 +    }
@@ -4381,10 +4339,10 @@ index 0000000..2ce7bcf
 +}
 diff --git a/xkb/xkbxml.h b/xkb/xkbxml.h
 new file mode 100644
-index 0000000..56811ef
+index 0000000..6c00f1d
 --- /dev/null
 +++ b/xkb/xkbxml.h
-@@ -0,0 +1,110 @@
+@@ -0,0 +1,113 @@
 +/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
 +/* vim:set et sts=4: */
 +/* bus - The Input Bus
@@ -4462,6 +4420,8 @@ index 0000000..56811ef
 + * @layout_desc: Keyboard layout description for engine description
 + * @variant: Keyboard variant
 + * @variant_desc: Keyboard variant description for engine description
++ * @name_prefix: Name prefix for engine description, If NULL,
++ *               the default is "xkb:layout:".
 + * @returns: A newly allocated IBusEngineDesc.
 + *
 + * New a IBusEngineDesc.
@@ -4470,7 +4430,8 @@ index 0000000..56811ef
 +                                                  const gchar *layout,
 +                                                  const gchar *layout_desc,
 +                                                  const gchar *variant,
-+                                                  const gchar *variant_desc);
++                                                  const gchar *variant_desc,
++                                                  const gchar *name_prefix);
 +
 +GType            ibus_xkb_layout_config_get_type (void);
 +

@@ -1066,3 +1066,272 @@ index 1567c5f..2164e7c 100644
 -- 
 1.7.5.4
 
+From 624c4451da2bd171bd8ac53a9b9dd2a4227ef67f Mon Sep 17 00:00:00 2001
+From: Peng Huang <shawn.p.huang@gmail.com>
+Date: Thu, 7 Jul 2011 12:42:52 -0400
+Subject: [PATCH] Fix several GVariant related issues. And remove a wrong
+ unref.
+
+BUG=None
+TEST=Linux desktop
+
+Review URL: http://codereview.appspot.com/4667067
+---
+ bus/ibusimpl.c     |   11 +++++------
+ bus/inputcontext.c |    1 -
+ src/ibusconfig.c   |    8 ++------
+ 3 files changed, 7 insertions(+), 13 deletions(-)
+
+diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
+index b356b2c..42afeec 100644
+--- a/bus/ibusimpl.c
++++ b/bus/ibusimpl.c
+@@ -2183,8 +2183,8 @@ bus_ibus_impl_save_global_engine_name_to_config (BusIBusImpl *ibus)
+         ibus->use_global_engine &&
+         ibus->global_engine_name) {
+         ibus_config_set_value (ibus->config,
+-                        "general", "global_engine",
+-                        g_variant_new ("s", ibus->global_engine_name));
++                               "general", "global_engine",
++                               g_variant_new_string (ibus->global_engine_name));
+     }
+ }
+ 
+@@ -2206,8 +2206,7 @@ bus_ibus_impl_load_global_previous_engine_name_from_config (BusIBusImpl *ibus)
+     GVariant *value = ibus_config_get_value (ibus->config, "general", "global_previous_engine");
+     if (value == NULL)
+         return NULL;
+-    gchar *engine_name = NULL;
+-    g_variant_get (value, "(s)", &engine_name);
++    gchar *engine_name = g_variant_dup_string (value, NULL);
+     g_variant_unref (value);
+     return engine_name;
+ }
+@@ -2226,8 +2225,8 @@ bus_ibus_impl_save_global_previous_engine_name_to_config (BusIBusImpl *ibus)
+         ibus->use_global_engine &&
+         ibus->global_previous_engine_name) {
+         ibus_config_set_value (ibus->config,
+-                        "general", "global_previous_engine",
+-                        g_variant_new ("s", ibus->global_previous_engine_name));
++                               "general", "global_previous_engine",
++                               g_variant_new_string (ibus->global_previous_engine_name));
+     }
+ }
+ 
+diff --git a/bus/inputcontext.c b/bus/inputcontext.c
+index 2164e7c..47ac9d5 100644
+--- a/bus/inputcontext.c
++++ b/bus/inputcontext.c
+@@ -1171,7 +1171,6 @@ bus_input_context_focus_in (BusInputContext *context)
+                             NULL, /* we do not cancel the call. */
+                             NULL, /* use the default callback function. */
+                             NULL);
+-            g_object_unref (desc);
+         }
+     }
+ 
+diff --git a/src/ibusconfig.c b/src/ibusconfig.c
+index 36ef44b..b691277 100644
+--- a/src/ibusconfig.c
++++ b/src/ibusconfig.c
+@@ -191,7 +191,6 @@ ibus_config_get_value (IBusConfig  *conf
+ 
+     GVariant *value = NULL;
+     g_variant_get (result, "(v)", &value);
+-    g_variant_ref (value);
+     g_variant_unref (result);
+ 
+     return value;
+@@ -235,7 +234,6 @@ ibus_config_get_value_async_finish (IBus
+                                                  error);
+     if (retval != NULL) {
+         g_variant_get (retval, "(v)", &value);
+-        g_variant_ref (value);
+         g_variant_unref (retval);
+     }
+ 
+-- 
+1.7.5.4
+
+From 55a5652ac7d91fb319ef6576500e421eb53e80f4 Mon Sep 17 00:00:00 2001
+From: Yusuke Sato <yusukes@chromium.org>
+Date: Mon, 11 Jul 2011 11:55:19 +0900
+Subject: [PATCH] Remove the callback on destroy.
+
+BUG=crosbug.com/17293
+TEST=src/tests/ibus-bus.c
+
+Review URL: http://codereview.appspot.com/4675074
+---
+ src/ibusbus.c        |    4 ++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
+
+diff --git a/src/ibusbus.c b/src/ibusbus.c
+index 39ad784..2607448 100644
+--- a/src/ibusbus.c
++++ b/src/ibusbus.c
+@@ -398,8 +398,12 @@ ibus_bus_destroy (IBusObject *object)
+     }
+ 
+     if (bus->priv->connection) {
++        g_signal_handlers_disconnect_by_func (bus->priv->connection,
++                                              G_CALLBACK (_connection_closed_cb),
++                                              bus);
+         /* FIXME should use async close function */
+         g_dbus_connection_close_sync (bus->priv->connection, NULL, NULL);
++        g_object_unref (bus->priv->connection);
+         bus->priv->connection = NULL;
+     }
+ 
+-- 
+1.7.5.4
+
+From 290a37e1d4e3ec44dfea4b99744520f781c92592 Mon Sep 17 00:00:00 2001
+From: Yusuke Sato <yusukes@chromium.org>
+Date: Tue, 12 Jul 2011 14:04:30 +0900
+Subject: [PATCH] Use g_variant_dup_string for consistency.
+
+This fix is similar to https://github.com/ibus/ibus/commit/624c4451da2bd171bd8ac53a9b9dd2a4227ef67f .
+
+BUG=None
+TEST=None
+
+Review URL: http://codereview.appspot.com/4641101
+---
+ bus/ibusimpl.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
+index 42afeec..b6b2441 100644
+--- a/bus/ibusimpl.c
++++ b/bus/ibusimpl.c
+@@ -2163,7 +2163,7 @@ bus_ibus_impl_load_global_engine_name_from_config (BusIBusImpl *ibus)
+     GVariant *variant = ibus_config_get_value (ibus->config, "general", "global_engine");
+     gchar *engine_name = NULL;
+     if (variant != NULL) {
+-        g_variant_get (variant, "s", &engine_name);
++        engine_name = g_variant_dup_string (variant, NULL);
+         g_variant_unref (variant);
+     }
+     return engine_name;
+-- 
+1.7.5.4
+
+From 48cc200d7dbe999f92b05507a7c59bea42ac6f1c Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Tue, 12 Jul 2011 15:14:59 +0900
+Subject: [PATCH] Fixed an error in IBus.Bus.register_component
+
+TEST=Linux desktop
+
+Review URL: http://codereview.appspot.com/4668060
+---
+ ibus/component.py |    9 +++++----
+ 1 files changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/ibus/component.py b/ibus/component.py
+index 12f593d..7255ee1 100644
+--- a/ibus/component.py
++++ b/ibus/component.py
+@@ -94,6 +94,11 @@ class Component(Serializable):
+         engine = EngineDesc(name, longname, description, language, license, author, icon, layout, hotkeys)
+         self.__engines.append(engine)
+ 
++    def add_engines(self, engines):
++        if not isinstance(engines, list):
++            raise TypeError("engines must be an instance of list")
++        self.__engines.extend(engines)
++
+     def serialize(self, struct):
+         super(Component, self).serialize(struct)
+         struct.append (dbus.String(self.__name))
+@@ -106,8 +111,6 @@ class Component(Serializable):
+         struct.append (dbus.String(self.__textdomain))
+         struct.append (dbus.Array(map(serialize_object,self.__observed_paths), signature="v"))
+         struct.append (dbus.Array(map(serialize_object,self.__engines), signature="v"))
+-        # New properties of Component will use dict for serialize
+-        struct.append(dbus.Array({}, signature=None))
+ 
+     def deserialize(self, struct):
+         super(Component, self).deserialize(struct)
+@@ -123,8 +126,6 @@ class Component(Serializable):
+ 
+         self.__observed_paths = map(deserialize_object, struct.pop(0))
+         self.__engines = map(deserialize_object, struct.pop(0))
+-        # New properties of Component will use dict for serialize
+-        #value = struct.pop(0)
+ 
+ def test():
+     text = Component("Hello", "", "", "", "", "", "", "")
+-- 
+1.7.5.4
+
+From 88a44759ce5d3d785c7be96525130c67e8c63e1e Mon Sep 17 00:00:00 2001
+From: Daiki Ueno <ueno@unixuser.org>
+Date: Fri, 15 Jul 2011 09:51:07 +0900
+Subject: [PATCH] Fix GObject ref/unref issues.
+
+BUG=none
+TEST=manual
+
+Review URL: http://codereview.appspot.com/4700048
+---
+ bus/registry.c    |    5 +++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/bus/registry.c b/bus/registry.c
+index bc6680d..7b74781 100644
+--- a/bus/registry.c
++++ b/bus/registry.c
+@@ -424,7 +424,9 @@ bus_registry_load_in_dir (BusRegistry *registry,
+         if (component != NULL) {
+             BusComponent *buscomp = bus_component_new (component,
+                                                        NULL /* factory */);
+-            registry->components = g_list_append (registry->components, buscomp);
++            g_object_ref_sink (buscomp);
++            registry->components =
++                g_list_append (registry->components, buscomp);
+         }
+ 
+         g_free (path);
+@@ -654,7 +656,6 @@ bus_registry_name_owner_changed (BusRegistry *registry,
+         factory = bus_factory_proxy_new (connection);
+         if (factory == NULL)
+             return;
+-        g_object_ref_sink (factory);
+         bus_component_set_factory (component, factory);
+         g_object_unref (factory);
+     }
+-- 
+1.7.5.4
+
+From 0cb912cfe5664714e612206d955d458532adc707 Mon Sep 17 00:00:00 2001
+From: Peng Huang <shawn.p.huang@gmail.com>
+Date: Sat, 23 Jul 2011 09:23:41 +0800
+Subject: [PATCH] Always enable the new focused BusInputContext
+
+BUG=http://crosbug.com/17013
+TEST=On ChromeOS
+
+Review URL: http://codereview.appspot.com/4816047
+---
+ bus/ibusimpl.c |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
+
+diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
+index b6b2441..853465c 100644
+--- a/bus/ibusimpl.c
++++ b/bus/ibusimpl.c
+@@ -1203,8 +1203,7 @@ bus_ibus_impl_set_focused_context (BusIBusImpl     *ibus,
+         /* attach engine to the focused context */
+         if (engine != NULL) {
+             bus_input_context_set_engine (context, engine);
+-            if (bus_engine_proxy_is_enabled (engine))
+-                bus_input_context_enable (context);
++            bus_input_context_enable (context);
+             g_object_unref (engine);
+         }
+ 
+-- 
+1.7.5.4
+
