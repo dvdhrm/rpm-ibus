@@ -20,7 +20,7 @@
 
 Name:       ibus
 Version:    1.3.99.20110419
-Release:    13%{?dist}
+Release:    14%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -28,7 +28,7 @@ URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
 %if %have_gjsfile
-Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/ibus-gjs-1.3.99.20110806.tar.gz
+Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/ibus-gjs-1.3.99.20110814.tar.gz
 %endif
 Source3:    https://www.transifex.net/projects/p/ibus/resource/master/l/da/download/ibus_master_da.po
 Patch0:     ibus-HEAD.patch
@@ -62,6 +62,9 @@ BuildRequires:  iso-codes-devel
 %if %have_libxkbfile
 BuildRequires:  libxkbfile-devel
 %endif
+# for ibus-gjs-xx.tar.gz
+BuildRequires:  gjs
+BuildRequires:  gnome-shell
 
 Requires:   %{name}-libs = %{version}-%{release}
 Requires:   %{name}-gtk2 = %{version}-%{release}
@@ -184,14 +187,6 @@ mv data/ibus.schemas.in data/ibus.schemas.in.in
 %patch91 -p1 -b .fallback-icon
 
 %build
-%if %have_gjsfile
-d=`basename %SOURCE2 .tar.gz`
-cd $d
-%configure
-make %{?_smp_mflags}
-cd ..
-%endif
-
 %if %have_libxkbfile
 aclocal -I m4
 autoheader
@@ -213,6 +208,16 @@ automake -a -c -f
 
 # make -C po update-gmo
 make %{?_smp_mflags}
+
+
+%if %have_gjsfile
+d=`basename %SOURCE2 .tar.gz`
+cd $d
+export PKG_CONFIG_PATH=..:/usr/lib64/pkgconfig:/usr/lib/pkgconfig
+%configure
+make %{?_smp_mflags}
+cd ..
+%endif
 
 %install
 rm -rf $RPM_BUILD_ROOT
@@ -364,7 +369,7 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Fri Aug 05 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110419-13
+* Fri Aug 12 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110419-14
 - Updated ibus-HEAD.patch for upstream.
 - Removed ibus-435880-surrounding-text.patch as upstream.
 - Added ibus-711632-fedora-fallback-icon.patch

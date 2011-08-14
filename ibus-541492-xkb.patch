@@ -1,6 +1,6 @@
-From a253acde0935efae4bbc8aa59ca47ab273b9907b Mon Sep 17 00:00:00 2001
+From 2d0081ff5f19101a0348461b914274fc8bd63a19 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Fri, 5 Aug 2011 20:22:42 +0900
+Date: Thu, 11 Aug 2011 19:07:38 +0900
 Subject: [PATCH] Add XKB layouts
 
 ---
@@ -13,7 +13,7 @@ Subject: [PATCH] Add XKB layouts
  ibus/bus.py                |    3 +
  ibus/interface/iibus.py    |    3 +
  ibus/xkblayout.py.in       |  230 +++++++++++++++++
- ibus/xkbxml.py.in          |  416 ++++++++++++++++++++++++++++++
+ ibus/xkbxml.py.in          |  419 ++++++++++++++++++++++++++++++
  setup/Makefile.am          |    1 +
  setup/enginecombobox.py    |    7 +-
  setup/main.py              |    3 +
@@ -32,9 +32,9 @@ Subject: [PATCH] Add XKB layouts
  xkb/xkblayoutconfig.xml.in |    6 +
  xkb/xkblib.c               |  327 ++++++++++++++++++++++++
  xkb/xkblib.h               |   41 +++
- xkb/xkbxml.c               |  339 ++++++++++++++++++++++++
+ xkb/xkbxml.c               |  345 +++++++++++++++++++++++++
  xkb/xkbxml.h               |  113 ++++++++
- 30 files changed, 4027 insertions(+), 4 deletions(-)
+ 30 files changed, 4036 insertions(+), 4 deletions(-)
  create mode 100644 ibus/xkblayout.py.in
  create mode 100644 ibus/xkbxml.py.in
  create mode 100644 setup/xkbsetup.py
@@ -537,10 +537,10 @@ index 0000000..11fce12
 +        self.__default_option = self.get_option()
 diff --git a/ibus/xkbxml.py.in b/ibus/xkbxml.py.in
 new file mode 100644
-index 0000000..16f47df
+index 0000000..9407c13
 --- /dev/null
 +++ b/ibus/xkbxml.py.in
-@@ -0,0 +1,416 @@
+@@ -0,0 +1,419 @@
 +# vim:set et sts=4 sw=4:
 +#
 +# ibus - The Input Bus
@@ -836,7 +836,7 @@ index 0000000..16f47df
 +                        layout_desc=None,
 +                        variant=None,
 +                        variant_desc=None,
-+                        name_prefix='xkb:layout:'):
++                        name=None):
 +        if variant_desc != None:
 +            longname = variant_desc
 +        elif layout != None and variant != None:
@@ -845,12 +845,15 @@ index 0000000..16f47df
 +            longname = layout_desc
 +        else:
 +            longname = layout
++        name_prefix='xkb:layout:'
 +        if variant != None:
-+            name = name_prefix + layout + ':' + variant
++            if name == None:
++                name = name_prefix + layout + ':' + variant
 +            desc = 'XKB ' + layout + '(' + variant + ') keyboard layout'
 +            engine_layout = layout + '(' + variant + ')'
 +        else:
-+            name = name_prefix + layout
++            if name == None:
++                name = name_prefix + layout
 +            desc = 'XKB ' + layout + ' keyboard layout'
 +            engine_layout = layout
 +
@@ -2991,7 +2994,7 @@ index 0000000..ad9cdd9
 +endif
 diff --git a/xkb/ibus-engine-xkb-main.c b/xkb/ibus-engine-xkb-main.c
 new file mode 100644
-index 0000000..a2f131c
+index 0000000..0fb0f0c
 --- /dev/null
 +++ b/xkb/ibus-engine-xkb-main.c
 @@ -0,0 +1,413 @@
@@ -3324,7 +3327,7 @@ index 0000000..a2f131c
 +                                                   NULL,
 +                                                   NULL,
 +                                                   NULL);
-+            ibus_component_add_engine (component, engine);
++                ibus_component_add_engine (component, engine);
 +            }
 +        }
 +        variants = (GList *) g_hash_table_lookup (layout_list, keys->data);
@@ -3994,10 +3997,10 @@ index 0000000..15e5d18
 +#endif
 diff --git a/xkb/xkbxml.c b/xkb/xkbxml.c
 new file mode 100644
-index 0000000..ad10c28
+index 0000000..d59a929
 --- /dev/null
 +++ b/xkb/xkbxml.c
-@@ -0,0 +1,339 @@
+@@ -0,0 +1,345 @@
 +/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
 +/* vim:set et sts=4: */
 +/* bus - The Input Bus
@@ -4267,19 +4270,17 @@ index 0000000..ad10c28
 +                          const gchar *layout_desc,
 +                          const gchar *variant,
 +                          const gchar *variant_desc,
-+                          const gchar *name_prefix)
++                          const gchar *alt_name)
 +{
 +    IBusEngineDesc *engine;
 +    gchar *name = NULL;
 +    gchar *longname = NULL;
 +    gchar *desc = NULL;
 +    gchar *engine_layout = NULL;
++    const gchar *name_prefix = "xkb:layout:";
 +
 +    g_return_val_if_fail (lang != NULL && layout != NULL, NULL);
 +
-+    if (name_prefix == NULL) {
-+        name_prefix = "xkb:layout:";
-+    }
 +    if (variant_desc) {
 +        longname = g_strdup (variant_desc);
 +    } else if (layout && variant) {
@@ -4290,11 +4291,19 @@ index 0000000..ad10c28
 +        longname = g_strdup (layout);
 +    }
 +    if (variant) {
-+        name = g_strdup_printf ("%s%s:%s", name_prefix, layout, variant);
++        if (alt_name) {
++            name = g_strdup (alt_name);
++        } else {
++            name = g_strdup_printf ("%s%s:%s", name_prefix, layout, variant);
++        }
 +        desc = g_strdup_printf ("XKB %s(%s) keyboard layout", layout, variant);
 +        engine_layout = g_strdup_printf ("%s(%s)", layout, variant);
 +    } else {
-+        name = g_strdup_printf ("%s%s", name_prefix, layout);
++        if (alt_name) {
++            name = g_strdup (alt_name);
++        } else {
++            name = g_strdup_printf ("%s%s", name_prefix, layout);
++        }
 +        desc = g_strdup_printf ("XKB %s keyboard layout", layout);
 +        engine_layout = g_strdup (layout);
 +    }
