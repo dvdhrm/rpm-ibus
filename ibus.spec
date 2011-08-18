@@ -5,7 +5,7 @@
 %define have_libxkbfile 1
 %define have_gjsfile 1
 
-%if 0%{?fedora} > 16
+%if 0%{?fedora} > 15
 %define have_bridge_hotkey 1
 %else
 %define have_bridge_hotkey 0
@@ -20,7 +20,7 @@
 
 Name:       ibus
 Version:    1.3.99.20110419
-Release:    15%{?dist}
+Release:    16%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
