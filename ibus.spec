@@ -20,7 +20,7 @@
 
 Name:       ibus
 Version:    1.3.99.20110419
-Release:    14%{?dist}
+Release:    15%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -28,7 +28,7 @@ URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
 %if %have_gjsfile
-Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/ibus-gjs-1.3.99.20110814.tar.gz
+Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/ibus-gjs-1.3.99.20110818.tar.gz
 %endif
 Source3:    https://www.transifex.net/projects/p/ibus/resource/master/l/da/download/ibus_master_da.po
 Patch0:     ibus-HEAD.patch
@@ -369,7 +369,7 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Fri Aug 12 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110419-14
+* Thu Aug 18 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110419-15
 - Updated ibus-HEAD.patch for upstream.
 - Removed ibus-435880-surrounding-text.patch as upstream.
 - Added ibus-711632-fedora-fallback-icon.patch
