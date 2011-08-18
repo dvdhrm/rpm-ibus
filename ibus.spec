@@ -5,7 +5,7 @@
 %define have_libxkbfile 1
 %define have_gjsfile 1
 
-%if 0%{?fedora} > 15
+%if 0%{?fedora} > 16
 %define have_bridge_hotkey 1
 %else
 %define have_bridge_hotkey 0
@@ -369,7 +369,7 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Thu Aug 18 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110419-15
+* Thu Aug 18 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110419-16
 - Updated ibus-HEAD.patch for upstream.
 - Removed ibus-435880-surrounding-text.patch as upstream.
 - Added ibus-711632-fedora-fallback-icon.patch
