@@ -477,6 +477,36 @@ index 853465c..00864ac 100644
                  desc = (IBusEngineDesc *) ibus->engine_list->data;
              }
          }
+@@ -1407,6 +1731,9 @@ bus_ibus_impl_set_focused_context (BusIBusImpl     *ibus,
+ 
+     BusEngineProxy *engine = NULL;
+     gboolean is_enabled = FALSE;
++#if USE_BRIDGE_HOTKEY
++    IBusEngineDesc *desc = NULL;
++#endif
+ 
+     if (ibus->focused_context) {
+         if (ibus->use_global_engine) {
+@@ -1336,6 +1741,9 @@ bus_ibus_impl_set_focused_context (BusIBusImpl     *ibus,
+             engine = bus_input_context_get_engine (ibus->focused_context);
+             if (engine) {
+                 is_enabled = bus_input_context_is_enabled (ibus->focused_context);
++#if USE_BRIDGE_HOTKEY
++                desc = bus_input_context_get_prev_hotkey_engine (ibus->focused_context);
++#endif
+                 g_object_ref (engine);
+                 bus_input_context_set_engine (ibus->focused_context, NULL);
+             }
+@@ -1360,6 +1768,9 @@ bus_ibus_impl_set_focused_context (BusIBusImpl     *ibus,
+             if (is_enabled) {
+                 bus_input_context_enable (context);
+             }
++#if USE_BRIDGE_HOTKEY
++            bus_input_context_set_prev_hotkey_engine (ibus->focused_context, desc);
++#endif
+             g_object_unref (engine);
+         }
+ 
 @@ -2267,6 +2591,9 @@ bus_ibus_impl_filter_keyboard_shortcuts 
  
      GQuark event;
@@ -1483,16 +1513,7 @@ index 8804634..f7b3e50 100644
              else:
                  self.__set_im_icon(ICON_KEYBOARD)
                  self.__set_im_name(None)
-@@ -260,6 +355,8 @@ class Panel(ibus.PanelBase):
- 
-     def focus_out(self, ic):
-         self.reset()
-+        if self.__focus_ic and self.__focus_ic.is_enabled():
-+            self.__focus_ic.disable()
-         self.__focus_ic = None
-         self.__language_bar.set_enabled(False)
-         self.__language_bar.focus_out()
-@@ -273,7 +370,21 @@ class Panel(ibus.PanelBase):
+@@ -273,7 +368,21 @@ class Panel(ibus.PanelBase):
              return
  
          enabled = self.__focus_ic.is_enabled()
@@ -1515,7 +1536,7 @@ index 8804634..f7b3e50 100644
  
          if enabled == False:
              self.reset()
-@@ -287,7 +398,7 @@ class Panel(ibus.PanelBase):
+@@ -287,7 +396,7 @@ class Panel(ibus.PanelBase):
                  self.__set_im_icon(engine.icon)
                  self.__set_im_name(engine.longname)
                  if self.__bus.get_use_sys_layout():
@@ -1524,7 +1545,7 @@ index 8804634..f7b3e50 100644
              else:
                  self.__set_im_icon(ICON_KEYBOARD)
                  self.__set_im_name(None)
-@@ -315,6 +426,7 @@ class Panel(ibus.PanelBase):
+@@ -315,6 +424,7 @@ class Panel(ibus.PanelBase):
  
      def __config_load_show(self):
          show = self.__config.get_value("panel", "show", 0)
@@ -1532,7 +1553,7 @@ index 8804634..f7b3e50 100644
          self.__language_bar.set_show(show)
  
      def __config_load_position(self):
-@@ -443,6 +555,21 @@ class Panel(ibus.PanelBase):
+@@ -443,6 +553,21 @@ class Panel(ibus.PanelBase):
      #     menu.set_take_focus(False)
      #     return menu
  
@@ -1554,7 +1575,7 @@ index 8804634..f7b3e50 100644
      def __create_im_menu(self):
          engines = self.__bus.list_active_engines()
          current_engine = \
-@@ -453,25 +580,39 @@ class Panel(ibus.PanelBase):
+@@ -453,25 +578,39 @@ class Panel(ibus.PanelBase):
          size = gtk.icon_size_lookup(gtk.ICON_SIZE_MENU)
          menu = gtk.Menu()
          for i, engine in enumerate(engines):
@@ -1607,7 +1628,7 @@ index 8804634..f7b3e50 100644
  
          menu.show_all()
          menu.set_take_focus(False)
-@@ -523,8 +664,25 @@ class Panel(ibus.PanelBase):
+@@ -523,8 +662,25 @@ class Panel(ibus.PanelBase):
          if not self.__focus_ic:
              return
          if engine:
@@ -1634,7 +1655,7 @@ index 8804634..f7b3e50 100644
              self.__focus_ic.disable()
  
      def __sys_menu_item_activate_cb(self, item, command):
-@@ -573,12 +731,85 @@ class Panel(ibus.PanelBase):
+@@ -573,12 +729,85 @@ class Panel(ibus.PanelBase):
          self.__setup_pid = pid
          glib.child_watch_add(self.__setup_pid, self.__child_watch_cb)
  

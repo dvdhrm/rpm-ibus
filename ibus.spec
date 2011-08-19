@@ -20,7 +20,7 @@
 
 Name:       ibus
 Version:    1.3.99.20110419
-Release:    16%{?dist}
+Release:    17%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -369,7 +369,7 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Thu Aug 18 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110419-16
+* Fri Aug 19 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110419-17
 - Updated ibus-HEAD.patch for upstream.
 - Removed ibus-435880-surrounding-text.patch as upstream.
 - Added ibus-711632-fedora-fallback-icon.patch
@@ -378,6 +378,7 @@ fi
   Fixed Bug 700472 Use a symbol icon instead of an image icon.
 - Added ibus-xx-bridge-hotkey.patch
   Triaged Bug 707370 SetEngine timeout
+  Fixed Bug 731610 Keep IM state when text input focus changes
 - Added transitional ibus-gnome3 package.
   Fixed Bug 718110 Use a shell icon instead of pygtk2 icon.
 
