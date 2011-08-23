@@ -1013,6 +1013,26 @@ index 8979515..2a2b459
        <locale name="C">
          <short>Trigger shortcut keys</short>
  	    <long>The shortcut keys for turning input method on or off</long>
+@@ -103,6 +103,19 @@
+       </locale>
+     </schema>
+     <schema>
++      <key>/schemas/desktop/ibus/general/hotkey/use_bridge_hotkey</key>
++      <applyto>/desktop/ibus/general/hotkey/use_bridge_hotkey</applyto>
++      <owner>ibus</owner>
++      <type>bool</type>
++      <default>true</default>
++      <locale name="C">
++        <short>Use bridge hotkey</short>
++	    <long>Use trigger keys to toggle the prev and next IM engines
++                  if true. Use trigger keys to toggle an enable and 
++                  disabled IM engine if false.</long>
++      </locale>
++    </schema>
++    <schema>
+       <key>/schemas/desktop/ibus/panel/show</key>
+       <applyto>/desktop/ibus/panel/show</applyto>
+       <owner>ibus</owner>
 diff --git a/ibus/_config.py.in b/ibus/_config.py.in
 index a830136..4c3c980 100644
 --- a/ibus/_config.py.in
