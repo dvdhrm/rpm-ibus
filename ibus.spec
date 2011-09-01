@@ -21,8 +21,8 @@
 %define gnome_icon_theme_legacy_version 2.91.6
 
 Name:       ibus
-Version:    1.3.99.20110419
-Release:    18%{?dist}
+Version:    1.3.99.20110817
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -32,14 +32,11 @@ Source1:    xinput-ibus
 %if %have_gjsfile
 Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/ibus-gjs-%{ibus_gjs_version}.tar.gz
 %endif
-Source3:    https://www.transifex.net/projects/p/ibus/resource/master/l/da/download/ibus_master_da.po
 Patch0:     ibus-HEAD.patch
 Patch1:     ibus-530711-preload-sys.patch
-Patch2:     ibus-xx-icon-symbol.patch
-Patch3:     ibus-xx-factory-signal.patch
-Patch4:     ibus-541492-xkb.patch
-Patch5:     ibus-xx-bridge-hotkey.patch
-Patch6:     ibus-xx-setup-frequent-lang.patch
+Patch2:     ibus-541492-xkb.patch
+Patch3:     ibus-xx-bridge-hotkey.patch
+Patch4:     ibus-xx-setup-frequent-lang.patch
 
 # Workaround for oxygen-gtk icon theme until bug 699103 is fixed.
 Patch91:    ibus-711632-fedora-fallback-icon.patch
@@ -173,18 +170,15 @@ The ibus-devel-docs package contains developer documentation for ibus
 %if %have_gjsfile
 zcat %SOURCE2 | tar xf -
 %endif
-cp %SOURCE3 po/da.po
 %patch0 -p1
 cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
 %patch1 -p1 -b .preload-sys
-%patch2 -p1 -b .icon-symbol
-%patch3 -p1 -b .factory
 %if %have_libxkbfile
-%patch4 -p1 -b .xkb
+%patch2 -p1 -b .xkb
 %endif
 mv data/ibus.schemas.in data/ibus.schemas.in.in
-%patch5 -p1 -b .bridge-key
-%patch6 -p1 -b .setup-frequent-lang
+%patch3 -p1 -b .bridge-key
+%patch4 -p1 -b .setup-frequent-lang
 
 %patch91 -p1 -b .fallback-icon
 
@@ -371,13 +365,12 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Tue Aug 23 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110419-18
+* Thu Sep 01 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110817-1
+- Fixed Bug 700472 Use a symbol icon instead of an image icon.
 - Updated ibus-HEAD.patch for upstream.
 - Removed ibus-435880-surrounding-text.patch as upstream.
 - Added ibus-711632-fedora-fallback-icon.patch
   Fixed SEGV with no icon in oxygen-gtk icon theme.
-- Added ibus-xx-icon-symbol.patch
-  Fixed Bug 700472 Use a symbol icon instead of an image icon.
 - Added ibus-xx-bridge-hotkey.patch
   Triaged Bug 707370 SetEngine timeout
   Fixed Bug 731610 Keep IM state when text input focus changes

@@ -921,7 +921,7 @@ diff --git a/configure.ac b/configure.ac
 index 4c20ae7..21d35c3 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -456,6 +456,34 @@ else
+@@ -462,6 +462,34 @@ else
      enable_surrounding_text="no (disabled, use --enable-surrounding-text to enable)"
  fi
  
@@ -956,15 +956,15 @@ index 4c20ae7..21d35c3 100644
  # check iso-codes
  PKG_CHECK_MODULES(ISOCODES, [
      iso-codes
-@@ -482,6 +510,7 @@ bus/Makefile
+@@ -488,6 +516,7 @@ bus/Makefile
  util/Makefile
  util/IMdkit/Makefile
  data/Makefile
 +data/ibus.schemas.in
  data/icons/Makefile
  data/keymaps/Makefile
- docs/Makefile
-@@ -534,5 +563,7 @@ Build options:
+ data/dconf/Makefile
+@@ -540,5 +569,7 @@ Build options:
    No snooper regexes        "$NO_SNOOPER_APPS"
    Panel icon                "$IBUS_ICON_KEYBOARD"
    Enable surrounding-text   $enable_surrounding_text
@@ -976,8 +976,8 @@ diff --git a/data/Makefile.am b/data/Makefile.am
 index 99be41c..824da76 100644
 --- a/data/Makefile.am
 +++ b/data/Makefile.am
-@@ -26,7 +26,8 @@ SUBDIRS = \
- 	$(NULL)
+@@ -30,7 +30,8 @@ SUBDIRS += dconf
+ endif
  
  schemasdir = $(GCONF_SCHEMA_FILE_DIR)
 -schemas_in_files = ibus.schemas.in
@@ -986,7 +986,7 @@ index 99be41c..824da76 100644
  schemas_DATA = $(schemas_in_files:.schemas.in=.schemas)
  @INTLTOOL_SCHEMAS_RULE@
  
-@@ -41,11 +42,12 @@ if GCONF_SCHEMAS_INSTALL
+@@ -45,11 +46,12 @@ if GCONF_SCHEMAS_INSTALL
  endif
  
  EXTRA_DIST = \
@@ -1780,15 +1780,7 @@ diff --git a/xkb/ibus-engine-xkb-main.c b/xkb/ibus-engine-xkb-main.c
 index 0fb0f0c..4787bf2 100644
 --- a/xkb/ibus-engine-xkb-main.c
 +++ b/xkb/ibus-engine-xkb-main.c
-@@ -25,6 +25,7 @@
- #endif
- 
- #include <ibus.h>
-+#include <glib/gi18n-lib.h>
- #include <stdlib.h>
- 
- #ifdef ENABLE_NLS
-@@ -290,6 +291,9 @@ print_component ()
+@@ -290,6 +290,9 @@ print_component ()
      const gchar *desc;
      gchar *output;
      GString *str;
@@ -1798,7 +1790,7 @@ index 0fb0f0c..4787bf2 100644
  
  #ifdef XKBLAYOUTCONFIG_FILE
      layout_config = ibus_xkb_layout_config_new (XKBLAYOUTCONFIG_FILE);
-@@ -302,6 +306,19 @@ print_component ()
+@@ -302,6 +305,19 @@ print_component ()
      layout_desc = (GHashTable *) ibus_xkb_config_registry_get_layout_desc (config_registry);
      variant_desc = (GHashTable *) ibus_xkb_config_registry_get_variant_desc (config_registry);
      component = ibus_xkb_component_new ();
@@ -1818,15 +1810,6 @@ index 0fb0f0c..4787bf2 100644
      for (keys = g_hash_table_get_keys (layout_list); keys; keys = keys->next) {
          if (keys->data == NULL) {
              continue;
-@@ -390,6 +407,8 @@ main (int argc, char **argv)
- 
- #ifdef ENABLE_NLS
-     setlocale (LC_ALL, "");
-+    bindtextdomain (GETTEXT_PACKAGE, IBUS_LOCALEDIR);
-+    bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
- #endif
- 
-     g_type_init ();
 diff --git a/xkb/xkbxml.c b/xkb/xkbxml.c
 index d59a929..86bcf8f 100644
 --- a/xkb/xkbxml.c
