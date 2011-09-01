@@ -8,9 +8,11 @@
 %if 0%{?fedora} > 15
 %define have_bridge_hotkey 1
 %define ibus_gjs_version 3.1.4.20110823
+%define ibus_gjs_build_failure 1
 %else
 %define have_bridge_hotkey 0
 %define ibus_gjs_version 3.0.2.20110823
+%define ibus_gjs_build_failure 0
 %endif
 
 %define ibus_api_version 1.0
@@ -22,7 +24,7 @@
 
 Name:       ibus
 Version:    1.3.99.20110817
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -40,6 +42,9 @@ Patch4:     ibus-xx-setup-frequent-lang.patch
 
 # Workaround for oxygen-gtk icon theme until bug 699103 is fixed.
 Patch91:    ibus-711632-fedora-fallback-icon.patch
+# Workaround gnome-shell build failure
+# http://koji.fedoraproject.org/koji/getfile?taskID=3317917&name=root.log
+Patch92:    ibus-gjs-xx-gnome-shell-3.1.4-build-failure.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -48,6 +53,7 @@ BuildRequires:  cvs
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
 BuildRequires:  python
+BuildRequires:  gobject-introspection-devel
 BuildRequires:  gtk2-devel
 BuildRequires:  gtk3-devel
 BuildRequires:  dbus-glib-devel
@@ -63,7 +69,9 @@ BuildRequires:  libxkbfile-devel
 %endif
 # for ibus-gjs-xx.tar.gz
 BuildRequires:  gjs
+%if ! %ibus_gjs_build_failure
 BuildRequires:  gnome-shell
+%endif
 
 Requires:   %{name}-libs = %{version}-%{release}
 Requires:   %{name}-gtk2 = %{version}-%{release}
@@ -169,6 +177,12 @@ The ibus-devel-docs package contains developer documentation for ibus
 %setup -q
 %if %have_gjsfile
 zcat %SOURCE2 | tar xf -
+%if %ibus_gjs_build_failure
+d=`basename %SOURCE2 .tar.gz`
+cd $d
+%patch92 -p1 -b .fail-g-s
+cd ..
+%endif
 %endif
 %patch0 -p1
 cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
@@ -209,6 +223,9 @@ make %{?_smp_mflags}
 %if %have_gjsfile
 d=`basename %SOURCE2 .tar.gz`
 cd $d
+%if %ibus_gjs_build_failure
+autoreconf
+%endif
 export PKG_CONFIG_PATH=..:/usr/lib64/pkgconfig:/usr/lib/pkgconfig
 %configure
 make %{?_smp_mflags}
@@ -365,7 +382,7 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Thu Sep 01 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110817-1
+* Thu Sep 01 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110817-2
 - Fixed Bug 700472 Use a symbol icon instead of an image icon.
 - Updated ibus-HEAD.patch for upstream.
 - Removed ibus-435880-surrounding-text.patch as upstream.
