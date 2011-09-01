@@ -24,7 +24,7 @@
 
 Name:       ibus
 Version:    1.3.99.20110817
-Release:    2%{?dist}
+Release:    3%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -382,7 +382,7 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Thu Sep 01 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110817-2
+* Thu Sep 01 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110817-3
 - Fixed Bug 700472 Use a symbol icon instead of an image icon.
 - Updated ibus-HEAD.patch for upstream.
 - Removed ibus-435880-surrounding-text.patch as upstream.
