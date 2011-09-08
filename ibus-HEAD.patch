@@ -694,3 +694,102 @@ index 723b5fd..3c81688 100644
 -- 
 1.7.5.4
 
+From 34518370fbb5f69f8dfa2153d0d0da4473d0344d Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Wed, 7 Sep 2011 15:09:01 +0900
+Subject: [PATCH] Added get methods for the members in IBusAttribute for non-C
+ language.
+
+---
+ src/ibusattribute.c |   24 ++++++++++++++++++++++++
+ src/ibusattribute.h |   39 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 63 insertions(+), 0 deletions(-)
+
+diff --git a/src/ibusattribute.c b/src/ibusattribute.c
+index 816bcee..aac14d4 100644
+--- a/src/ibusattribute.c
++++ b/src/ibusattribute.c
+@@ -124,6 +124,30 @@ ibus_attribute_new (guint type,
+     return attr;
+ }
+ 
++guint
++ibus_attribute_get_attr_type (IBusAttribute *attr)
++{
++    return attr->type;
++}
++
++guint
++ibus_attribute_get_value (IBusAttribute *attr)
++{
++    return attr->value;
++}
++
++guint
++ibus_attribute_get_start_index (IBusAttribute *attr)
++{
++    return attr->start_index;
++}
++
++guint
++ibus_attribute_get_end_index (IBusAttribute *attr)
++{
++    return attr->end_index;
++}
++
+ IBusAttribute *
+ ibus_attr_underline_new (guint underline_type,
+                          guint start_index,
+diff --git a/src/ibusattribute.h b/src/ibusattribute.h
+index 2628415..f44860c 100644
+--- a/src/ibusattribute.h
++++ b/src/ibusattribute.h
+@@ -138,6 +138,45 @@ IBusAttribute       *ibus_attribute_new         (guint           type,
+                                                  guint           value,
+                                                  guint           start_index,
+                                                  guint           end_index);
++
++/**
++ * ibus_attribute_get_attr_type:
++ * @returns: An enum of IBusAttrType.
++ *
++ * Returns an enum of IBusAttrType.
++ */
++guint                ibus_attribute_get_attr_type
++                                                (IBusAttribute *attr);
++
++/**
++ * ibus_attribute_get_value:
++ * @returns: An unsigned int value relative with IBusAttrType.
++ *
++ * Returns an unsigned int value relative with IBusAttrType.
++ * If the type is IBUS_ATTR_TYPE_UNDERLINE, the return value is
++ * IBusAttrUnderline. If the type is IBUS_ATTR_TYPE_FOREGROUND,
++ * the return value is the color RGB.
++ */
++guint                ibus_attribute_get_value   (IBusAttribute *attr);
++
++/**
++ * ibus_attribute_get_start_index:
++ * @returns: A start unsigned index
++ *
++ * Returns a start unsigned index
++ */
++guint                ibus_attribute_get_start_index
++                                                (IBusAttribute *attr);
++
++/**
++ * ibus_attribute_get_end_index:
++ * @returns: A end unsigned index
++ *
++ * Returns a end unsigned index
++ */
++guint                ibus_attribute_get_end_index
++                                                (IBusAttribute *attr);
++
+ /**
+  * ibus_attr_underline_new:
+  * @underline_type: Type of underline.
+-- 
+1.7.5.4
+

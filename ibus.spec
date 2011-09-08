@@ -7,11 +7,11 @@
 
 %if 0%{?fedora} > 15
 %define have_bridge_hotkey 1
-%define ibus_gjs_version 3.1.4.20110823
+%define ibus_gjs_version 3.1.91.20110908
 %define ibus_gjs_build_failure 1
 %else
 %define have_bridge_hotkey 0
-%define ibus_gjs_version 3.0.2.20110823
+%define ibus_gjs_version 3.0.2.20110908
 %define ibus_gjs_build_failure 0
 %endif
 
@@ -24,7 +24,7 @@
 
 Name:       ibus
 Version:    1.3.99.20110817
-Release:    3%{?dist}
+Release:    4%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -45,6 +45,9 @@ Patch91:    ibus-711632-fedora-fallback-icon.patch
 # Workaround gnome-shell build failure
 # http://koji.fedoraproject.org/koji/getfile?taskID=3317917&name=root.log
 Patch92:    ibus-gjs-xx-gnome-shell-3.1.4-build-failure.patch
+# Workaround to disable preedit on gnome-shell until bug 658420 is fixed.
+# https://bugzilla.gnome.org/show_bug.cgi?id=658420
+Patch93:    ibus-xx-g-s-disable-preedit.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -185,6 +188,7 @@ cd ..
 %endif
 %endif
 %patch0 -p1
+%patch93 -p1 -b .g-s-preedit
 cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
 %patch1 -p1 -b .preload-sys
 %if %have_libxkbfile
@@ -382,6 +386,14 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Sep 08 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110817-4
+- Updated ibus-gjs 3.1.91.20110908 and 3.0.2.20110908 for gnome-shell.
+  Fixed preedit active segments on gnome-shell and X11 apps.
+- Added ibus-xx-g-s-disable-preedit.patch
+  Disabled preedit on gnome-shell for a workaround.
+- Updated ibus.spec
+  Fixed Bug 735879 pre/postun scripts
+
 * Thu Sep 01 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110817-3
 - Fixed Bug 700472 Use a symbol icon instead of an image icon.
 - Updated ibus-HEAD.patch for upstream.
