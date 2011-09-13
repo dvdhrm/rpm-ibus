@@ -7,7 +7,7 @@
 
 %if 0%{?fedora} > 15
 %define have_bridge_hotkey 1
-%define ibus_gjs_version 3.1.91.20110908
+%define ibus_gjs_version 3.1.91.20110913
 %define ibus_gjs_build_failure 1
 %else
 %define have_bridge_hotkey 0
@@ -24,7 +24,7 @@
 
 Name:       ibus
 Version:    1.3.99.20110817
-Release:    4%{?dist}
+Release:    5%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -386,6 +386,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Tue Sep 13 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110817-5
+- Updated ibus-gjs 3.1.91.20110913 for f16.
+
 * Thu Sep 08 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110817-4
 - Updated ibus-gjs 3.1.91.20110908 and 3.0.2.20110908 for gnome-shell.
   Fixed preedit active segments on gnome-shell and X11 apps.
