@@ -23,8 +23,8 @@
 %define gnome_icon_theme_legacy_version 2.91.6
 
 Name:       ibus
-Version:    1.3.99.20110817
-Release:    5%{?dist}
+Version:    1.4.0
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -34,7 +34,7 @@ Source1:    xinput-ibus
 %if %have_gjsfile
 Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/ibus-gjs-%{ibus_gjs_version}.tar.gz
 %endif
-Patch0:     ibus-HEAD.patch
+# Patch0:     ibus-HEAD.patch
 Patch1:     ibus-530711-preload-sys.patch
 Patch2:     ibus-541492-xkb.patch
 Patch3:     ibus-xx-bridge-hotkey.patch
@@ -187,7 +187,7 @@ cd $d
 cd ..
 %endif
 %endif
-%patch0 -p1
+# %patch0 -p1
 %patch93 -p1 -b .g-s-preedit
 cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
 %patch1 -p1 -b .preload-sys
@@ -386,6 +386,17 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Sep 28 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-1
+- Updated to 1.4.0
+- Updated ibus-gjs 3.0.2.20110928 for f15.
+- Updated ibus-gjs 3.2.0.20110928 for f16. (#740588)
+- Updated ibus-530711-preload-sys.patch
+  Fixed not to show duplicated engine names in setup treeview (#740447)
+- Updated bus-gjs-xx-gnome-shell-3.1.4-build-failure.patch for f16.
+- Updated ibus-xx-bridge-hotkey.patch
+  Fixed a XKB configuration without the input focus for f16 (#739165)
+  Fixed not to show null strings in case of no variants (#738130)
+
 * Tue Sep 13 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.3.99.20110817-5
 - Updated ibus-gjs 3.1.91.20110913 for f16.
 

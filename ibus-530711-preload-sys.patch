@@ -1,6 +1,6 @@
-From fd80539e980f464192aed22c71e83ff3a6ec61b3 Mon Sep 17 00:00:00 2001
+From a7e922f290c1e3eba42ca1c6147ab1704ec272fb Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Thu, 1 Sep 2011 14:38:13 +0900
+Date: Mon, 26 Sep 2011 13:06:05 +0900
 Subject: [PATCH] Reload preload engines until users customize the list.
 
 The idea is, if users don't customize the preload_engines with ibus-setup,
@@ -20,10 +20,10 @@ IBUS_PRELOAD_ENGINE_MODE_USER and users can customize the value
  bus/ibusimpl.c       |  412 +++++++++++++++++++++++++++++++++++++++-----------
  data/ibus.schemas.in |   15 ++-
  ibus/common.py       |    6 +
- setup/main.py        |   70 ++++++++-
+ setup/main.py        |   73 ++++++++-
  setup/setup.ui       |   21 +++-
  src/ibustypes.h      |   10 ++
- 6 files changed, 438 insertions(+), 96 deletions(-)
+ 6 files changed, 440 insertions(+), 97 deletions(-)
 
 diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
 index 1942504..3fce912 100644
@@ -560,7 +560,7 @@ index 6483aae..127ed93 100644
      pass
  
 diff --git a/setup/main.py b/setup/main.py
-index 7f4a040..192fb88 100644
+index 7f4a040..095084b 100644
 --- a/setup/main.py
 +++ b/setup/main.py
 @@ -92,6 +92,7 @@ class Setup(object):
@@ -599,7 +599,17 @@ index 7f4a040..192fb88 100644
  
          self.__treeview = self.__builder.get_object("treeview_engines")
          self.__treeview.set_engines(engines)
-@@ -265,6 +273,26 @@ class Setup(object):
+@@ -247,7 +255,8 @@ class Setup(object):
+     def __combobox_notify_active_engine_cb(self, combobox, property):
+         engine = self.__combobox.get_active_engine()
+         button = self.__builder.get_object("button_engine_add")
+-        button.set_sensitive(engine != None and engine not in self.__treeview.get_engines())
++        button.set_sensitive(engine != None and \
++                engine.name not in map(lambda e: e.name, self.__treeview.get_engines()))
+ 
+     def __treeview_notify_cb(self, treeview, property):
+         if property.name != "active-engine" and property.name != "engines":
+@@ -265,6 +274,26 @@ class Setup(object):
              engine_names = map(lambda e: e.name, engines)
              self.__config.set_list("general", "preload_engines", engine_names, "s")
  
@@ -626,7 +636,7 @@ index 7f4a040..192fb88 100644
      def __button_engine_add_cb(self, button):
          engine = self.__combobox.get_active_engine()
          self.__treeview.append_engine(engine)
-@@ -276,6 +304,32 @@ class Setup(object):
+@@ -276,6 +305,32 @@ class Setup(object):
              about.run()
              about.destroy()
  
@@ -659,7 +669,7 @@ index 7f4a040..192fb88 100644
      def __init_bus(self):
          try:
              self.__bus = ibus.Bus()
-@@ -466,7 +520,11 @@ class Setup(object):
+@@ -466,7 +521,11 @@ class Setup(object):
          self.__config.set_value("general", "use_global_engine", value)
  
      def __config_value_changed_cb(self, bus, section, name, value):
@@ -719,10 +729,10 @@ index f1e6d0b..562c091 100644
                      </child>
                    </object>
 diff --git a/src/ibustypes.h b/src/ibustypes.h
-index 8146719..6151cd0 100644
+index d916265..422eb84 100644
 --- a/src/ibustypes.h
 +++ b/src/ibustypes.h
-@@ -186,6 +186,16 @@ typedef enum {
+@@ -198,6 +198,16 @@ typedef enum {
  } IBusError;
  
  /**
@@ -740,5 +750,5 @@ index 8146719..6151cd0 100644
   * @x: x coordinate.
   * @y: y coordinate.
 -- 
-1.7.5.4
+1.7.6.2
 

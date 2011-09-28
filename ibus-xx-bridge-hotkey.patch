@@ -918,14 +918,14 @@ index cdabec0..721187c 100644
   *
   * Terminate all component processes.
 diff --git a/configure.ac b/configure.ac
-index 4c20ae7..21d35c3 100644
+index 227e28e..788fbef 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -462,6 +462,34 @@ else
+@@ -483,6 +483,34 @@ else
      enable_surrounding_text="no (disabled, use --enable-surrounding-text to enable)"
  fi
  
-+# option for bridge hotkey
++# Option for bridge hotkey
 +AC_ARG_ENABLE(bridge-hotkey,
 +    AS_HELP_STRING([--enable-bridge-hotkey],
 +        [Enable bridge hotkey instead of ON/OFF hotkey]),
@@ -944,7 +944,7 @@ index 4c20ae7..21d35c3 100644
 +AC_SUBST(USE_BRIDGE_HOTKEY)
 +AC_SUBST(TRIGGER_HOTKEYS)
 +
-+# define default bridge engine name
++# Define default bridge engine name
 +AC_ARG_WITH(bridge-engine,
 +    AS_HELP_STRING([--with-bridge-engine[=bridge_engine_name]],
 +        [Set bridge engine name in IM bridge hotkey. (default: xkb:layout:default:)]),
@@ -953,10 +953,10 @@ index 4c20ae7..21d35c3 100644
 +)
 +AC_SUBST(DEFAULT_BRIDGE_ENGINE_NAME)
 +
- # check iso-codes
+ # Check iso-codes.
  PKG_CHECK_MODULES(ISOCODES, [
      iso-codes
-@@ -488,6 +516,7 @@ bus/Makefile
+@@ -509,6 +537,7 @@ bus/Makefile
  util/Makefile
  util/IMdkit/Makefile
  data/Makefile
@@ -964,7 +964,7 @@ index 4c20ae7..21d35c3 100644
  data/icons/Makefile
  data/keymaps/Makefile
  data/dconf/Makefile
-@@ -540,5 +569,7 @@ Build options:
+@@ -561,5 +590,7 @@ Build options:
    No snooper regexes        "$NO_SNOOPER_APPS"
    Panel icon                "$IBUS_ICON_KEYBOARD"
    Enable surrounding-text   $enable_surrounding_text
@@ -1386,7 +1386,7 @@ index 7cf1995..a19d16e 100644
 +
  #endif
 diff --git a/ui/gtk/panel.py b/ui/gtk/panel.py
-index 8804634..f7b3e50 100644
+index 8804634..a2a5733 100644
 --- a/ui/gtk/panel.py
 +++ b/ui/gtk/panel.py
 @@ -67,6 +67,7 @@ class Panel(ibus.PanelBase):
@@ -1431,7 +1431,7 @@ index 8804634..f7b3e50 100644
  
      def set_cursor_location(self, x, y, w, h):
          self.__candidate_panel.set_cursor_location(x, y, w, h)
-@@ -233,12 +249,91 @@ class Panel(ibus.PanelBase):
+@@ -233,12 +249,97 @@ class Panel(ibus.PanelBase):
      def __set_im_name(self, name):
          self.__language_bar.set_im_name(name)
  
@@ -1472,7 +1472,13 @@ index 8804634..f7b3e50 100644
 +                if model == '':
 +                    model = None
 +                model_desc = _("Default Layout")
-+                if model != None:
++                if i == 0:
++                    l = 0
++                    for j in range(0, len(models)):
++                        l = l + len(models[j])
++                    if l != 0:
++                        model_desc = model_desc + " (" + model + ")"
++                elif model != None:
 +                    model_desc = model_desc + " (" + model + ")"
 +                name = ibus.DEFAULT_BRIDGE_ENGINE_NAME + "#" + str(i)
 +                engine = registry.engine_desc_new(lang,
@@ -1524,7 +1530,7 @@ index 8804634..f7b3e50 100644
          if not enabled:
              self.__set_im_icon(ICON_KEYBOARD)
              self.__set_im_name(None)
-@@ -250,7 +345,7 @@ class Panel(ibus.PanelBase):
+@@ -250,7 +351,7 @@ class Panel(ibus.PanelBase):
                  self.__set_im_icon(engine.icon)
                  self.__set_im_name(engine.longname)
                  if self.__bus.get_use_sys_layout():
@@ -1533,7 +1539,7 @@ index 8804634..f7b3e50 100644
              else:
                  self.__set_im_icon(ICON_KEYBOARD)
                  self.__set_im_name(None)
-@@ -273,7 +368,21 @@ class Panel(ibus.PanelBase):
+@@ -273,7 +374,21 @@ class Panel(ibus.PanelBase):
              return
  
          enabled = self.__focus_ic.is_enabled()
@@ -1556,7 +1562,7 @@ index 8804634..f7b3e50 100644
  
          if enabled == False:
              self.reset()
-@@ -287,7 +396,7 @@ class Panel(ibus.PanelBase):
+@@ -287,7 +402,7 @@ class Panel(ibus.PanelBase):
                  self.__set_im_icon(engine.icon)
                  self.__set_im_name(engine.longname)
                  if self.__bus.get_use_sys_layout():
@@ -1565,7 +1571,7 @@ index 8804634..f7b3e50 100644
              else:
                  self.__set_im_icon(ICON_KEYBOARD)
                  self.__set_im_name(None)
-@@ -315,6 +424,7 @@ class Panel(ibus.PanelBase):
+@@ -315,6 +430,7 @@ class Panel(ibus.PanelBase):
  
      def __config_load_show(self):
          show = self.__config.get_value("panel", "show", 0)
@@ -1573,7 +1579,7 @@ index 8804634..f7b3e50 100644
          self.__language_bar.set_show(show)
  
      def __config_load_position(self):
-@@ -443,6 +553,21 @@ class Panel(ibus.PanelBase):
+@@ -443,6 +559,21 @@ class Panel(ibus.PanelBase):
      #     menu.set_take_focus(False)
      #     return menu
  
@@ -1595,7 +1601,7 @@ index 8804634..f7b3e50 100644
      def __create_im_menu(self):
          engines = self.__bus.list_active_engines()
          current_engine = \
-@@ -453,25 +578,39 @@ class Panel(ibus.PanelBase):
+@@ -453,25 +584,39 @@ class Panel(ibus.PanelBase):
          size = gtk.icon_size_lookup(gtk.ICON_SIZE_MENU)
          menu = gtk.Menu()
          for i, engine in enumerate(engines):
@@ -1648,7 +1654,7 @@ index 8804634..f7b3e50 100644
  
          menu.show_all()
          menu.set_take_focus(False)
-@@ -523,8 +662,25 @@ class Panel(ibus.PanelBase):
+@@ -523,8 +668,25 @@ class Panel(ibus.PanelBase):
          if not self.__focus_ic:
              return
          if engine:
@@ -1662,7 +1668,7 @@ index 8804634..f7b3e50 100644
 +                if current_engine and \
 +                   current_engine.name.startswith(ibus.DEFAULT_BRIDGE_ENGINE_NAME):
 +                    self.__disabled_engines_prev_id = self.__disabled_engines_id
-+                    self.__disabled_engines_swapped = 0
++                    self.__disabled_engines_swapped = 2
 +                else:
 +                    self.__disabled_engines_prev_id = -1
 +                self.__disabled_engines_id = engine.disabled_engines_id
@@ -1675,7 +1681,7 @@ index 8804634..f7b3e50 100644
              self.__focus_ic.disable()
  
      def __sys_menu_item_activate_cb(self, item, command):
-@@ -573,12 +729,85 @@ class Panel(ibus.PanelBase):
+@@ -573,12 +735,113 @@ class Panel(ibus.PanelBase):
          self.__setup_pid = pid
          glib.child_watch_add(self.__setup_pid, self.__child_watch_cb)
  
@@ -1746,17 +1752,45 @@ index 8804634..f7b3e50 100644
 +           self.__disabled_engines != None and \
 +           self.__disabled_engines_id < len(self.__disabled_engines):
 +            if changed_state and self.__disabled_engines_prev_id != -1:
-+                # state_changed is always called twice because we change
++                # stateChanged is always called triple because we change
 +                # the engine. So the first two calls are ignored here.
++                # Since this._disabledEnginesPrevID needs to be reseted
++                # to -1 and and stateChanged is called multiple times.
++                # engine.layout is not used.
++                #
++                # When stateChanged is called by Control + Space,
++                # this._disabledEnginesID and this._disabledEnginesPrevID
++                # are toggled because this._disabledEnginesID is the
++                # current XKB group id and this._disabledEnginesPrevID
++                # is the next XKB group id.
++                #
++                # When stateChanged is called by ibus activate menu,
++                # this._disabledEnginesID is the XKB group id.
++                #
++                # FIXME: If this._activeEngine is used, focusIn event is
++                # called by either choosing ibus menu item or switching
++                # input contexts.
++                # So there is a bug: After XKB group is switched by
++                # ibus menu, if the input contexts are switched, 
++                # the next toggled input method has next XKB group keymap
++                # instead of the current XKB group keymap.
++                # focusIn event don't know either choosing ibus menu or
++                # switching input contexts are happened.
 +                if self.__disabled_engines_swapped < 2:
-+                    self.__disabled_engines_swapped = \
-+                            self.__disabled_engines_swapped + 1
-+                else:
 +                    x = self.__disabled_engines_prev_id
 +                    self.__disabled_engines_prev_id = self.__disabled_engines_id
 +                    self.__disabled_engines_id = x
-+                    self.__disabled_engines_swapped = 1
++                    self.__disabled_engines_swapped = \
++                            1 if self.__disabled_engines_swapped == 0 else 0
++                else:
++                    self.__disabled_engines_swapped = \
++                            self.__disabled_engines_swapped + 1 \
++                            if self.__disabled_engines_swapped < 4 else 0
 +            retval = self.__disabled_engines[self.__disabled_engines_id].layout
++            # engine is an input-method or a keymap and if engine is
++            # a keymap, the layout is not 'default'.
++            # if engine is an input-method, the layout is merged with the
++            # current XKB keymap here.
 +            if engine.layout != None and engine.layout.startswith("default"):
 +                return self.__merge_models_and_options(retval, engine.layout)
 +            return retval
