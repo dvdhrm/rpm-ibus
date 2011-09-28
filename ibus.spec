@@ -7,11 +7,11 @@
 
 %if 0%{?fedora} > 15
 %define have_bridge_hotkey 1
-%define ibus_gjs_version 3.1.91.20110913
+%define ibus_gjs_version 3.2.0.20110928
 %define ibus_gjs_build_failure 1
 %else
 %define have_bridge_hotkey 0
-%define ibus_gjs_version 3.0.2.20110908
+%define ibus_gjs_version 3.0.2.20110928
 %define ibus_gjs_build_failure 0
 %endif
 
@@ -24,7 +24,7 @@
 
 Name:       ibus
 Version:    1.4.0
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -386,7 +386,7 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Wed Sep 28 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-1
+* Wed Sep 28 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-2
 - Updated to 1.4.0
 - Updated ibus-gjs 3.0.2.20110928 for f15.
 - Updated ibus-gjs 3.2.0.20110928 for f16. (#740588)
