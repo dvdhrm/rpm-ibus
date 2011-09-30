@@ -24,7 +24,7 @@
 
 Name:       ibus
 Version:    1.4.0
-Release:    2%{?dist}
+Release:    3%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -386,6 +386,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Sep 30 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-3
+- Rebuilt for f16 gnome-shell 3.2 and gjs 1.30
+
 * Wed Sep 28 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-2
 - Updated to 1.4.0
 - Updated ibus-gjs 3.0.2.20110928 for f15.
