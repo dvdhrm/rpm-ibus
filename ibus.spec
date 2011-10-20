@@ -7,11 +7,11 @@
 
 %if 0%{?fedora} > 15
 %define have_bridge_hotkey 1
-%define ibus_gjs_version 3.2.0.20110928
+%define ibus_gjs_version 3.2.0.20111018
 %define ibus_gjs_build_failure 1
 %else
 %define have_bridge_hotkey 0
-%define ibus_gjs_version 3.0.2.20110928
+%define ibus_gjs_version 3.0.2.20111018
 %define ibus_gjs_build_failure 0
 %endif
 
@@ -24,7 +24,7 @@
 
 Name:       ibus
 Version:    1.4.0
-Release:    3%{?dist}
+Release:    4%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -34,7 +34,7 @@ Source1:    xinput-ibus
 %if %have_gjsfile
 Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/ibus-gjs-%{ibus_gjs_version}.tar.gz
 %endif
-# Patch0:     ibus-HEAD.patch
+Patch0:     ibus-HEAD.patch
 Patch1:     ibus-530711-preload-sys.patch
 Patch2:     ibus-541492-xkb.patch
 Patch3:     ibus-xx-bridge-hotkey.patch
@@ -187,7 +187,7 @@ cd $d
 cd ..
 %endif
 %endif
-# %patch0 -p1
+%patch0 -p1
 %patch93 -p1 -b .g-s-preedit
 cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
 %patch1 -p1 -b .preload-sys
@@ -386,6 +386,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Oct 20 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-4
+- Fixed Bug 746869 - no keymaps if the XKB has no group and no variant
+
 * Fri Sep 30 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-3
 - Rebuilt for f16 gnome-shell 3.2 and gjs 1.30
 

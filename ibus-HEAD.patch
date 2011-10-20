@@ -1,1 +1,83 @@
+From 5d519fb7a798e252dc28665694d53b0773542584 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Thu, 20 Oct 2011 11:00:23 +0900
+Subject: [PATCH] Fix previous_engine without global engine.
+
+---
+ bus/ibusimpl.c |   31 +++++++++++++++++++------------
+ 1 files changed, 19 insertions(+), 12 deletions(-)
+
+diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
+index 1494f5f..0a4f3fb 100644
+--- a/bus/ibusimpl.c
++++ b/bus/ibusimpl.c
+@@ -1044,13 +1044,14 @@ bus_ibus_impl_get_engine_desc (BusIBusImpl *ibus,
+ }
+ 
+ /**
+- * bus_ibus_impl_context_request_next_engine_in_menu:
++ * bus_ibus_impl_context_request_rotate_engine_in_menu:
+  *
+- * Process the "next_engine_in_menu" hotkey.
++ * Process the "next_engine_in_menu" or "previous_engine" hotkey.
+  */
+ static void
+-bus_ibus_impl_context_request_next_engine_in_menu (BusIBusImpl     *ibus,
+-                                                   BusInputContext *context)
++bus_ibus_impl_context_request_rotate_engine_in_menu (BusIBusImpl     *ibus,
++                                                     BusInputContext *context,
++                                                     gboolean         is_next)
+ {
+     BusEngineProxy *engine;
+     IBusEngineDesc *desc;
+@@ -1071,12 +1072,20 @@ bus_ibus_impl_context_request_next_engine_in_menu (BusIBusImpl     *ibus,
+ 
+     p = g_list_find (ibus->register_engine_list, desc);
+     if (p != NULL) {
+-        p = p->next;
++        if (is_next) {
++            p = p->next;
++        } else if (p->prev) {
++            p = p->prev;
++        }
+     }
+     if (p == NULL) {
+         p = g_list_find (ibus->engine_list, desc);
+         if (p != NULL) {
+-            p = p->next;
++            if (is_next) {
++                p = p->next;
++            } else if (p->prev) {
++                p = p->prev;
++            }
+         }
+     }
+ 
+@@ -1126,12 +1135,9 @@ bus_ibus_impl_context_request_previous_engine (BusIBusImpl     *ibus,
+         }
+     }
+ 
+-    /*
+-     * If the previous engine name is not found, switch to the next engine
+-     * in the menu. This behavior is better than doing nothing.
+-     */
+     if (!engine_name) {
+-        bus_ibus_impl_context_request_next_engine_in_menu (ibus, context);
++        bus_ibus_impl_context_request_rotate_engine_in_menu (ibus, context,
++                                                             FALSE);
+         return;
+     }
+ 
+@@ -2084,7 +2090,8 @@ bus_ibus_impl_filter_keyboard_shortcuts (BusIBusImpl     *ibus,
+     }
+     if (event == next) {
+         if (bus_input_context_is_enabled (context)) {
+-            bus_ibus_impl_context_request_next_engine_in_menu (ibus, context);
++            bus_ibus_impl_context_request_rotate_engine_in_menu (ibus, context,
++                                                                 TRUE);
+         }
+         else {
+             bus_input_context_enable (context);
+-- 
+1.7.6.4
 

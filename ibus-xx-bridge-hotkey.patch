@@ -1386,7 +1386,7 @@ index 7cf1995..a19d16e 100644
 +
  #endif
 diff --git a/ui/gtk/panel.py b/ui/gtk/panel.py
-index 8804634..a2a5733 100644
+index 8804634..bef6fbf 100644
 --- a/ui/gtk/panel.py
 +++ b/ui/gtk/panel.py
 @@ -67,6 +67,7 @@ class Panel(ibus.PanelBase):
@@ -1404,7 +1404,7 @@ index 8804634..a2a5733 100644
 +        self.__default_layout = 'default'
 +        self.__default_model = 'default'
 +        self.__default_option = 'default'
-+        self.__disabled_engines = None
++        self.__disabled_engines = []
 +        self.__disabled_engines_id = -1
 +        self.__disabled_engines_prev_id = -1
 +        self.__disabled_engines_swapped = 0
@@ -1455,8 +1455,7 @@ index 8804634..a2a5733 100644
 +        models = None
 +        if default_model != None and default_model != '':
 +            models = default_model.split(',')
-+        if self.__disabled_engines == None or self.__disabled_engines == []:
-+            self.__disabled_engines = []
++        if len(self.__disabled_engines) == 0:
 +            for i, layout in enumerate(layouts):
 +                registry = ibus.XKBConfigRegistry()
 +                langs = registry.get_layout_lang()[layout]
@@ -1467,15 +1466,16 @@ index 8804634..a2a5733 100644
 +                if i == 0:
 +                    layout = default_layout
 +                    model = default_model
-+                elif i < len(models):
++                elif models != None and i < len(models):
 +                    model = models[i]
 +                if model == '':
 +                    model = None
 +                model_desc = _("Default Layout")
 +                if i == 0:
 +                    l = 0
-+                    for j in range(0, len(models)):
-+                        l = l + len(models[j])
++                    if models != None:
++                        for j in range(0, len(models)):
++                            l = l + len(models[j])
 +                    if l != 0:
 +                        model_desc = model_desc + " (" + model + ")"
 +                elif model != None:
@@ -1491,7 +1491,7 @@ index 8804634..a2a5733 100644
 +            self.__disabled_engines_id = self.__xkblayout.get_group()
 +        if not use_bridge_hotkey:
 +            return
-+        if self.__disabled_engines != None and self.__disabled_engines != []:
++        if len(self.__disabled_engines) > 0:
 +            if self.__focus_ic == None:
 +                return
 +            engine = self.__focus_ic.get_engine()
@@ -1620,7 +1620,7 @@ index 8804634..a2a5733 100644
 +            if engine.name.startswith(ibus.DEFAULT_BRIDGE_ENGINE_NAME):
 +                if not self.__use_bridge_hotkey():
 +                    continue
-+                if self.__disabled_engines == None:
++                if len(self.__disabled_engines) == 0:
 +                    continue
 +                engine.disabled_engines_id = -1
 +                for j, kb_engine in enumerate(self.__disabled_engines):
@@ -1749,7 +1749,7 @@ index 8804634..a2a5733 100644
              return engine.layout
 +        elif self.__use_bridge_hotkey() and \
 +           self.__disabled_engines_id >= 0 and \
-+           self.__disabled_engines != None and \
++           len(self.__disabled_engines) > 0 and \
 +           self.__disabled_engines_id < len(self.__disabled_engines):
 +            if changed_state and self.__disabled_engines_prev_id != -1:
 +                # stateChanged is always called triple because we change
