@@ -7,7 +7,7 @@
 
 %if 0%{?fedora} > 15
 %define have_bridge_hotkey 1
-%define ibus_gjs_version 3.2.0.20111018
+%define ibus_gjs_version 3.2.1.20111021
 %define ibus_gjs_build_failure 1
 %else
 %define have_bridge_hotkey 0
@@ -24,7 +24,7 @@
 
 Name:       ibus
 Version:    1.4.0
-Release:    4%{?dist}
+Release:    5%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -386,6 +386,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Oct 21 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-5
+- Fixed Bug 747845 - ibus icon cannot open menu item on gnome-shell
+
 * Thu Oct 20 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-4
 - Fixed Bug 746869 - no keymaps if the XKB has no group and no variant
 
