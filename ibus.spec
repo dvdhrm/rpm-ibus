@@ -24,7 +24,7 @@
 
 Name:       ibus
 Version:    1.4.0
-Release:    5%{?dist}
+Release:    6%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -386,6 +386,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Oct 26 2011 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.4.0-6
+- Rebuilt for glibc bug#747377
+
 * Fri Oct 21 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-5
 - Fixed Bug 747845 - ibus icon cannot open menu item on gnome-shell
 
