@@ -8,7 +8,7 @@
 %if 0%{?fedora} > 16
 %define have_bridge_hotkey 1
 %define ibus_gjs_version 3.2.1.20111028
-%define ibus_gjs_build_failure 0
+%define ibus_gjs_build_failure 1
 %else
 %if 0%{?fedora} > 15
 %define have_bridge_hotkey 1
@@ -30,7 +30,7 @@
 
 Name:       ibus
 Version:    1.4.0
-Release:    7%{?dist}
+Release:    8%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -392,7 +392,7 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Fri Oct 28 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-7
+* Fri Oct 28 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-8
 - Fixed Bug 747902 - mouse and ctrl+space not working
 
 * Wed Oct 26 2011 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.4.0-6
