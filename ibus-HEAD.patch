@@ -1,8 +1,132 @@
-From 5d519fb7a798e252dc28665694d53b0773542584 Mon Sep 17 00:00:00 2001
+From cb519c852dfc7a652df1768c81974d750ef48f58 Mon Sep 17 00:00:00 2001
+From: Daiki Ueno <ueno@unixuser.org>
+Date: Thu, 29 Sep 2011 12:24:53 +0900
+Subject: [PATCH] Fix hiding button items in GTK panel.
+
+BUG=none
+TEST=manual
+
+Review URL: http://codereview.appspot.com/5148041
+---
+ ui/gtk/toolitem.py |   12 ++++--------
+ 1 files changed, 4 insertions(+), 8 deletions(-)
+
+diff --git a/ui/gtk/toolitem.py b/ui/gtk/toolitem.py
+index 4bdffba..4f4f97d 100644
+--- a/ui/gtk/toolitem.py
++++ b/ui/gtk/toolitem.py
+@@ -73,11 +73,9 @@ class ToolButton(gtk.ToolButton, PropItem):
+         self.set_icon_name(self._prop.icon)
+ 
+         if self._prop.visible:
+-            self.set_no_show_all(False)
+-            self.show_all()
++            self.show()
+         else:
+-            self.set_no_show_all(True)
+-            self.hide_all()
++            self.hide()
+ 
+     def do_clicked(self):
+         self.emit("property-activate", self._prop.key, self._prop.state)
+@@ -128,11 +126,9 @@ class ToggleToolButton(gtk.ToggleToolButton, PropItem):
+         self.set_active(self._prop.state == ibus.PROP_STATE_CHECKED)
+         self.set_sensitive(self._prop.sensitive)
+         if self._prop.visible:
+-            self.set_no_show_all(False)
+-            self.show_all()
++            self.show()
+         else:
+-            self.set_no_show_all(True)
+-            self.hide_all()
++            self.hide()
+ 
+     def do_toggled(self):
+         # Do not send property-activate to engine in case the event is
+-- 
+1.7.6.4
+
+From d19018b8709847009d2e0836c942dd9f1385e7cb Mon Sep 17 00:00:00 2001
+From: Yusuke Sato <yusukes@chromium.org>
+Date: Sun, 9 Oct 2011 13:52:42 +0900
+Subject: [PATCH] Always consume a hotkey press
+
+BUG=1324
+
+Review URL: http://codereview.appspot.com/5242044
+---
+ bus/ibusimpl.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
+index 1942504..1494f5f 100644
+--- a/bus/ibusimpl.c
++++ b/bus/ibusimpl.c
+@@ -2066,21 +2066,21 @@ bus_ibus_impl_filter_keyboard_shortcuts (BusIBusImpl     *ibus,
+         else {
+             bus_input_context_enable (context);
+         }
+-        return (enabled != bus_input_context_is_enabled (context));
++        return TRUE;
+     }
+     if (event == enable_unconditional) {
+         gboolean enabled = bus_input_context_is_enabled (context);
+         if (!enabled) {
+             bus_input_context_enable (context);
+         }
+-        return bus_input_context_is_enabled (context);
++        return TRUE;
+     }
+     if (event == disable_unconditional) {
+         gboolean enabled = bus_input_context_is_enabled (context);
+         if (enabled) {
+             bus_input_context_disable (context);
+         }
+-        return !bus_input_context_is_enabled (context);
++        return TRUE;
+     }
+     if (event == next) {
+         if (bus_input_context_is_enabled (context)) {
+-- 
+1.7.6.4
+
+From ee966e327cc3b1b4bba40379bc0fbb3d46c38239 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Thu, 20 Oct 2011 11:00:23 +0900
+Date: Tue, 25 Oct 2011 10:37:22 +0900
+Subject: [PATCH] Add ibusutil.h in ibus.h
+
+BUG=http://code.google.com/p/ibus/issues/detail?id=1338
+TEST=Linux desktop
+
+Review URL: http://codereview.appspot.com/5294054
+---
+ src/ibus.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/src/ibus.h b/src/ibus.h
+index 0765799..addc531 100644
+--- a/src/ibus.h
++++ b/src/ibus.h
+@@ -52,6 +52,7 @@
+ #include <ibusconfig.h>
+ #include <ibusconfigservice.h>
+ #include <ibuspanelservice.h>
++#include <ibusutil.h>
+ 
+ #undef __IBUS_H_INSIDE__
+ 
+-- 
+1.7.6.4
+
+From 910f8a64098d89b04c50056f621ec1a49dd3e7ea Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Tue, 25 Oct 2011 10:50:34 +0900
 Subject: [PATCH] Fix previous_engine without global engine.
 
+BUG=http://code.google.com/p/ibus/issues/detail?id=1331
+TEST=Linux desktop
+
+Review URL: http://codereview.appspot.com/5297047
 ---
  bus/ibusimpl.c |   31 +++++++++++++++++++------------
  1 files changed, 19 insertions(+), 12 deletions(-)
@@ -78,6 +202,126 @@ index 1494f5f..0a4f3fb 100644
          }
          else {
              bus_input_context_enable (context);
+-- 
+1.7.6.4
+
+From cca4fd8993613a6993965c3120323e43c4647ef5 Mon Sep 17 00:00:00 2001
+From: Daiki Ueno <ueno@unixuser.org>
+Date: Fri, 28 Oct 2011 15:42:08 +0900
+Subject: [PATCH] Don't set focus on GTK password entry.
+
+For an old bug:
+https://bugzilla.redhat.com/show_bug.cgi?id=484643
+Input method should be disabled on password entry for security reason.
+
+BUG=none
+TEST=manually with gtk-demo "Entry Buffer" example
+
+Review URL: http://codereview.appspot.com/5319053
+---
+ client/gtk2/ibusimcontext.c |   13 +++++++++++++
+ 1 files changed, 13 insertions(+), 0 deletions(-)
+
+diff --git a/client/gtk2/ibusimcontext.c b/client/gtk2/ibusimcontext.c
+index 327a5d9..b6ca12e 100644
+--- a/client/gtk2/ibusimcontext.c
++++ b/client/gtk2/ibusimcontext.c
+@@ -734,6 +734,19 @@ ibus_im_context_focus_in (GtkIMContext *context)
+     if (ibusimcontext->has_focus)
+         return;
+ 
++    /* don't set focus on password entry */
++    if (ibusimcontext->client_window != NULL) {
++        GtkWidget *widget;
++
++        gdk_window_get_user_data (ibusimcontext->client_window,
++                                  (gpointer *)&widget);
++
++        if (GTK_IS_ENTRY (widget) &&
++            !gtk_entry_get_visibility (GTK_ENTRY (widget))) {
++            return;
++        }
++    }
++
+     if (_focus_im_context != NULL) {
+         g_assert (_focus_im_context != context);
+         gtk_im_context_focus_out (_focus_im_context);
+-- 
+1.7.6.4
+
+From d57b575f2a1b33b60ad84310a4e685e706f8a574 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Fri, 28 Oct 2011 13:09:07 +0900
+Subject: [PATCH] Rerotate next/previous engines without global engine.
+
+---
+ bus/ibusimpl.c |   33 ++++++++++++++++++++++++++++++---
+ 1 files changed, 30 insertions(+), 3 deletions(-)
+
+diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
+index 0a4f3fb..687f910 100644
+--- a/bus/ibusimpl.c
++++ b/bus/ibusimpl.c
+@@ -1056,7 +1056,7 @@ bus_ibus_impl_context_request_rotate_engine_in_menu (BusIBusImpl     *ibus,
+     BusEngineProxy *engine;
+     IBusEngineDesc *desc;
+     IBusEngineDesc *next_desc = NULL;
+-    GList *p;
++    GList *p = NULL;
+ 
+     engine = bus_input_context_get_engine (context);
+     if (engine == NULL) {
+@@ -1074,21 +1074,48 @@ bus_ibus_impl_context_request_rotate_engine_in_menu (BusIBusImpl     *ibus,
+     if (p != NULL) {
+         if (is_next) {
+             p = p->next;
+-        } else if (p->prev) {
++        } else {
+             p = p->prev;
+         }
+     }
++
++    /* Rotate register_engine_list and engine_list. */
++    if (p == NULL && is_next &&
++        g_list_find (ibus->register_engine_list, desc) != NULL) {
++        p = ibus->engine_list;
++    }
++    else if (p == NULL && !is_next &&
++             g_list_find (ibus->register_engine_list, desc) != NULL &&
++             ibus->engine_list != NULL) {
++        p = g_list_last (ibus->engine_list);
++    }
++
+     if (p == NULL) {
+         p = g_list_find (ibus->engine_list, desc);
+         if (p != NULL) {
+             if (is_next) {
+                 p = p->next;
+-            } else if (p->prev) {
++            } else {
+                 p = p->prev;
+             }
+         }
+     }
+ 
++    if (p == NULL && !is_next &&
++        g_list_find (ibus->engine_list, desc) != NULL) {
++        p = g_list_last (ibus->register_engine_list);
++        if (p == NULL) {
++            p = g_list_last (ibus->engine_list);
++        }
++    }
++    else if (p == NULL && is_next &&
++             g_list_find (ibus->engine_list, desc) != NULL) {
++        p = ibus->register_engine_list;
++        if (p == NULL) {
++            p = ibus->engine_list;
++        }
++    }
++
+     if (p != NULL) {
+         next_desc = (IBusEngineDesc*) p->data;
+     }
 -- 
 1.7.6.4
 

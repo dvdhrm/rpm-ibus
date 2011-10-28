@@ -1,6 +1,6 @@
-From 72785243dfb47e9028de47910bed603776e4ec6e Mon Sep 17 00:00:00 2001
+From 471e7583078c1e4b65219c9d37e16bf0d3d808bf Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 7 Sep 2011 15:27:26 +0900
+Date: Fri, 28 Oct 2011 15:25:19 +0900
 Subject: [PATCH] Add XKB layouts
 
 ---
@@ -85,10 +85,10 @@ index ff0fabc..056ddfc 100644
  	$(DCONF_DIRS)   \
  	$(NULL)
 diff --git a/configure.ac b/configure.ac
-index 367b069..e90f20e 100644
+index f452666..227e28e 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -191,6 +191,60 @@ else
+@@ -221,6 +221,60 @@ else
      enable_xim="no (disabled, use --enable-xim to enable)"
  fi
  
@@ -149,7 +149,7 @@ index 367b069..e90f20e 100644
  # GObject introspection
  GOBJECT_INTROSPECTION_CHECK([0.6.8])
  
-@@ -457,6 +511,7 @@ bindings/Makefile
+@@ -478,6 +532,7 @@ bindings/Makefile
  bindings/vala/Makefile
  dconf/Makefile
  dconf/dconf.xml.in
@@ -157,7 +157,7 @@ index 367b069..e90f20e 100644
  ])
  
  AC_OUTPUT
-@@ -472,6 +527,7 @@ Build options:
+@@ -493,6 +548,7 @@ Build options:
    Build gtk2 immodule       $enable_gtk2
    Build gtk3 immodule       $enable_gtk3
    Build XIM agent server    $enable_xim
@@ -280,10 +280,10 @@ index 7c8f8be..3c25605 100644
 +from xkbxml import *
  from _config import *
 diff --git a/ibus/bus.py b/ibus/bus.py
-index 5738fad..05ec49e 100644
+index a8a458d..84b4140 100644
 --- a/ibus/bus.py
 +++ b/ibus/bus.py
-@@ -160,6 +160,9 @@ class Bus(object.Object):
+@@ -163,6 +163,9 @@ class Bus(object.Object):
              data = serializable.deserialize_object(data)
          return data
  
@@ -2149,7 +2149,7 @@ index 0000000..af9ec53
 +        expander.set_data("checked", checked)
 +
 diff --git a/src/Makefile.am b/src/Makefile.am
-index 90e412f..fc7008e 100644
+index 6f0321c..c62f3ed 100644
 --- a/src/Makefile.am
 +++ b/src/Makefile.am
 @@ -186,6 +186,11 @@ typelibs_DATA = $(INTROSPECTION_GIRS:.gir=.typelib)
@@ -2165,7 +2165,7 @@ index 90e412f..fc7008e 100644
  ibusenumtypes.h: $(ibus_headers) ibusenumtypes.h.template
  	$(AM_V_GEN) ( top_builddir=`cd $(top_builddir) && pwd`; \
 diff --git a/src/ibus.h b/src/ibus.h
-index 0765799..5843b7f 100644
+index addc531..467c775 100644
 --- a/src/ibus.h
 +++ b/src/ibus.h
 @@ -45,6 +45,7 @@
@@ -9985,5 +9985,5 @@ index 0000000..6c00f1d
 +G_END_DECLS
 +#endif
 -- 
-1.7.5.4
+1.7.6.4
 
