@@ -30,7 +30,7 @@
 
 Name:       ibus
 Version:    1.4.0
-Release:    8%{?dist}
+Release:    9%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -208,6 +208,17 @@ mv data/ibus.schemas.in data/ibus.schemas.in.in
 
 %build
 %if %have_libxkbfile
+XKB_PRELOAD_LAYOUTS=\
+"us,us(chr),us(dvorak),ad,al,am,ara,az,ba,bd,be,bg,br,bt,by,"\
+"de,dk,ca,ch,cn(tib),cz,ee,epo,es,et,fi,fo,fr,"\
+"gb,ge,ge(dsb),ge(ru),ge(os),gh,gh(akan),gh(ewe),gh(fula),gh(ga),gh(hausa),"\
+"gn,gr,hu,hr,ie,ie(CloGaelach),il,"\
+"in,"\
+"in(tel),in(bolnagri),iq,iq(ku),ir,ir(ku),is,it,"\
+"kg,kh,kz,la,latam,lk,lk(tam_unicode),lt,lv,ma,ma(tifinagh),mal,mao,"\
+"me,mk,mm,mt,mv,ng,ng(hausa),ng,ng(igbo),ng(yoruba),nl,no,no(smi),np,"\
+"pk,pl,pl(csb),pt,ro,rs,ru,ru(cv),ru(kom),ru(sah),ru(tt),ru(xal),"\
+"se,si,sk,sy,sy(ku),th,tj,tr,ua,uz,vn"
 aclocal -I m4
 autoheader
 autoconf -f
@@ -221,6 +232,9 @@ automake -a -c -f
     --disable-gtk-doc \
     --with-no-snooper-apps='gnome-do,Do.*,firefox.*,.*chrome.*,.*chromium.*' \
     --enable-surrounding-text \
+%if %have_libxkbfile
+    --with-xkb-preload-layouts=$XKB_PRELOAD_LAYOUTS \
+%endif
 %if %have_bridge_hotkey
     --enable-bridge-hotkey \
 %endif
@@ -392,7 +406,17 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Nov 02 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-9
+- Updated ibus-HEAD.patch
+  Fixed prev/next keys without global engine.
+- Updated ibus-xx-bridge-hotkey.patch for f16
+  Fixed Bug 747902 - mouse and ctrl+space not working
+  Fixed Bug 749770 - IME hotkey after Control + Space
+- Updated ibus-711632-fedora-fallback-icon.patch
+  Fixed Bug 717831 - use old icon for desktops other than gnome
+
 * Fri Oct 28 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-8
+- Updated ibus-xx-bridge-hotkey.patch for f16
 - Fixed Bug 747902 - mouse and ctrl+space not working
 
 * Wed Oct 26 2011 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.4.0-6

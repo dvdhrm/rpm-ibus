@@ -1,3 +1,22 @@
+--- ibus/ibus/_config.py.in.orig	2011-11-01 18:32:09.235894859 +0900
++++ ibus/ibus/_config.py.in	2011-11-02 10:26:40.672355868 +0900
+@@ -47,10 +47,14 @@ def get_license():
+ 
+ def get_ICON_KEYBOARD():
+     import gtk
+-    theme = gtk.icon_theme_get_default()
+     icon = '@IBUS_ICON_KEYBOARD@'
++    fallback_icon = 'ibus-keyboard'
++    settings = gtk.settings_get_default()
++    if settings.get_property('gtk-icon-theme-name') != 'gnome':
++        icon = fallback_icon
++    theme = gtk.icon_theme_get_default()
+     if not theme.lookup_icon(icon, 18, 0):
+-        icon = 'ibus-keyboard'
++        icon = fallback_icon
+     return icon
+ 
+ def use_bridge_hotkey():
 --- ibus/ui/gtk/main.py.orig	2011-04-25 12:33:39.296999692 +0900
 +++ ibus/ui/gtk/main.py	2011-06-08 11:53:44.027232075 +0900
 @@ -86,6 +86,9 @@ class UIApplication:
@@ -10,9 +29,9 @@
      # gtk.settings_get_default().props.gtk_theme_name = "/home/phuang/.themes/aud-Default/gtk-2.0/gtkrc"
      # gtk.rc_parse("./themes/default/gtkrc")
      UIApplication(replace).run()
---- ibus/ui/gtk/panel.py.orig	2011-06-08 12:16:40.107577438 +0900
-+++ ibus/ui/gtk/panel.py	2011-06-08 12:17:00.440460268 +0900
-@@ -507,7 +507,7 @@ class Panel(ibus.PanelBase):
+--- ibus/ui/gtk/panel.py.orig	2011-11-01 18:31:49.845898037 +0900
++++ ibus/ui/gtk/panel.py	2011-11-01 18:31:34.480900329 +0900
+@@ -654,7 +660,7 @@ class Panel(ibus.PanelBase):
              menu = gtk.Menu()
              item = gtk.ImageMenuItem(_("No input window"))
              size = gtk.icon_size_lookup(gtk.ICON_SIZE_MENU)

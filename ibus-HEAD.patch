@@ -249,17 +249,17 @@ index 327a5d9..b6ca12e 100644
 -- 
 1.7.6.4
 
-From d57b575f2a1b33b60ad84310a4e685e706f8a574 Mon Sep 17 00:00:00 2001
+From 05f9556278f791bacc0f1019427f8575fa39c9db Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Fri, 28 Oct 2011 13:09:07 +0900
+Date: Wed, 2 Nov 2011 10:47:55 +0900
 Subject: [PATCH] Rerotate next/previous engines without global engine.
 
 ---
- bus/ibusimpl.c |   33 ++++++++++++++++++++++++++++++---
- 1 files changed, 30 insertions(+), 3 deletions(-)
+ bus/ibusimpl.c |   31 ++++++++++++++++++++++++++++---
+ 1 files changed, 28 insertions(+), 3 deletions(-)
 
 diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
-index 0a4f3fb..687f910 100644
+index 0a4f3fb..059d660 100644
 --- a/bus/ibusimpl.c
 +++ b/bus/ibusimpl.c
 @@ -1056,7 +1056,7 @@ bus_ibus_impl_context_request_rotate_engine_in_menu (BusIBusImpl     *ibus,
@@ -271,7 +271,7 @@ index 0a4f3fb..687f910 100644
  
      engine = bus_input_context_get_engine (context);
      if (engine == NULL) {
-@@ -1074,21 +1074,48 @@ bus_ibus_impl_context_request_rotate_engine_in_menu (BusIBusImpl     *ibus,
+@@ -1074,21 +1074,46 @@ bus_ibus_impl_context_request_rotate_engine_in_menu (BusIBusImpl     *ibus,
      if (p != NULL) {
          if (is_next) {
              p = p->next;
@@ -282,14 +282,12 @@ index 0a4f3fb..687f910 100644
      }
 +
 +    /* Rotate register_engine_list and engine_list. */
-+    if (p == NULL && is_next &&
-+        g_list_find (ibus->register_engine_list, desc) != NULL) {
-+        p = ibus->engine_list;
-+    }
-+    else if (p == NULL && !is_next &&
-+             g_list_find (ibus->register_engine_list, desc) != NULL &&
-+             ibus->engine_list != NULL) {
-+        p = g_list_last (ibus->engine_list);
++    if (p == NULL && g_list_find (ibus->register_engine_list, desc) != NULL) {
++        if (is_next) {
++            p = ibus->engine_list;
++        } else {
++            p = g_list_last (ibus->engine_list);
++        }
 +    }
 +
      if (p == NULL) {
@@ -304,18 +302,18 @@ index 0a4f3fb..687f910 100644
          }
      }
  
-+    if (p == NULL && !is_next &&
-+        g_list_find (ibus->engine_list, desc) != NULL) {
-+        p = g_list_last (ibus->register_engine_list);
-+        if (p == NULL) {
-+            p = g_list_last (ibus->engine_list);
-+        }
-+    }
-+    else if (p == NULL && is_next &&
-+             g_list_find (ibus->engine_list, desc) != NULL) {
-+        p = ibus->register_engine_list;
-+        if (p == NULL) {
-+            p = ibus->engine_list;
++    /* Rerotate register_engine_list and engine_list. */
++    if (p == NULL && g_list_find (ibus->engine_list, desc) != NULL) {
++        if (is_next) {
++            p = ibus->register_engine_list;
++            if (p == NULL) {
++                p = ibus->engine_list;
++            }
++        } else {
++            p = g_list_last (ibus->register_engine_list);
++            if (p == NULL) {
++                p = g_list_last (ibus->engine_list);
++            }
 +        }
 +    }
 +
