@@ -1,6 +1,6 @@
-From d4fd56784b18c8eb321c75e86a9c21d3e1984888 Mon Sep 17 00:00:00 2001
+From 1f5b2a32bf2ab762d293fb493ca355f3eb21ae48 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 2 Nov 2011 12:01:55 +0900
+Date: Fri, 4 Nov 2011 18:54:23 +0900
 Subject: [PATCH] Add a bridge hotkey which use prev-next engines instead
  of on-off.
 
@@ -30,11 +30,11 @@ Subject: [PATCH] Add a bridge hotkey which use prev-next engines instead
  src/ibusinputcontext.h          |   12 +
  src/ibusutil.c                  |   12 +
  src/ibusutil.h                  |   14 +
- ui/gtk/panel.py                 |  315 +++++++++++++++++++--
+ ui/gtk/panel.py                 |  335 ++++++++++++++++++++--
  xkb/Makefile.am                 |    2 +
  xkb/ibus-engine-xkb-main.c      |   16 +
  xkb/xkbxml.c                    |   10 +-
- 29 files changed, 1596 insertions(+), 392 deletions(-)
+ 29 files changed, 1616 insertions(+), 392 deletions(-)
  delete mode 100644 data/ibus.schemas.in
  create mode 100644 data/ibus.schemas.in.in
 
@@ -1688,7 +1688,7 @@ index 7cf1995..a19d16e 100644
 +
  #endif
 diff --git a/ui/gtk/panel.py b/ui/gtk/panel.py
-index 8804634..2fc11bb 100644
+index 8804634..549393a 100644
 --- a/ui/gtk/panel.py
 +++ b/ui/gtk/panel.py
 @@ -67,6 +67,7 @@ class Panel(ibus.PanelBase):
@@ -1733,7 +1733,7 @@ index 8804634..2fc11bb 100644
  
      def set_cursor_location(self, x, y, w, h):
          self.__candidate_panel.set_cursor_location(x, y, w, h)
-@@ -233,12 +249,99 @@ class Panel(ibus.PanelBase):
+@@ -233,12 +249,119 @@ class Panel(ibus.PanelBase):
      def __set_im_name(self, name):
          self.__language_bar.set_im_name(name)
  
@@ -1744,6 +1744,25 @@ index 8804634..2fc11bb 100644
 +            return True
 +        return self.__config.get_value("general/hotkey", "use_bridge_hotkey",
 +                                       True)
++
++    def __registry_get_lang_from_layout(self, layout, model=None):
++        langs = None
++        lang = 'en'
++        registry = ibus.XKBConfigRegistry()
++        get_layout_lang = registry.get_layout_lang()
++        if model == '':
++            model = None
++        if model != None:
++            label = "%s(%s)" % (layout, model)
++            if label in get_layout_lang:
++                langs = get_layout_lang[label]
++        if langs == None:
++            label = layout
++            if label in get_layout_lang:
++                langs = get_layout_lang[label]
++        if langs != None:
++            lang = str(langs[0])
++        return lang
 +
 +    def __set_default_layout_engine(self, use_bridge_hotkey):
 +        default_layout = self.__default_layout
@@ -1760,10 +1779,10 @@ index 8804634..2fc11bb 100644
 +        if len(self.__disabled_engines) == 0:
 +            for i, layout in enumerate(layouts):
 +                registry = ibus.XKBConfigRegistry()
-+                langs = registry.get_layout_lang()[layout]
-+                lang = 'en'
-+                if langs != None:
-+                    lang = str(langs[0])
++                model = None
++                if models != None and i < len(models):
++                    model = models[i]
++                lang = self.__registry_get_lang_from_layout(layout, model)
 +                model = None
 +                if i == 0:
 +                    layout = default_layout
@@ -1775,7 +1794,8 @@ index 8804634..2fc11bb 100644
 +                model_desc = _("Default Layout")
 +                if i == 0:
 +                    l = 0
-+                    if models != None:
++                    # layout 'in' and model 'eng' is English layout.
++                    if models != None and model != 'eng':
 +                        for j in range(0, len(models)):
 +                            l = l + len(models[j])
 +                    if l != 0:
@@ -1834,7 +1854,7 @@ index 8804634..2fc11bb 100644
          if not enabled:
              self.__set_im_icon(ICON_KEYBOARD)
              self.__set_im_name(None)
-@@ -247,10 +350,13 @@ class Panel(ibus.PanelBase):
+@@ -247,10 +370,13 @@ class Panel(ibus.PanelBase):
          else:
              engine = self.__focus_ic.get_engine()
              if engine:
@@ -1850,7 +1870,7 @@ index 8804634..2fc11bb 100644
              else:
                  self.__set_im_icon(ICON_KEYBOARD)
                  self.__set_im_name(None)
-@@ -273,7 +379,21 @@ class Panel(ibus.PanelBase):
+@@ -273,7 +399,21 @@ class Panel(ibus.PanelBase):
              return
  
          enabled = self.__focus_ic.is_enabled()
@@ -1873,7 +1893,7 @@ index 8804634..2fc11bb 100644
  
          if enabled == False:
              self.reset()
-@@ -284,10 +404,13 @@ class Panel(ibus.PanelBase):
+@@ -284,10 +424,13 @@ class Panel(ibus.PanelBase):
          else:
              engine = self.__focus_ic.get_engine()
              if engine:
@@ -1889,7 +1909,7 @@ index 8804634..2fc11bb 100644
              else:
                  self.__set_im_icon(ICON_KEYBOARD)
                  self.__set_im_name(None)
-@@ -315,6 +438,7 @@ class Panel(ibus.PanelBase):
+@@ -315,6 +458,7 @@ class Panel(ibus.PanelBase):
  
      def __config_load_show(self):
          show = self.__config.get_value("panel", "show", 0)
@@ -1897,7 +1917,7 @@ index 8804634..2fc11bb 100644
          self.__language_bar.set_show(show)
  
      def __config_load_position(self):
-@@ -443,6 +567,21 @@ class Panel(ibus.PanelBase):
+@@ -443,6 +587,21 @@ class Panel(ibus.PanelBase):
      #     menu.set_take_focus(False)
      #     return menu
  
@@ -1919,7 +1939,7 @@ index 8804634..2fc11bb 100644
      def __create_im_menu(self):
          engines = self.__bus.list_active_engines()
          current_engine = \
-@@ -453,25 +592,39 @@ class Panel(ibus.PanelBase):
+@@ -453,25 +612,39 @@ class Panel(ibus.PanelBase):
          size = gtk.icon_size_lookup(gtk.ICON_SIZE_MENU)
          menu = gtk.Menu()
          for i, engine in enumerate(engines):
@@ -1972,7 +1992,7 @@ index 8804634..2fc11bb 100644
  
          menu.show_all()
          menu.set_take_focus(False)
-@@ -523,8 +676,25 @@ class Panel(ibus.PanelBase):
+@@ -523,8 +696,25 @@ class Panel(ibus.PanelBase):
          if not self.__focus_ic:
              return
          if engine:
@@ -1999,7 +2019,7 @@ index 8804634..2fc11bb 100644
              self.__focus_ic.disable()
  
      def __sys_menu_item_activate_cb(self, item, command):
-@@ -573,12 +743,113 @@ class Panel(ibus.PanelBase):
+@@ -573,12 +763,113 @@ class Panel(ibus.PanelBase):
          self.__setup_pid = pid
          glib.child_watch_add(self.__setup_pid, self.__child_watch_cb)
  

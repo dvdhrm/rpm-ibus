@@ -1,6 +1,6 @@
-From 471e7583078c1e4b65219c9d37e16bf0d3d808bf Mon Sep 17 00:00:00 2001
+From 10bff3bb3c4ea8ec1316beb47b6d8fcbdfd357bf Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Fri, 28 Oct 2011 15:25:19 +0900
+Date: Fri, 4 Nov 2011 18:17:29 +0900
 Subject: [PATCH] Add XKB layouts
 
 ---
@@ -12,7 +12,7 @@ Subject: [PATCH] Add XKB layouts
  ibus/__init__.py             |    2 +
  ibus/bus.py                  |    3 +
  ibus/interface/iibus.py      |    3 +
- ibus/xkblayout.py.in         |  230 +++
+ ibus/xkblayout.py.in         |  231 +++
  ibus/xkbxml.py.in            |  419 ++++
  setup/Makefile.am            |    1 +
  setup/enginecombobox.py      |    7 +-
@@ -38,7 +38,7 @@ Subject: [PATCH] Add XKB layouts
  xkb/xkblib.h                 |   41 +
  xkb/xkbxml.c                 |  345 ++++
  xkb/xkbxml.h                 |  113 ++
- 34 files changed, 9523 insertions(+), 4 deletions(-)
+ 34 files changed, 9524 insertions(+), 4 deletions(-)
  create mode 100644 ibus/xkblayout.py.in
  create mode 100644 ibus/xkbxml.py.in
  create mode 100644 setup/xkbsetup.py
@@ -309,10 +309,10 @@ index 678d517..7de56fc 100644
  
 diff --git a/ibus/xkblayout.py.in b/ibus/xkblayout.py.in
 new file mode 100644
-index 0000000..11fce12
+index 0000000..9d7468f
 --- /dev/null
 +++ b/ibus/xkblayout.py.in
-@@ -0,0 +1,230 @@
+@@ -0,0 +1,231 @@
 +# vim:set et sts=4 sw=4:
 +#
 +# ibus - The Input Bus
@@ -469,7 +469,8 @@ index 0000000..11fce12
 +        need_us_layout = False
 +        for latin_layout in self.__xkb_latin_layouts:
 +            latin_layout = str(latin_layout)
-+            if layout == latin_layout:
++            # layout 'in' and model 'eng' is English layout.
++            if layout == latin_layout and model != 'eng':
 +                need_us_layout = True
 +                break
 +            if model != None and layout + '(' + model + ')' == latin_layout:

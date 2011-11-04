@@ -7,16 +7,16 @@
 
 %if 0%{?fedora} > 16
 %define have_bridge_hotkey 1
-%define ibus_gjs_version 3.2.1.20111028
+%define ibus_gjs_version 3.2.1.20111104
 %define ibus_gjs_build_failure 1
 %else
 %if 0%{?fedora} > 15
 %define have_bridge_hotkey 1
-%define ibus_gjs_version 3.2.1.20111028
+%define ibus_gjs_version 3.2.1.20111104
 %define ibus_gjs_build_failure 0
 %else
 %define have_bridge_hotkey 0
-%define ibus_gjs_version 3.0.2.20111028
+%define ibus_gjs_version 3.0.2.20111104
 %define ibus_gjs_build_failure 0
 %endif
 %endif
@@ -30,7 +30,7 @@
 
 Name:       ibus
 Version:    1.4.0
-Release:    9%{?dist}
+Release:    10%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -406,6 +406,12 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Nov 04 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-10
+- Updated ibus-xx-bridge-hotkey.patch for f16
+  Fixed no XKB languages from layout only. e.g. in(eng).
+- Updated ibus-541492-xkb.patch
+  Fixed not to show 'eng' on GUI for in(eng).
+
 * Wed Nov 02 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-9
 - Updated ibus-HEAD.patch
   Fixed prev/next keys without global engine.
