@@ -323,3 +323,176 @@ index 0a4f3fb..059d660 100644
 -- 
 1.7.6.4
 
+From a8c21dd867f4a9e1c37cae4f6509af1491c5fc96 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Thu, 17 Nov 2011 15:10:05 +0900
+Subject: [PATCH] Use ibus_input_context_process_key_event_async in ibus-x11
+
+---
+ client/x11/main.c |  115 ++++++++++++++++++++++++++++++++++++++++++++---------
+ 1 files changed, 96 insertions(+), 19 deletions(-)
+
+diff --git a/client/x11/main.c b/client/x11/main.c
+index 0ba826c..8611bfc 100644
+--- a/client/x11/main.c
++++ b/client/x11/main.c
+@@ -116,6 +116,8 @@ static gint     g_debug_level = 0;
+ 
+ static IBusBus *_bus = NULL;
+ 
++static gboolean _use_sync_mode = FALSE;
++
+ static void
+ _xim_preedit_start (XIMS xims, const X11IC *x11ic)
+ {
+@@ -443,6 +445,31 @@ xim_unset_ic_focus (XIMS xims, IMChangeFocusStruct *call_data)
+ 
+ }
+ 
++static void
++_process_key_event_done (GObject      *object,
++                         GAsyncResult *res,
++                         gpointer      user_data)
++{
++    IBusInputContext *context = (IBusInputContext *)object;
++    IMForwardEventStruct *pfe = (IMForwardEventStruct*) user_data;
++
++    GError *error = NULL;
++    gboolean retval = ibus_input_context_process_key_event_async_finish (
++            context,
++            res,
++            &error);
++
++    if (error != NULL) {
++        g_warning ("Process Key Event failed: %s.", error->message);
++        g_error_free (error);
++    }
++
++    if (retval == FALSE) {
++        IMForwardEvent (_xims, (XPointer) pfe);
++    }
++    g_free (pfe);
++}
++
+ static int
+ xim_forward_event (XIMS xims, IMForwardEventStruct *call_data)
+ {
+@@ -469,32 +496,61 @@ xim_forward_event (XIMS xims, IMForwardEventStruct *call_data)
+     if (event.type == GDK_KEY_RELEASE) {
+         event.state |= IBUS_RELEASE_MASK;
+     }
+-    retval = ibus_input_context_process_key_event (x11ic->context,
+-                                                   event.keyval,
+-                                                   event.hardware_keycode - 8,
+-                                                   event.state);
+-    if (retval) {
+-        if (! x11ic->has_preedit_area) {
+-            _xim_set_cursor_location (x11ic);
++
++    if (_use_sync_mode) {
++        retval = ibus_input_context_process_key_event (
++                                      x11ic->context,
++                                      event.keyval,
++                                      event.hardware_keycode - 8,
++                                      event.state);
++        if (retval) {
++            if (! x11ic->has_preedit_area) {
++                _xim_set_cursor_location (x11ic);
++            }
++            return 1;
+         }
+-        return 1;
+-    }
+ 
+-    IMForwardEventStruct fe;
+-    memset (&fe, 0, sizeof (fe));
++        IMForwardEventStruct fe;
++        memset (&fe, 0, sizeof (fe));
+ 
+-    fe.major_code = XIM_FORWARD_EVENT;
+-    fe.icid = x11ic->icid;
+-    fe.connect_id = x11ic->connect_id;
+-    fe.sync_bit = 0;
+-    fe.serial_number = 0L;
+-    fe.event = call_data->event;
++        fe.major_code = XIM_FORWARD_EVENT;
++        fe.icid = x11ic->icid;
++        fe.connect_id = x11ic->connect_id;
++        fe.sync_bit = 0;
++        fe.serial_number = 0L;
++        fe.event = call_data->event;
+ 
+-    IMForwardEvent (_xims, (XPointer) &fe);
++        IMForwardEvent (_xims, (XPointer) &fe);
+ 
+-    return 1;
++        retval = 1;
++    }
++    else {
++        IMForwardEventStruct *pfe;
++
++        pfe = g_new0 (IMForwardEventStruct, 1);
++        pfe->major_code = XIM_FORWARD_EVENT;
++        pfe->icid = x11ic->icid;
++        pfe->connect_id = x11ic->connect_id;
++        pfe->sync_bit = 0;
++        pfe->serial_number = 0L;
++        memcpy (&pfe->event, xevent, sizeof (XKeyEvent));
++
++        ibus_input_context_process_key_event_async (
++                                      x11ic->context,
++                                      event.keyval,
++                                      event.hardware_keycode - 8,
++                                      event.state,
++                                      -1,
++                                      NULL,
++                                      _process_key_event_done,
++                                      pfe);
++        retval = 1;
++    }
++    return retval;
+ }
+ 
++#undef _XIM_COPY_XKEYEVENT
++
+ 
+ static int
+ xim_open (XIMS xims, IMOpenStruct *call_data)
+@@ -897,6 +953,25 @@ _context_disabled_cb (IBusInputContext *context,
+     _xim_preedit_end (_xims, x11ic);
+ }
+ 
++static gboolean
++_get_boolean_env(const gchar *name,
++                 gboolean     defval)
++{
++    const gchar *value = g_getenv (name);
++
++    if (value == NULL)
++      return defval;
++
++    if (g_strcmp0 (value, "") == 0 ||
++        g_strcmp0 (value, "0") == 0 ||
++        g_strcmp0 (value, "false") == 0 ||
++        g_strcmp0 (value, "False") == 0 ||
++        g_strcmp0 (value, "FALSE") == 0)
++      return FALSE;
++
++    return TRUE;
++}
++
+ static void
+ _init_ibus (void)
+ {
+@@ -909,6 +984,8 @@ _init_ibus (void)
+ 
+     g_signal_connect (_bus, "disconnected",
+                         G_CALLBACK (_bus_disconnected_cb), NULL);
++
++    _use_sync_mode = _get_boolean_env ("IBUS_ENABLE_SYNC_MODE", FALSE);
+ }
+ 
+ static void
+-- 
+1.7.6.4
+

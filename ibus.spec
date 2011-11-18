@@ -7,16 +7,16 @@
 
 %if 0%{?fedora} > 16
 %define have_bridge_hotkey 1
-%define ibus_gjs_version 3.2.1.20111104
+%define ibus_gjs_version 3.2.1.20111118
 %define ibus_gjs_build_failure 1
 %else
 %if 0%{?fedora} > 15
 %define have_bridge_hotkey 1
-%define ibus_gjs_version 3.2.1.20111104
+%define ibus_gjs_version 3.2.1.20111118
 %define ibus_gjs_build_failure 0
 %else
 %define have_bridge_hotkey 0
-%define ibus_gjs_version 3.0.2.20111104
+%define ibus_gjs_version 3.0.2.20111118
 %define ibus_gjs_build_failure 0
 %endif
 %endif
@@ -30,7 +30,7 @@
 
 Name:       ibus
 Version:    1.4.0
-Release:    10%{?dist}
+Release:    11%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -406,6 +406,12 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Nov 18 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-11
+- Updated ibus-541492-xkb.patch
+  Fixed Bug 750484 - support reloading Xmodmap
+- Updated ibus-HEAD.patch
+  Fixed Bug 753781 - ibus-x11 needs async for hangul ibus_commit_text.
+
 * Fri Nov 04 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-10
 - Updated ibus-xx-bridge-hotkey.patch for f16
   Fixed no XKB languages from layout only. e.g. in(eng).

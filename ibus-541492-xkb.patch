@@ -1,18 +1,18 @@
-From 10bff3bb3c4ea8ec1316beb47b6d8fcbdfd357bf Mon Sep 17 00:00:00 2001
+From a8f02d4be33f87cf97039736407cd13e795b992b Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Fri, 4 Nov 2011 18:17:29 +0900
+Date: Fri, 18 Nov 2011 18:05:42 +0900
 Subject: [PATCH] Add XKB layouts
 
 ---
  Makefile.am                  |    7 +
  configure.ac                 |   56 +
- data/ibus.schemas.in         |   36 +
+ data/ibus.schemas.in         |   47 +
  ibus-1.0.pc.in               |    2 +
  ibus/Makefile.am             |   26 +
  ibus/__init__.py             |    2 +
  ibus/bus.py                  |    3 +
  ibus/interface/iibus.py      |    3 +
- ibus/xkblayout.py.in         |  231 +++
+ ibus/xkblayout.py.in         |  360 ++++
  ibus/xkbxml.py.in            |  419 ++++
  setup/Makefile.am            |    1 +
  setup/enginecombobox.py      |    7 +-
@@ -38,7 +38,7 @@ Subject: [PATCH] Add XKB layouts
  xkb/xkblib.h                 |   41 +
  xkb/xkbxml.c                 |  345 ++++
  xkb/xkbxml.h                 |  113 ++
- 34 files changed, 9524 insertions(+), 4 deletions(-)
+ 34 files changed, 9664 insertions(+), 4 deletions(-)
  create mode 100644 ibus/xkblayout.py.in
  create mode 100644 ibus/xkbxml.py.in
  create mode 100644 setup/xkbsetup.py
@@ -166,10 +166,10 @@ index f452666..227e28e 100644
    Build gconf modules       $enable_gconf
    Build memconf modules     $enable_memconf
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 663358c..8979515 100644
+index 663358c..e0a6a37 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
-@@ -191,6 +191,42 @@
+@@ -191,6 +191,53 @@
        </locale>
      </schema>
      <schema>
@@ -194,6 +194,17 @@ index 663358c..8979515 100644
 +      <locale name="C">
 +        <short>Set system keyboard option</short>
 +            <long>Override default system keyboard option. default is 'default'</long>
++      </locale>
++    </schema>
++    <schema>
++      <key>/schemas/desktop/ibus/general/use_xmodmap</key>
++      <applyto>/desktop/ibus/general/use_xmodmap</applyto>
++      <owner>ibus</owner>
++      <type>bool</type>
++      <default>true</default>
++      <locale name="C">
++        <short>Use xmodmap</short>
++           <long>Run xmodmap if .xmodmap/.Xmodmap exists.</long>
 +      </locale>
 +    </schema>
 +    <schema>
@@ -309,10 +320,10 @@ index 678d517..7de56fc 100644
  
 diff --git a/ibus/xkblayout.py.in b/ibus/xkblayout.py.in
 new file mode 100644
-index 0000000..9d7468f
+index 0000000..c0c95ce
 --- /dev/null
 +++ b/ibus/xkblayout.py.in
-@@ -0,0 +1,231 @@
+@@ -0,0 +1,360 @@
 +# vim:set et sts=4 sw=4:
 +#
 +# ibus - The Input Bus
@@ -341,15 +352,21 @@ index 0000000..9d7468f
 +    )
 +
 +import os, sys, time
++import glib
 +
 +XKB_COMMAND = @XKB_COMMAND@
 +XKB_SESSION_TIME_OUT = 30.0
++XMODMAP_CMD = 'xmodmap'
++XMODMAP_KNOWN_FILES = ['.xmodmap', '.xmodmaprc', '.Xmodmap', '.Xmodmaprc']
 +
 +class XKBLayout():
 +    def __init__(self, config = None, command=XKB_COMMAND):
 +        self.__config = config
 +        self.__command = command
 +        self.__use_xkb = True
++        self.__xkb_pid = None
++        self.__xmodmap_pid = None
++        self.__use_xmodmap = True
 +        if self.__command == None:
 +            self.__use_xkb = False
 +        self.__default_layout = self.get_layout()
@@ -363,6 +380,9 @@ index 0000000..9d7468f
 +            self.__xkb_latin_layouts = list(self.__config.get_value('general',
 +                                                                    'xkb_latin_layouts',
 +                                                                    []))
++            self.__use_xmodmap = bool(self.__config.get_value('general',
++                                                              'use_xmodmap',
++                                                              True))
 +
 +
 +    def __get_model_from_layout(self, layout):
@@ -390,6 +410,44 @@ index 0000000..9d7468f
 +                retval = line[len(string):]
 +                break
 +        return retval
++
++    def __get_userhome(self):
++        if 'HOME' not in os.environ:
++            import pwd
++            userhome = pwd.getpwuid(os.getuid()).pw_dir
++        else:
++            userhome = os.environ['HOME']
++        userhome = userhome.rstrip('/')
++        return userhome
++
++    def __get_fullpath(self, command):
++        if 'PATH' in os.environ:
++            envpath = os.environ['PATH']
++        else:
++            envpath = os.defpath
++        PATH = envpath.split(os.pathsep)
++        for dir in PATH:
++            filepath = os.path.join(dir, command)
++            if os.path.exists(filepath):
++                return filepath
++        return None
++
++    def __set_layout_cb(self, pid, status):
++        if self.__xkb_pid != pid:
++            print >> sys.stderr, \
++                'ibus.xkblayout: set_layout_cb has another pid'
++            return
++        self.__xkb_pid.close()
++        self.__xkb_pid = None
++        self.set_xmodmap()
++
++    def __set_xmodmap_cb(self, pid, status):
++        if self.__xmodmap_pid != pid:
++            print >> sys.stderr, \
++                'ibus.xkblayout: set_xmodmap_cb has another pid'
++            return
++        self.__xmodmap_pid.close()
++        self.__xmodmap_pid = None
 +
 +    def use_xkb(self, enable):
 +        if self.__command == None:
@@ -486,7 +544,6 @@ index 0000000..9d7468f
 +            return
 +        args = []
 +        args.append(self.__command)
-+        args.append(os.path.basename(self.__command))
 +        args.append('--layout')
 +        args.append(layout)
 +        if model != None:
@@ -495,8 +552,10 @@ index 0000000..9d7468f
 +        if option != None:
 +            args.append('--option')
 +            args.append(option)
-+        pid = os.spawnl(os.P_NOWAIT, *args)
-+        os.waitpid(pid, 0)
++        pid = glib.spawn_async(argv=args,
++                               flags=glib.SPAWN_DO_NOT_REAP_CHILD)[0]
++        self.__xkb_pid = pid
++        glib.child_watch_add(self.__xkb_pid, self.__set_layout_cb)
 +
 +    def set_default_layout(self, layout='default', model='default'):
 +        if not self.__use_xkb:
@@ -544,6 +603,87 @@ index 0000000..9d7468f
 +        self.__default_layout = self.get_layout()
 +        self.__default_model = self.get_model()
 +        self.__default_option = self.get_option()
++
++    def set_xmodmap(self):
++        if not self.__use_xmodmap:
++            return
++        if self.__xmodmap_pid != None:
++            return
++        xmodmap_cmdpath = self.__get_fullpath(XMODMAP_CMD)
++        if xmodmap_cmdpath == None:
++            xmodmap_cmdpath = XMODMAP_CMD
++        for xmodmap_file in XMODMAP_KNOWN_FILES:
++            xmodmap_filepath = os.path.join(self.__get_userhome(), xmodmap_file)
++            if not os.path.exists(xmodmap_filepath):
++                continue
++            pid = glib.spawn_async(argv=[xmodmap_cmdpath, xmodmap_filepath],
++                                   flags=glib.SPAWN_DO_NOT_REAP_CHILD)[0]
++            self.__xmodmap_pid = pid
++            glib.child_watch_add(self.__xmodmap_pid, self.__set_xmodmap_cb)
++            break
++
++
++def test():
++    import gtk
++    import ibus
++
++    window = None
++    config = None
++    xkblayout = None
++
++    def __destroy(*args):
++        window.hide()
++        gtk.main_quit()
++
++    def __test_set_session_xkb(button):
++        xkblayout.set_layout('default')
++        print 'Reset the default keymap'
++        print 'Layout:', xkblayout.get_default_layout()
++        print 'Option:', xkblayout.get_default_option()
++
++    def __test_set_user_xkb(button):
++        layout = 'us'
++        model = 'default'
++        option = 'default'
++        if len(sys.argv) > 1:
++            layout = sys.argv[1]
++        if len(sys.argv) > 2:
++            model = sys.argv[2]
++            if model == 'None':
++                model = None
++        if len(sys.argv) > 3:
++            option = sys.argv[3]
++            if option == 'None':
++                optoin = None
++        xkblayout.set_layout(layout, model, option)
++        print 'Test set_layout:', layout, model, option
++
++    if ibus.get_address() != None:
++        bus = ibus.Bus()
++        config = bus.get_config()
++    else:
++        print 'no ibus'
++    xkblayout = XKBLayout(config)
++    print 'Layout:', xkblayout.get_default_layout()
++    print 'Option:', xkblayout.get_default_option()
++    window = gtk.Window(gtk.WINDOW_TOPLEVEL)
++    window.connect('destroy', __destroy)
++    vb = gtk.VBox()
++    window.add(vb)
++    b = gtk.Button('Test xkb')
++    b.connect('clicked', __test_set_user_xkb)
++    vb.add(b)
++    b = gtk.Button('Reset the default xkb')
++    b.connect('clicked', __test_set_session_xkb)
++    vb.add(b)
++    window.show_all()
++    if config != None:
++        ibus.main()
++    else:
++        gtk.main()
++
++if __name__ == '__main__':
++    test()
 diff --git a/ibus/xkbxml.py.in b/ibus/xkbxml.py.in
 new file mode 100644
 index 0000000..9407c13
@@ -2803,7 +2943,7 @@ index 0000000..6986b5c
 +G_END_DECLS
 +#endif
 diff --git a/ui/gtk/panel.py b/ui/gtk/panel.py
-index 90be1d5..8804634 100644
+index f71a36d..a202d13 100644
 --- a/ui/gtk/panel.py
 +++ b/ui/gtk/panel.py
 @@ -132,6 +132,22 @@ class Panel(ibus.PanelBase):
