@@ -33,7 +33,7 @@
 
 Name:       ibus
 Version:    1.4.0
-Release:    12%{?dist}
+Release:    13%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -72,6 +72,7 @@ BuildRequires:  desktop-file-utils
 BuildRequires:  gtk-doc
 %if %have_dconf
 BuildRequires:  dconf-devel
+BuildRequires:  dbus-x11
 %endif
 # for AM_GCONF_SOURCE_2 in configure.ac
 BuildRequires:  GConf2-devel
@@ -434,7 +435,7 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Fri Nov 25 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-12
+* Fri Nov 25 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-13
 - Enabled dconf.
 - Updated ibus-HEAD.patch
   Fixed Bug 618229 - engine setup buton on ibus-setup.
