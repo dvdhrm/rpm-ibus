@@ -7,17 +7,20 @@
 
 %if 0%{?fedora} > 16
 %define have_bridge_hotkey 1
-%define ibus_gjs_version 3.2.1.20111118
+%define ibus_gjs_version 3.2.1.20111128
 %define ibus_gjs_build_failure 1
+%define have_dconf 1
 %else
 %if 0%{?fedora} > 15
 %define have_bridge_hotkey 1
-%define ibus_gjs_version 3.2.1.20111118
+%define ibus_gjs_version 3.2.1.20111128
 %define ibus_gjs_build_failure 0
+%define have_dconf 1
 %else
 %define have_bridge_hotkey 0
 %define ibus_gjs_version 3.0.2.20111118
 %define ibus_gjs_build_failure 0
+%define have_dconf 0
 %endif
 %endif
 
@@ -30,7 +33,7 @@
 
 Name:       ibus
 Version:    1.4.0
-Release:    11%{?dist}
+Release:    12%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -46,14 +49,12 @@ Patch2:     ibus-541492-xkb.patch
 Patch3:     ibus-xx-bridge-hotkey.patch
 Patch4:     ibus-xx-setup-frequent-lang.patch
 
-# Workaround for oxygen-gtk icon theme until bug 699103 is fixed.
-Patch91:    ibus-711632-fedora-fallback-icon.patch
 # Workaround gnome-shell build failure
 # http://koji.fedoraproject.org/koji/getfile?taskID=3317917&name=root.log
-Patch92:    ibus-gjs-xx-gnome-shell-3.1.4-build-failure.patch
+Patch91:    ibus-gjs-xx-gnome-shell-3.1.4-build-failure.patch
 # Workaround to disable preedit on gnome-shell until bug 658420 is fixed.
 # https://bugzilla.gnome.org/show_bug.cgi?id=658420
-Patch93:    ibus-xx-g-s-disable-preedit.patch
+Patch92:    ibus-xx-g-s-disable-preedit.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -69,6 +70,10 @@ BuildRequires:  dbus-glib-devel
 BuildRequires:  dbus-python-devel >= %{dbus_python_version}
 BuildRequires:  desktop-file-utils
 BuildRequires:  gtk-doc
+%if %have_dconf
+BuildRequires:  dconf-devel
+%endif
+# for AM_GCONF_SOURCE_2 in configure.ac
 BuildRequires:  GConf2-devel
 BuildRequires:  pygobject2-devel
 BuildRequires:  intltool
@@ -94,7 +99,11 @@ Requires:   iso-codes
 Requires:   dbus-python >= %{dbus_python_version}
 Requires:   dbus-x11
 Requires:   im-chooser
+%if %have_dconf
+Requires:   dconf
+%else
 Requires:   GConf2
+%endif
 Requires:   notify-python
 Requires:   librsvg2
 Requires:   gnome-icon-theme-legacy >= %{gnome_icon_theme_legacy_version}
@@ -189,12 +198,12 @@ zcat %SOURCE2 | tar xf -
 %if %ibus_gjs_build_failure
 d=`basename %SOURCE2 .tar.gz`
 cd $d
-%patch92 -p1 -b .fail-g-s
+%patch91 -p1 -b .fail-g-s
 cd ..
 %endif
 %endif
 %patch0 -p1
-%patch93 -p1 -b .g-s-preedit
+%patch92 -p1 -b .g-s-preedit
 cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
 %patch1 -p1 -b .preload-sys
 %if %have_libxkbfile
@@ -203,8 +212,6 @@ cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
 mv data/ibus.schemas.in data/ibus.schemas.in.in
 %patch3 -p1 -b .bridge-key
 %patch4 -p1 -b .setup-frequent-lang
-
-%patch91 -p1 -b .fallback-icon
 
 %build
 %if %have_libxkbfile
@@ -237,6 +244,10 @@ automake -a -c -f
 %endif
 %if %have_bridge_hotkey
     --enable-bridge-hotkey \
+%endif
+%if %have_dconf
+    --enable-dconf \
+    --disable-gconf \
 %endif
     --enable-introspection
 
@@ -308,20 +319,26 @@ touch --no-create %{_datadir}/icons/hicolor || :
 
 %{_sbindir}/alternatives --install %{_sysconfdir}/X11/xinit/xinputrc xinputrc %{_xinputconf} 83 || :
 
+%if !%have_dconf
 export GCONF_CONFIG_SOURCE=`gconftool-2 --get-default-source`
 gconftool-2 --makefile-install-rule %{_sysconfdir}/gconf/schemas/ibus.schemas > /dev/null 2>&1 || :
+%endif
 
 %pre
+%if !%have_dconf
 if [ "$1" -gt 1 ]; then
     export GCONF_CONFIG_SOURCE=`gconftool-2 --get-default-source`
     gconftool-2 --makefile-uninstall-rule %{_sysconfdir}/gconf/schemas/ibus.schemas > /dev/null 2>&1 || :
 fi
+%endif
 
 %preun
+%if !%have_dconf
 if [ "$1" -eq 0 ]; then
     export GCONF_CONFIG_SOURCE=`gconftool-2 --get-default-source`
     gconftool-2 --makefile-uninstall-rule %{_sysconfdir}/gconf/schemas/ibus.schemas > /dev/null 2>&1 || :
 fi
+%endif
 
 %postun
 # recreate icon cache
@@ -363,11 +380,22 @@ fi
 %{_datadir}/ibus/*
 %{_datadir}/applications/*
 %{_datadir}/icons/hicolor/*/apps/*
+%if %have_dconf
+%{_datadir}/GConf/gsettings/*
+%{_datadir}/glib-2.0/schemas/*.xml
+%{_libexecdir}/ibus-dconf
+%else
 %{_libexecdir}/ibus-gconf
+%endif
 %{_libexecdir}/ibus-ui-gtk
 %{_libexecdir}/ibus-x11
 # %{_sysconfdir}/xdg/autostart/ibus.desktop
+%if %have_dconf
+%{_sysconfdir}/dconf/db/ibus
+%{_sysconfdir}/dconf/profile/ibus
+%else
 %{_sysconfdir}/gconf/schemas/ibus.schemas
+%endif
 %config %{_xinputconf}
 %if %have_libxkbfile
 %{_libexecdir}/ibus-engine-xkb
@@ -406,6 +434,14 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Nov 25 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-12
+- Enabled dconf.
+- Updated ibus-HEAD.patch
+  Fixed Bug 618229 - engine setup buton on ibus-setup.
+- Removed ibus-711632-fedora-fallback-icon.patch as upstreamed.
+- Updated ibus-xx-bridge-hotkey.patch
+  Removed Enable/Disable buttons on ibus-setup
+
 * Fri Nov 18 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-11
 - Updated ibus-541492-xkb.patch
   Fixed Bug 750484 - support reloading Xmodmap

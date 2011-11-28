@@ -563,7 +563,7 @@ diff --git a/setup/main.py b/setup/main.py
 index 7f4a040..095084b 100644
 --- a/setup/main.py
 +++ b/setup/main.py
-@@ -92,6 +92,7 @@ class Setup(object):
+@@ -91,6 +91,7 @@ class Setup(object):
          # keyboard shortcut
          # trigger
          self.__config = self.__bus.get_config()
@@ -571,7 +571,7 @@ index 7f4a040..095084b 100644
          shortcuts = self.__config.get_value(
                          "general/hotkey", "trigger",
                          ibus.CONFIG_GENERAL_SHORTCUT_TRIGGER_DEFAULT)
-@@ -213,15 +214,22 @@ class Setup(object):
+@@ -212,15 +213,22 @@ class Setup(object):
          self.__checkbutton_use_global_engine.connect("toggled", self.__checkbutton_use_global_engine_toggled_cb)
  
          # init engine page
@@ -599,7 +599,7 @@ index 7f4a040..095084b 100644
  
          self.__treeview = self.__builder.get_object("treeview_engines")
          self.__treeview.set_engines(engines)
-@@ -247,7 +255,8 @@ class Setup(object):
+@@ -248,7 +256,8 @@ class Setup(object):
      def __combobox_notify_active_engine_cb(self, combobox, property):
          engine = self.__combobox.get_active_engine()
          button = self.__builder.get_object("button_engine_add")
@@ -607,9 +607,9 @@ index 7f4a040..095084b 100644
 +        button.set_sensitive(engine != None and \
 +                engine.name not in map(lambda e: e.name, self.__treeview.get_engines()))
  
-     def __treeview_notify_cb(self, treeview, property):
-         if property.name != "active-engine" and property.name != "engines":
-@@ -265,6 +274,26 @@ class Setup(object):
+     def __get_engine_setup_exec_args(self, engine):
+         args = []
+@@ -290,6 +299,26 @@ class Setup(object):
              engine_names = map(lambda e: e.name, engines)
              self.__config.set_list("general", "preload_engines", engine_names, "s")
  
@@ -636,9 +636,9 @@ index 7f4a040..095084b 100644
      def __button_engine_add_cb(self, button):
          engine = self.__combobox.get_active_engine()
          self.__treeview.append_engine(engine)
-@@ -276,6 +305,32 @@ class Setup(object):
-             about.run()
-             about.destroy()
+@@ -319,6 +348,32 @@ class Setup(object):
+             del self.__engine_setup_exec_list[name]
+         self.__engine_setup_exec_list[name] = os.spawnl(os.P_NOWAIT, *args)
  
 +    def __checkbutton_preload_engine_mode_toggled_cb(self, button):
 +        if button.get_active():
@@ -669,7 +669,7 @@ index 7f4a040..095084b 100644
      def __init_bus(self):
          try:
              self.__bus = ibus.Bus()
-@@ -466,7 +521,11 @@ class Setup(object):
+@@ -509,7 +564,11 @@ class Setup(object):
          self.__config.set_value("general", "use_global_engine", value)
  
      def __config_value_changed_cb(self, bus, section, name, value):
@@ -686,7 +686,7 @@ diff --git a/setup/setup.ui b/setup/setup.ui
 index f1e6d0b..562c091 100644
 --- a/setup/setup.ui
 +++ b/setup/setup.ui
-@@ -582,7 +582,22 @@
+@@ -585,7 +585,22 @@
                      <property name="visible">True</property>
                      <property name="orientation">vertical</property>
                      <child>
@@ -710,7 +710,7 @@ index f1e6d0b..562c091 100644
                          <property name="visible">True</property>
                          <child>
                            <object class="GtkAlignment" id="alignment6">
-@@ -733,7 +748,7 @@
+@@ -752,7 +767,7 @@
                          </child>
                        </object>
                        <packing>
@@ -719,7 +719,7 @@ index f1e6d0b..562c091 100644
                        </packing>
                      </child>
                      <child>
-@@ -772,7 +787,7 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
+@@ -791,7 +806,7 @@ You may use up/down buttons to change it
                        </object>
                        <packing>
                          <property name="expand">False</property>
