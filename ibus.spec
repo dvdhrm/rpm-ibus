@@ -33,7 +33,7 @@
 
 Name:       ibus
 Version:    1.4.0
-Release:    13%{?dist}
+Release:    14%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -435,7 +435,7 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Fri Nov 25 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-13
+* Wed Nov 30 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-14
 - Enabled dconf.
 - Updated ibus-HEAD.patch
   Fixed Bug 618229 - engine setup buton on ibus-setup.
