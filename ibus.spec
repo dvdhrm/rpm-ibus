@@ -33,7 +33,7 @@
 
 Name:       ibus
 Version:    1.4.0
-Release:    15%{?dist}
+Release:    16%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -435,7 +435,7 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Fri Dec 30 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-15
+* Fri Dec 30 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-16
 - Enhanced ibus-gnome3 shell lookup window.
 - Updated ibus-HEAD.patch from upstream
   Fixed Bug 769135 - ibus-x11 SEGV in _process_key_event_done.
