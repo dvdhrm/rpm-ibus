@@ -1784,8 +1784,8 @@ index 8804634..549393a 100644
          if value != 'default':
              self.__xkblayout.set_default_layout(value)
 +            if value.find('(') >= 0:
-+                self.__default_layout = value.split('(')[0]
-+                self.__default_model = value.split('(')[1].split(')')[0]
++                [self.__default_layout, self.__default_model] = \
++                    self.__xkblayout.get_default_layout()
 +            else:
 +                self.__default_layout = value
 +                self.__default_model = None

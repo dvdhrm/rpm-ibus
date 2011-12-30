@@ -574,14 +574,52 @@ index 0ba826c..58069fc 100644
 -- 
 1.7.6.4
 
-From e7a722948025948f39ac8e7f9d5527a79f23c7ff Mon Sep 17 00:00:00 2001
+From 5d2ac19e1524b1802f5298eedff1ba52423c847f Mon Sep 17 00:00:00 2001
+From: Daiki Ueno <ueno@unixuser.org>
+Date: Wed, 30 Nov 2011 09:40:15 +0900
+Subject: [PATCH] Disable surrounding-text when retrieve-surrounding
+ signal is not handled in GTK.
+
+BUG=https://code.google.com/p/ibus/issues/detail?id=1358
+TEST=On Fedora with ibus-m17n tis820
+
+Review URL: http://codereview.appspot.com/5431086
+---
+ client/gtk2/ibusimcontext.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
+
+diff --git a/client/gtk2/ibusimcontext.c b/client/gtk2/ibusimcontext.c
+index b6ca12e..5ae5cfc 100644
+--- a/client/gtk2/ibusimcontext.c
++++ b/client/gtk2/ibusimcontext.c
+@@ -278,6 +278,11 @@ _request_surrounding_text (IBusIMContext *context)
+         IDEBUG ("requesting surrounding text");
+         g_signal_emit (context, _signal_retrieve_surrounding_id, 0,
+                        &return_value);
++        if (!return_value) {
++            context->caps &= ~IBUS_CAP_SURROUNDING_TEXT;
++            ibus_input_context_set_capabilities (context->ibuscontext,
++                                                 context->caps);
++        }
+     }
+ }
+ 
+-- 
+1.7.6.4
+
+From 5236e2159f2e6184c18df9a9ecbb05bfb09106d4 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Fri, 25 Nov 2011 17:19:53 +0900
+Date: Wed, 30 Nov 2011 12:28:22 +0900
 Subject: [PATCH] Add the engine preference button on ibus-setup
 
 The new preference button launches $libexecdir/ibus-setup- + engine.name
 by default. The engine is IBusEngineDesc.
 If engine.setup has a value, the button launches it instead.
+
+BUG=RH#618229
+TEST=Linux desktop
+
+Review URL: http://codereview.appspot.com/5437062
 ---
  ibus/enginedesc.py   |   11 +++++++++--
  setup/ibus-setup.in  |    2 ++
@@ -928,4 +966,967 @@ index 76a7adc..928743e 100644
   * ibus_engine_desc_output:
 -- 
 1.7.6.4
+
+From fd07a5a761fe1c242ba8babaab1060d5679a3618 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Tue, 20 Dec 2011 13:46:45 +0900
+Subject: [PATCH] Fix a SEGV if ibusimcontext->ibuscontext is null.
+
+BUG=
+TEST=Linux desktop
+
+Review URL: http://codereview.appspot.com/5489086
+---
+ client/gtk2/ibusimcontext.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/client/gtk2/ibusimcontext.c b/client/gtk2/ibusimcontext.c
+index 5ae5cfc..72db581 100644
+--- a/client/gtk2/ibusimcontext.c
++++ b/client/gtk2/ibusimcontext.c
+@@ -273,6 +273,7 @@ _request_surrounding_text (IBusIMContext *context)
+ {
+     if (context && context->enable &&
+         (context->caps & IBUS_CAP_SURROUNDING_TEXT) != 0 &&
++        context->ibuscontext != NULL &&
+         ibus_input_context_needs_surrounding_text (context->ibuscontext)) {
+         gboolean return_value;
+         IDEBUG ("requesting surrounding text");
+-- 
+1.7.7
+
+From ee9c4fba4535e85bd1f02743cab8914dd84e6178 Mon Sep 17 00:00:00 2001
+From: Peng Huang <shawn.p.huang@gmail.com>
+Date: Thu, 22 Dec 2011 09:57:01 -0500
+Subject: [PATCH] Make all fields of IBusProperty as gobject property.
+
+BUG=http://code.google.com/p/ibus/issues/detail?id=1383
+TEST=Linux desktop
+
+Review URL: http://codereview.appspot.com/5500066
+---
+ src/ibusproperty.c |  471 +++++++++++++++++++++++++++++++++++++++------------
+ src/ibusproperty.h |   41 ++---
+ 2 files changed, 376 insertions(+), 136 deletions(-)
+
+diff --git a/src/ibusproperty.c b/src/ibusproperty.c
+index 5a2dd78..e5480fa 100644
+--- a/src/ibusproperty.c
++++ b/src/ibusproperty.c
+@@ -21,8 +21,52 @@
+  */
+ #include "ibusproperty.h"
+ #include "ibusproplist.h"
++#include "ibusenumtypes.h"
++
++enum {
++    LAST_SIGNAL,
++};
++
++enum {
++    PROP_0 = 0,
++    PROP_KEY,
++    PROP_ICON,
++    PROP_LABEL,
++    PROP_TOOLTIP,
++    PROP_SENSITIVE,
++    PROP_VISIBLE,
++    PROP_PROP_TYPE,
++    PROP_STATE,
++    PROP_SUB_PROPS,
++};
++
++/* _IBusPropertyPrivate */
++struct _IBusPropertyPrivate {
++    gchar    *key;
++    gchar    *icon;
++    IBusText *label;
++    IBusText *tooltip;
++
++    gboolean sensitive;
++    gboolean visible;
++    IBusPropType type;
++    IBusPropState state;
++
++    IBusPropList *sub_props;
++};
++
++#define IBUS_PROPERTY_GET_PRIVATE(o)  \
++   (G_TYPE_INSTANCE_GET_PRIVATE ((o), IBUS_TYPE_PROPERTY, IBusPropertyPrivate))
+ 
+ /* functions prototype */
++static void         ibus_property_set_property  (IBusProperty       *prop,
++                                                 guint               prop_id,
++                                                 const GValue       *value,
++                                                 GParamSpec         *pspec);
++static void         ibus_property_get_property  (IBusProperty       *prop,
++                                                 guint               prop_id,
++                                                 GValue             *value,
++                                                 GParamSpec         *pspec);
+ static void         ibus_property_destroy       (IBusProperty       *prop);
+ static gboolean     ibus_property_serialize     (IBusProperty       *prop,
+                                                  GVariantBuilder    *builder);
+@@ -36,53 +80,253 @@ G_DEFINE_TYPE (IBusProperty, ibus_property, IBUS_TYPE_SERIALIZABLE)
+ static void
+ ibus_property_class_init (IBusPropertyClass *class)
+ {
++    GObjectClass *gobject_class = G_OBJECT_CLASS (class);
+     IBusObjectClass *object_class = IBUS_OBJECT_CLASS (class);
+     IBusSerializableClass *serializable_class = IBUS_SERIALIZABLE_CLASS (class);
+ 
++    g_type_class_add_private (class, sizeof (IBusPropertyPrivate));
++
++    gobject_class->set_property = (GObjectSetPropertyFunc) ibus_property_set_property;
++    gobject_class->get_property = (GObjectGetPropertyFunc) ibus_property_get_property;
++
+     object_class->destroy = (IBusObjectDestroyFunc) ibus_property_destroy;
+ 
+     serializable_class->serialize   = (IBusSerializableSerializeFunc) ibus_property_serialize;
+     serializable_class->deserialize = (IBusSerializableDeserializeFunc) ibus_property_deserialize;
+     serializable_class->copy        = (IBusSerializableCopyFunc) ibus_property_copy;
++
++    /* install properties */
++    /**
++     * IBusPropert:key:
++     *
++     * The key of property
++     */
++    g_object_class_install_property (gobject_class,
++            PROP_KEY,
++            g_param_spec_string ("key",
++                    "key",
++                    "The key of property",
++                    "",
++                    G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
++
++    /**
++     * IBusPropert:icon:
++     *
++     * The icon of property
++     */
++    g_object_class_install_property (gobject_class,
++            PROP_ICON,
++            g_param_spec_string ("icon",
++                    "icon",
++                    "The icon of property",
++                    "",
++                    G_PARAM_READWRITE));
++
++    /**
++     * IBusPropert:label:
++     *
++     * The label of property
++     */
++    g_object_class_install_property (gobject_class,
++            PROP_LABEL,
++            g_param_spec_object("label",
++                    "label",
++                    "The label of property",
++                    IBUS_TYPE_TEXT,
++                    G_PARAM_READWRITE | G_PARAM_CONSTRUCT));
++
++    /**
++     * IBusPropert:tooltip:
++     *
++     * The tooltip of property
++     */
++    g_object_class_install_property (gobject_class,
++            PROP_TOOLTIP,
++            g_param_spec_object("tooltip",
++                    "tooltip",
++                    "The tooltip of property",
++                    IBUS_TYPE_TEXT,
++                    G_PARAM_READWRITE));
++
++    /**
++     * IBusPropert:sensitive:
++     *
++     * The sensitive of property
++     */
++    g_object_class_install_property (gobject_class,
++            PROP_SENSITIVE,
++            g_param_spec_boolean("sensitive",
++                    "sensitive",
++                    "The sensitive of property",
++                    TRUE,
++                    G_PARAM_READWRITE));
++
++    /**
++     * IBusPropert:visible:
++     *
++     * The visible of property
++     */
++    g_object_class_install_property (gobject_class,
++            PROP_VISIBLE,
++            g_param_spec_boolean("visible",
++                    "visible",
++                    "The visible of property",
++                    TRUE,
++                    G_PARAM_READWRITE));
++
++    /**
++     * IBusPropert:type:
++     *
++     * The type of property
++     */
++    g_object_class_install_property (gobject_class,
++            PROP_PROP_TYPE,
++            g_param_spec_enum("prop-type",
++                    "prop-type",
++                    "The type of property",
++                    IBUS_TYPE_PROP_TYPE,
++                    PROP_TYPE_NORMAL,
++                    G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
++    /**
++     * IBusPropert:state:
++     *
++     * The state of property
++     */
++    g_object_class_install_property (gobject_class,
++            PROP_STATE,
++            g_param_spec_enum("state",
++                    "state",
++                    "The state of property",
++                    IBUS_TYPE_PROP_STATE,
++                    PROP_STATE_UNCHECKED,
++                    G_PARAM_READWRITE));
++
++    /**
++     * IBusPropert:sub-props:
++     *
++     * The sub properties of property
++     */
++    g_object_class_install_property (gobject_class,
++            PROP_SUB_PROPS,
++            g_param_spec_object("sub-props",
++                    "sub properties",
++                    "The sub properties of property",
++                    IBUS_TYPE_PROP_LIST,
++                    G_PARAM_READWRITE));
+ }
+ 
+ static void
+ ibus_property_init (IBusProperty *prop)
+ {
+-    prop->key = NULL;
+-    prop->type = 0;
+-    prop->label = NULL;
+-    prop->icon = NULL;
+-    prop->tooltip = NULL;
+-    prop->sensitive = FALSE;
+-    prop->visible = FALSE;
+-    prop->state = 0;
+-
+-    prop->sub_props = NULL;
++    prop->priv = IBUS_PROPERTY_GET_PRIVATE (prop);
++
++    ibus_property_set_label (prop, NULL);
++    ibus_property_set_tooltip (prop, NULL);
++    ibus_property_set_sub_props (prop, NULL);
++
++}
++static void
++ibus_property_set_property (IBusProperty *prop,
++                            guint         prop_id,
++                            const GValue *value,
++                            GParamSpec   *pspec)
++{
++    switch (prop_id) {
++    case PROP_KEY:
++        g_assert (prop->priv->key == NULL);
++        prop->priv->key = g_value_dup_string (value);
++        break;
++    case PROP_ICON:
++        ibus_property_set_icon (prop, g_value_get_string (value));
++        break;
++    case PROP_LABEL:
++        ibus_property_set_label (prop, g_value_get_object (value));
++        break;
++    case PROP_TOOLTIP:
++        ibus_property_set_tooltip (prop, g_value_get_object (value));
++        break;
++    case PROP_SENSITIVE:
++        ibus_property_set_sensitive (prop, g_value_get_boolean (value));
++        break;
++    case PROP_VISIBLE:
++        ibus_property_set_visible (prop, g_value_get_boolean (value));
++        break;
++    case PROP_PROP_TYPE:
++        prop->priv->type = g_value_get_enum (value);
++        break;
++    case PROP_STATE:
++        ibus_property_set_state (prop, g_value_get_enum (value));
++        break;
++    case PROP_SUB_PROPS:
++        ibus_property_set_sub_props (prop,
++                (IBusPropList *)g_value_get_object (value));
++        break;
++    default:
++        G_OBJECT_WARN_INVALID_PROPERTY_ID (prop, prop_id, pspec);
++    }
++}
++
++static void
++ibus_property_get_property (IBusProperty *prop,
++                            guint         prop_id,
++                            GValue       *value,
++                            GParamSpec   *pspec)
++{
++    switch (prop_id) {
++    case PROP_KEY:
++        g_value_set_string (value, ibus_property_get_key (prop));
++        break;
++    case PROP_ICON:
++        g_value_set_string (value, ibus_property_get_icon (prop));
++        break;
++    case PROP_LABEL:
++        g_value_set_object (value, ibus_property_get_label (prop));
++        break;
++    case PROP_TOOLTIP:
++        g_value_set_object (value, ibus_property_get_tooltip (prop));
++        break;
++    case PROP_SENSITIVE:
++        g_value_set_boolean (value, ibus_property_get_sensitive (prop));
++        break;
++    case PROP_VISIBLE:
++        g_value_set_boolean (value, ibus_property_get_visible (prop));
++        break;
++    case PROP_PROP_TYPE:
++        g_value_set_enum (value, ibus_property_get_prop_type (prop));
++        break;
++    case PROP_STATE:
++        g_value_set_enum (value, ibus_property_get_state (prop));
++        break;
++    case PROP_SUB_PROPS:
++        g_value_set_object (value, ibus_property_get_sub_props (prop));
++        break;
++    default:
++        G_OBJECT_WARN_INVALID_PROPERTY_ID (prop, prop_id, pspec);
++    }
+ }
+ 
+ static void
+ ibus_property_destroy (IBusProperty *prop)
+ {
+-    g_free (prop->key);
+-    prop->key = NULL;
++    g_free (prop->priv->key);
++    prop->priv->key = NULL;
+ 
+-    g_free (prop->icon);
+-    prop->icon = NULL;
++    g_free (prop->priv->icon);
++    prop->priv->icon = NULL;
+ 
+-    if (prop->label) {
+-        g_object_unref (prop->label);
+-        prop->label = NULL;
++    if (prop->priv->label) {
++        g_object_unref (prop->priv->label);
++        prop->priv->label = NULL;
+     }
+ 
+-    if (prop->tooltip) {
+-        g_object_unref (prop->tooltip);
+-        prop->tooltip = NULL;
++    if (prop->priv->tooltip) {
++        g_object_unref (prop->priv->tooltip);
++        prop->priv->tooltip = NULL;
+     }
+ 
+-    if (prop->sub_props) {
+-        g_object_unref (prop->sub_props);
+-        prop->sub_props = NULL;
++    if (prop->priv->sub_props) {
++        g_object_unref (prop->priv->sub_props);
++        prop->priv->sub_props = NULL;
+     }
+ 
+     IBUS_OBJECT_CLASS (ibus_property_parent_class)->destroy ((IBusObject *)prop);
+@@ -99,15 +343,18 @@ ibus_property_serialize (IBusProperty    *prop,
+ 
+     g_return_val_if_fail (IBUS_IS_PROPERTY (prop), FALSE);
+ 
+-    g_variant_builder_add (builder, "s", prop->key);
+-    g_variant_builder_add (builder, "u", prop->type);
+-    g_variant_builder_add (builder, "v", ibus_serializable_serialize ((IBusSerializable *)prop->label));
+-    g_variant_builder_add (builder, "s", prop->icon);
+-    g_variant_builder_add (builder, "v", ibus_serializable_serialize ((IBusSerializable *)prop->tooltip));
+-    g_variant_builder_add (builder, "b", prop->sensitive);
+-    g_variant_builder_add (builder, "b", prop->visible);
+-    g_variant_builder_add (builder, "u", prop->state);
+-    g_variant_builder_add (builder, "v", ibus_serializable_serialize ((IBusSerializable *)prop->sub_props));
++    g_variant_builder_add (builder, "s", prop->priv->key);
++    g_variant_builder_add (builder, "u", prop->priv->type);
++    g_variant_builder_add (builder, "v",
++            ibus_serializable_serialize ((IBusSerializable *)prop->priv->label));
++    g_variant_builder_add (builder, "s", prop->priv->icon);
++    g_variant_builder_add (builder, "v",
++            ibus_serializable_serialize ((IBusSerializable *)prop->priv->tooltip));
++    g_variant_builder_add (builder, "b", prop->priv->sensitive);
++    g_variant_builder_add (builder, "b", prop->priv->visible);
++    g_variant_builder_add (builder, "u", prop->priv->state);
++    g_variant_builder_add (builder, "v",
++            ibus_serializable_serialize ((IBusSerializable *)prop->priv->sub_props));
+ 
+     return TRUE;
+ }
+@@ -121,28 +368,28 @@ ibus_property_deserialize (IBusProperty *prop,
+     retval = IBUS_SERIALIZABLE_CLASS (ibus_property_parent_class)->deserialize ((IBusSerializable *) prop, variant);
+     g_return_val_if_fail (retval, 0);
+ 
+-    g_variant_get_child (variant, retval++, "s", &prop->key);
+-    g_variant_get_child (variant, retval++, "u", &prop->type);
++    g_variant_get_child (variant, retval++, "s", &prop->priv->key);
++    g_variant_get_child (variant, retval++, "u", &prop->priv->type);
+ 
+     GVariant *subvar = g_variant_get_child_value (variant, retval++);
+-    prop->label = IBUS_TEXT (ibus_serializable_deserialize (subvar));
+-    g_object_ref_sink (prop->label);
++    prop->priv->label = IBUS_TEXT (ibus_serializable_deserialize (subvar));
++    g_object_ref_sink (prop->priv->label);
+     g_variant_unref (subvar);
+ 
+-    g_variant_get_child (variant, retval++, "s", &prop->icon);
++    g_variant_get_child (variant, retval++, "s", &prop->priv->icon);
+ 
+     subvar = g_variant_get_child_value (variant, retval++);
+-    prop->tooltip = IBUS_TEXT (ibus_serializable_deserialize (subvar));
+-    g_object_ref_sink (prop->tooltip);
++    prop->priv->tooltip = IBUS_TEXT (ibus_serializable_deserialize (subvar));
++    g_object_ref_sink (prop->priv->tooltip);
+     g_variant_unref (subvar);
+ 
+-    g_variant_get_child (variant, retval++, "b", &prop->sensitive);
+-    g_variant_get_child (variant, retval++, "b", &prop->visible);
+-    g_variant_get_child (variant, retval++, "u", &prop->state);
++    g_variant_get_child (variant, retval++, "b", &prop->priv->sensitive);
++    g_variant_get_child (variant, retval++, "b", &prop->priv->visible);
++    g_variant_get_child (variant, retval++, "u", &prop->priv->state);
+ 
+     subvar = g_variant_get_child_value (variant, retval++);
+-    prop->sub_props = IBUS_PROP_LIST (ibus_serializable_deserialize (subvar));
+-    g_object_ref_sink (prop->sub_props);
++    prop->priv->sub_props = IBUS_PROP_LIST (ibus_serializable_deserialize (subvar));
++    g_object_ref_sink (prop->priv->sub_props);
+     g_variant_unref (subvar);
+ 
+     return retval;
+@@ -160,25 +407,25 @@ ibus_property_copy (IBusProperty       *dest,
+     g_return_val_if_fail (IBUS_IS_PROPERTY (dest), FALSE);
+     g_return_val_if_fail (IBUS_IS_PROPERTY (src), FALSE);
+ 
+-    dest->key = g_strdup (src->key);
+-    dest->icon = g_strdup (src->icon);
+-    if (src->label) {
+-        dest->label = (IBusText *) ibus_serializable_copy ((IBusSerializable *) src->label);
++    dest->priv->key = g_strdup (src->priv->key);
++    dest->priv->icon = g_strdup (src->priv->icon);
++    if (src->priv->label) {
++        dest->priv->label = (IBusText *) ibus_serializable_copy ((IBusSerializable *) src->priv->label);
+     }
+     else
+-        dest->label = ibus_text_new_from_static_string ("");
+-    if (src->tooltip) {
+-        dest->tooltip = (IBusText *) ibus_serializable_copy ((IBusSerializable *) src->tooltip);
++        dest->priv->label = ibus_text_new_from_static_string ("");
++    if (src->priv->tooltip) {
++        dest->priv->tooltip = (IBusText *) ibus_serializable_copy ((IBusSerializable *) src->priv->tooltip);
+     }
+     else
+-        dest->tooltip = ibus_text_new_from_static_string ("");
++        dest->priv->tooltip = ibus_text_new_from_static_string ("");
+ 
+-    dest->sensitive = src->sensitive;
+-    dest->visible = src->visible;
+-    dest->type = src->type;
+-    dest->state = src->state;
++    dest->priv->sensitive = src->priv->sensitive;
++    dest->priv->visible = src->priv->visible;
++    dest->priv->type = src->priv->type;
++    dest->priv->state = src->priv->state;
+ 
+-    dest->sub_props = (IBusPropList *) ibus_serializable_copy ((IBusSerializable *) src->sub_props);
++    dest->priv->sub_props = (IBusPropList *) ibus_serializable_copy ((IBusSerializable *) src->priv->sub_props);
+ 
+     return TRUE;
+ }
+@@ -192,7 +439,7 @@ ibus_property_new (const gchar   *key,
+                    gboolean       sensitive,
+                    gboolean       visible,
+                    IBusPropState  state,
+-                   IBusPropList  *prop_list)
++                   IBusPropList  *props)
+ {
+     g_return_val_if_fail (key != NULL, NULL);
+     g_return_val_if_fail (type >= PROP_TYPE_NORMAL &&
+@@ -201,19 +448,17 @@ ibus_property_new (const gchar   *key,
+ 
+     IBusProperty *prop;
+ 
+-    prop = (IBusProperty *)g_object_new (IBUS_TYPE_PROPERTY, NULL);
+-
+-    prop->key = g_strdup (key);
+-    prop->type = type;
+-
+-    ibus_property_set_label (prop, label);
+-    ibus_property_set_icon (prop, icon);
+-    ibus_property_set_tooltip (prop, tooltip);
+-    ibus_property_set_sensitive (prop, sensitive);
+-    ibus_property_set_visible (prop, visible);
+-    ibus_property_set_state (prop, state);
+-    ibus_property_set_sub_props (prop, prop_list);
+-
++    prop = (IBusProperty *)g_object_new (IBUS_TYPE_PROPERTY,
++                                         "key", key,
++                                         "prop-type", type,
++                                         "label", label,
++                                         "icon", icon,
++                                         "tooltip", tooltip,
++                                         "sensitive", sensitive,
++                                         "visible", visible,
++                                         "state", state,
++                                         "sub-props", props,
++                                         NULL);
+     return prop;
+ }
+ 
+@@ -221,24 +466,25 @@ ibus_property_new (const gchar   *key,
+ return_type                                                             \
+ ibus_property_get_ ## field (IBusProperty *prop)                        \
+ {                                                                       \
+-    return prop->field;                                                 \
++    return prop->priv->field;                                           \
+ }
+ 
+ IBUS_PROPERTY_GET_FIELD (key, const gchar *)
+ IBUS_PROPERTY_GET_FIELD (icon, const gchar *)
+-IBUS_PROPERTY_GET_FIELD (label, const IBusText *)
+-IBUS_PROPERTY_GET_FIELD (tooltip, const IBusText *)
++IBUS_PROPERTY_GET_FIELD (label, IBusText *)
++IBUS_PROPERTY_GET_FIELD (tooltip, IBusText *)
+ IBUS_PROPERTY_GET_FIELD (sensitive, gboolean)
+ IBUS_PROPERTY_GET_FIELD (visible, gboolean)
+ IBUS_PROPERTY_GET_FIELD (state, IBusPropState)
+-IBUS_PROPERTY_GET_FIELD (sub_props, const IBusPropList *)
++IBUS_PROPERTY_GET_FIELD (sub_props, IBusPropList *)
+ #undef IBUS_PROPERTY_GET_FIELD
+ 
+ /* ibus_property_get_type() exists */
+ IBusPropType
+ ibus_property_get_prop_type (IBusProperty *prop)
+ {
+-    return prop->type;
++    g_assert (IBUS_IS_PROPERTY (prop));
++    return prop->priv->type;
+ }
+ 
+ void
+@@ -248,15 +494,15 @@ ibus_property_set_label (IBusProperty *prop,
+     g_assert (IBUS_IS_PROPERTY (prop));
+     g_return_if_fail (label == NULL || IBUS_IS_TEXT (label));
+ 
+-    if (prop->label) {
+-        g_object_unref (prop->label);
++    if (prop->priv->label) {
++        g_object_unref (prop->priv->label);
+     }
+ 
+     if (label == NULL) {
+-        prop->label = ibus_text_new_from_static_string ("");
++        prop->priv->label = ibus_text_new_from_static_string ("");
+     }
+     else {
+-        prop->label = g_object_ref_sink (label);
++        prop->priv->label = g_object_ref_sink (label);
+     }
+ }
+ 
+@@ -266,8 +512,8 @@ ibus_property_set_icon (IBusProperty *prop,
+ {
+     g_assert (IBUS_IS_PROPERTY (prop));
+ 
+-    g_free (prop->icon);
+-    prop->icon = g_strdup (icon != NULL ? icon : "");
++    g_free (prop->priv->icon);
++    prop->priv->icon = g_strdup (icon != NULL ? icon : "");
+ }
+ 
+ void
+@@ -277,17 +523,19 @@ ibus_property_set_tooltip (IBusProperty *prop,
+     g_assert (IBUS_IS_PROPERTY (prop));
+     g_assert (tooltip == NULL || IBUS_IS_TEXT (tooltip));
+ 
+-    if (prop->tooltip) {
+-        g_object_unref (prop->tooltip);
++    IBusPropertyPrivate *priv = prop->priv;
++
++    if (priv->tooltip) {
++        g_object_unref (priv->tooltip);
+     }
+ 
+     if (tooltip == NULL) {
+-        prop->tooltip = ibus_text_new_from_static_string ("");
+-        g_object_ref_sink (prop->tooltip);
++        priv->tooltip = ibus_text_new_from_static_string ("");
++        g_object_ref_sink (priv->tooltip);
+     }
+     else {
+-        prop->tooltip = tooltip;
+-        g_object_ref_sink (prop->tooltip);
++        priv->tooltip = tooltip;
++        g_object_ref_sink (priv->tooltip);
+     }
+ }
+ 
+@@ -296,7 +544,7 @@ ibus_property_set_sensitive (IBusProperty *prop,
+                              gboolean      sensitive)
+ {
+     g_assert (IBUS_IS_PROPERTY (prop));
+-    prop->sensitive = sensitive;
++    prop->priv->sensitive = sensitive;
+ }
+ 
+ void
+@@ -304,7 +552,7 @@ ibus_property_set_visible (IBusProperty *prop,
+                            gboolean      visible)
+ {
+     g_assert (IBUS_IS_PROPERTY (prop));
+-    prop->visible = visible;
++    prop->priv->visible = visible;
+ }
+ 
+ void
+@@ -316,7 +564,7 @@ ibus_property_set_state (IBusProperty  *prop,
+               state == PROP_STATE_CHECKED ||
+               state == PROP_STATE_INCONSISTENT);
+ 
+-    prop->state = state;
++    prop->priv->state = state;
+ }
+ 
+ void
+@@ -326,17 +574,19 @@ ibus_property_set_sub_props (IBusProperty *prop,
+     g_assert (IBUS_IS_PROPERTY (prop));
+     g_assert (IBUS_IS_PROP_LIST (prop_list) || prop_list == NULL);
+ 
+-    if (prop->sub_props) {
+-        g_object_unref (prop->sub_props);
++    IBusPropertyPrivate *priv = prop->priv;
++
++    if (priv->sub_props) {
++        g_object_unref (priv->sub_props);
+     }
+ 
+     if (prop_list) {
+-        prop->sub_props = prop_list;
++        priv->sub_props = prop_list;
+         g_object_ref_sink (prop_list);
+     }
+     else {
+-        prop->sub_props = ibus_prop_list_new ();
+-        g_object_ref_sink (prop->sub_props);
++        priv->sub_props = ibus_prop_list_new ();
++        g_object_ref_sink (priv->sub_props);
+     }
+ }
+ 
+@@ -347,25 +597,24 @@ ibus_property_update (IBusProperty *prop,
+     g_assert (IBUS_IS_PROPERTY (prop));
+     g_assert (IBUS_IS_PROPERTY (prop_update));
+ 
+-    if (g_strcmp0 (prop->key, prop_update->key) != 0) {
+-        return ibus_prop_list_update_property (prop->sub_props, prop_update);
++    IBusPropertyPrivate *priv = prop->priv;
++    IBusPropertyPrivate *priv_update = prop_update->priv;
++
++    if (g_strcmp0 (priv->key, priv_update->key) != 0) {
++        return ibus_prop_list_update_property (priv->sub_props, prop_update);
+     }
+ 
+-    g_free (prop->icon);
+-    prop->icon = g_strdup (prop_update->icon);
++    /* Do not support update prop type */
++    g_assert (priv->type == priv_update->type);
+ 
+-    if (prop->label) {
+-        g_object_unref (prop->label);
+-    }
+-    prop->label = (IBusText *) g_object_ref_sink (prop_update->label);
++    ibus_property_set_icon (prop, ibus_property_get_icon (prop_update));
++    ibus_property_set_label (prop, ibus_property_get_label (prop_update));
++    ibus_property_set_tooltip (prop, ibus_property_get_tooltip (prop_update));
++    ibus_property_set_visible (prop, ibus_property_get_visible (prop_update));
++    ibus_property_set_state (prop, ibus_property_get_state (prop_update));
++    ibus_property_set_sensitive (prop, ibus_property_get_sensitive (prop_update));
+ 
+-    if (prop->tooltip) {
+-        g_object_unref (prop->tooltip);
+-    }
+-    prop->tooltip = (IBusText *) g_object_ref_sink (prop_update->tooltip);
+-    prop->visible = prop_update->visible;
+-    prop->state = prop_update->state;
+-    prop->sensitive = prop_update->sensitive;
++    /* Do not support update sub props */
+ 
+     return TRUE;
+ }
+diff --git a/src/ibusproperty.h b/src/ibusproperty.h
+index 5e76c8f..ddbadc8 100644
+--- a/src/ibusproperty.h
++++ b/src/ibusproperty.h
+@@ -114,6 +114,7 @@ typedef enum {
+ 
+ typedef struct _IBusProperty IBusProperty;
+ typedef struct _IBusPropertyClass IBusPropertyClass;
++typedef struct _IBusPropertyPrivate IBusPropertyPrivate;
+ 
+ #ifndef __PROPLIST_DEFINED
+ #define __PROPLIST_DEFINED
+@@ -137,20 +138,11 @@ typedef struct _IBusPropListClass IBusPropListClass;
+  * UI component for input method engine property.
+  */
+ struct _IBusProperty {
++    /*< private >*/
+     IBusSerializable parent;
++    IBusPropertyPrivate *priv;
+ 
+-    /*< public >*/
+-    gchar    *key;
+-    gchar    *icon;
+-    IBusText *label;
+-    IBusText *tooltip;
+-
+-    gboolean sensitive;
+-    gboolean visible;
+-    guint type;
+-    guint state;
+-
+-    IBusPropList *sub_props;
++    gpointer pdummy[7];
+ };
+ 
+ struct _IBusPropertyClass {
+@@ -194,22 +186,13 @@ IBusProperty    *ibus_property_new          (const gchar    *key,
+ const gchar *    ibus_property_get_key      (IBusProperty   *prop);
+ 
+ /**
+- * ibus_property_get_prop_type:
+- * @prop: An IBusProperty.
+- * @returns: the type of IBusProperty.
+- *
+- * Get the type of IBusProperty.
+- */
+-IBusPropType     ibus_property_get_prop_type(IBusProperty   *prop);
+-
+-/**
+  * ibus_property_get_label:
+  * @prop: An IBusProperty.
+  * @returns: the label of IBusProperty. Should not be freed.
+  *
+  * Get the label of IBusProperty.
+  */
+-const IBusText * ibus_property_get_label    (IBusProperty   *prop);
++IBusText *      ibus_property_get_label    (IBusProperty   *prop);
+ 
+ /**
+  * ibus_property_set_label:
+@@ -247,7 +230,7 @@ void             ibus_property_set_icon     (IBusProperty   *prop,
+  *
+  * Get the tooltip of IBusProperty.
+  */
+-const IBusText * ibus_property_get_tooltip  (IBusProperty   *prop);
++IBusText *      ibus_property_get_tooltip  (IBusProperty   *prop);
+ 
+ /**
+  * ibus_property_set_tooltip:
+@@ -298,6 +281,15 @@ void             ibus_property_set_visible  (IBusProperty   *prop,
+                                              gboolean        visible);
+ 
+ /**
++ * ibus_property_get_property_type:
++ * @prop: An IBusProperty.
++ * @returns: the type of IBusProperty.
++ *
++ * Get the type of IBusProperty.
++ */
++IBusPropType     ibus_property_get_prop_type(IBusProperty   *prop);
++
++/**
+  * ibus_property_get_state:
+  * @prop: An IBusProperty.
+  * @returns: the state of IBusProperty.
+@@ -323,8 +315,7 @@ void             ibus_property_set_state    (IBusProperty   *prop,
+  *
+  * Get the IBusPropList of IBusProperty.
+  */
+-const IBusPropList *
+-                 ibus_property_get_sub_props(IBusProperty   *prop);
++IBusPropList *   ibus_property_get_sub_props(IBusProperty   *prop);
+ 
+ /**
+  * ibus_property_set_sub_props:
+-- 
+1.7.7.4
+
+From df10a24f905c8eea420a5fd33eff78417312410c Mon Sep 17 00:00:00 2001
+From: Peng Huang <shawn.p.huang@gmail.com>
+Date: Thu, 22 Dec 2011 09:57:23 -0500
+Subject: [PATCH] Add ibus_text_set_attributes for scipt language
+ bindings.
+
+BUG=None
+TEST=Linux desktop
+
+Review URL: http://codereview.appspot.com/5500067
+---
+ src/ibustext.c |   12 +++++++++++-
+ src/ibustext.h |   13 +++++++++++--
+ 2 files changed, 22 insertions(+), 3 deletions(-)
+
+diff --git a/src/ibustext.c b/src/ibustext.c
+index f4085e9..e5218d0 100644
+--- a/src/ibustext.c
++++ b/src/ibustext.c
+@@ -272,8 +272,18 @@ ibus_text_get_text (IBusText *text)
+     return text->text;
+ }
+ 
+-const IBusAttrList *
++IBusAttrList *
+ ibus_text_get_attributes (IBusText *text)
+ {
+     return text->attrs;
+ }
++
++void
++ibus_text_set_attributes (IBusText     *text,
++                          IBusAttrList *attrs)
++{
++    if (text->attrs)
++        g_object_unref (text->attrs);
++    text->attrs = attrs;
++    g_object_ref_sink (text->attrs);
++}
+diff --git a/src/ibustext.h b/src/ibustext.h
+index 1dca466..f6e25a7 100644
+--- a/src/ibustext.h
++++ b/src/ibustext.h
+@@ -194,8 +194,17 @@ const gchar *    ibus_text_get_text                 (IBusText       *text);
+  *
+  * Return the attributes in an IBusText. Should not be freed.
+  */
+-const IBusAttrList *
+-                 ibus_text_get_attributes           (IBusText       *text);
++IBusAttrList *   ibus_text_get_attributes           (IBusText       *text);
++
++/**
++ * ibus_text_set_attributes:
++ * @text: An IBusText.
++ * @attrs: An IBusAttrList
++ */
++void             ibus_text_set_attributes           (IBusText       *text,
++                                                     IBusAttrList   *attrs);
++
++
+ G_END_DECLS
+ #endif
+ 
+-- 
+1.7.7.4
+
+From 4d1f38314b3a9c3dc1683053cda10cfa36fd9019 Mon Sep 17 00:00:00 2001
+From: Peng Huang <shawn.p.huang@gmail.com>
+Date: Thu, 22 Dec 2011 09:59:05 -0500
+Subject: [PATCH] Fix a typo in docs/references/ibus/Makefile
+
+BUG=None
+TEST=make
+
+Review URL: http://codereview.appspot.com/5496079
+---
+ docs/reference/ibus/Makefile.am |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/docs/reference/ibus/Makefile.am b/docs/reference/ibus/Makefile.am
+index 4fa77a1..75e3815 100644
+--- a/docs/reference/ibus/Makefile.am
++++ b/docs/reference/ibus/Makefile.am
+@@ -117,7 +117,7 @@ trim-build.stamp: scan-build.stamp
+ 	$(AM_V_GEN) \
+ 	    $(SED) -f $(srcdir)/trim.sed -i.bak \
+ 			$(builddir)/$(DOC_MODULE)-sections.txt && \
+-	    $(RM) $(buildir)/$(DOC_MODULE)-sections.txt.bak && \
++	    $(RM) $(builddir)/$(DOC_MODULE)-sections.txt.bak && \
+ 	    touch trim-build.stamp
+ 
+ tmpl-build.stamp: trim-build.stamp  $(DOC_MODULE)-decl.txt $(SCANOBJ_FILES) $(DOC_MODULE)-overrides.txt
+-- 
+1.7.7.4
+
+From 377cf484ea64fc2f30706d298cf1f33debdd9c30 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Fri, 30 Dec 2011 13:53:50 +0900
+Subject: [PATCH] Fix ibus-x11 SEGV in _process_key_event_done.
+
+IMForwardEvent() calls _Xi18nFindClient() and it could return NULL.
+Maybe the connect_id would be disconnected during the async
+process_key_event.
+This fix checks XIM_DISCONNECT in ims_protocol_handler() to cancel
+IMForwardEvent() in _process_key_event_done().
+---
+ client/x11/main.c |   17 +++++++++++++++++
+ 1 files changed, 17 insertions(+), 0 deletions(-)
+
+diff --git a/client/x11/main.c b/client/x11/main.c
+index 58069fc..3cb03f0 100644
+--- a/client/x11/main.c
++++ b/client/x11/main.c
+@@ -77,6 +77,8 @@ struct _X11IC {
+     gint             onspot_preedit_length;
+ };
+ 
++static gint disconnected_id = 0;
++
+ static void     _xim_set_cursor_location    (X11IC              *x11ic);
+ static void     _context_commit_text_cb     (IBusInputContext   *context,
+                                              IBusText           *text,
+@@ -464,6 +466,12 @@ _process_key_event_done (GObject      *object,
+         g_error_free (error);
+     }
+ 
++    if (pfe->connect_id == disconnected_id) {
++        g_slice_free (IMForwardEventStruct, pfe);
++        disconnected_id = 0;
++        return;
++    }
++
+     if (retval == FALSE) {
+         IMForwardEvent (_xims, (XPointer) pfe);
+     }
+@@ -734,6 +742,13 @@ xim_reset_ic (XIMS xims, IMResetICStruct *call_data)
+     return 1;
+ }
+ 
++static int
++xim_disconnect_ic (XIMS xims, IMDisConnectStruct *call_data)
++{
++    disconnected_id = call_data->connect_id;
++    return 0;
++}
++
+ int
+ ims_protocol_handler (XIMS xims, IMProtocol *call_data)
+ {
+@@ -773,6 +788,8 @@ ims_protocol_handler (XIMS xims, IMProtocol *call_data)
+     case XIM_SYNC_REPLY:
+         LOG (1, "XIM_SYNC_REPLY");
+         return 0;
++    case XIM_DISCONNECT:
++        return xim_disconnect_ic (xims, (IMDisConnectStruct *)call_data);
+     default:
+         LOG (1, "Unkown (%d)", call_data->major_code);
+         return 0;
+-- 
+1.7.7.4
 

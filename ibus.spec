@@ -7,13 +7,13 @@
 
 %if 0%{?fedora} > 16
 %define have_bridge_hotkey 1
-%define ibus_gjs_version 3.2.1.20111128
+%define ibus_gjs_version 3.2.1.20111230
 %define ibus_gjs_build_failure 1
 %define have_dconf 1
 %else
 %if 0%{?fedora} > 15
 %define have_bridge_hotkey 1
-%define ibus_gjs_version 3.2.1.20111128
+%define ibus_gjs_version 3.2.1.20111230
 %define ibus_gjs_build_failure 0
 %define have_dconf 1
 %else
@@ -33,7 +33,7 @@
 
 Name:       ibus
 Version:    1.4.0
-Release:    14%{?dist}
+Release:    15%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -435,6 +435,16 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Dec 30 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-15
+- Enhanced ibus-gnome3 shell lookup window.
+- Updated ibus-HEAD.patch from upstream
+  Fixed Bug 769135 - ibus-x11 SEGV in _process_key_event_done.
+- Updated ibus-541492-xkb.patch
+  Fixed Bug 757889 - ibus-setup SEGV without active engine.
+  Fixed Bug 760213 - ibus-setup saves XKB variants correctly.
+  Fixed Bug 769133 - ibus-engine-xkb returns FALSE for ASCII typings.
+- Updated ibus-xx-bridge-hotkey.patch for an enhancement.
+
 * Wed Nov 30 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-14
 - Enabled dconf.
 - Updated ibus-HEAD.patch

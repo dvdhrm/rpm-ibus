@@ -1,6 +1,6 @@
-From a8f02d4be33f87cf97039736407cd13e795b992b Mon Sep 17 00:00:00 2001
+From 5b4c1700b4798f20b61dec5193b3f08d1e60742d Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Fri, 18 Nov 2011 18:05:42 +0900
+Date: Fri, 30 Dec 2011 15:46:13 +0900
 Subject: [PATCH] Add XKB layouts
 
 ---
@@ -18,7 +18,7 @@ Subject: [PATCH] Add XKB layouts
  setup/enginecombobox.py      |    7 +-
  setup/main.py                |    3 +
  setup/setup.ui               |  609 ++++++-
- setup/xkbsetup.py            |  457 +++++
+ setup/xkbsetup.py            |  490 +++++
  src/Makefile.am              |    5 +
  src/ibus.h                   |    1 +
  src/ibusxkbxml.c             |  441 +++++
@@ -29,7 +29,7 @@ Subject: [PATCH] Add XKB layouts
  xkb/gtkimcontextsimpleseqs.h | 4484 ++++++++++++++++++++++++++++++++++++++++++
  xkb/ibus-engine-xkb-main.c   |  303 +++
  xkb/ibus-engine-xkb-main.h   |   32 +
- xkb/ibus-simple-engine.c     | 1003 ++++++++++
+ xkb/ibus-simple-engine.c     | 1007 ++++++++++
  xkb/ibus-simple-engine.h     |   13 +
  xkb/ibus-xkb-main.c          |  112 ++
  xkb/xkblayout.xml.in         |   16 +
@@ -38,7 +38,7 @@ Subject: [PATCH] Add XKB layouts
  xkb/xkblib.h                 |   41 +
  xkb/xkbxml.c                 |  345 ++++
  xkb/xkbxml.h                 |  113 ++
- 34 files changed, 9664 insertions(+), 4 deletions(-)
+ 34 files changed, 9701 insertions(+), 4 deletions(-)
  create mode 100644 ibus/xkblayout.py.in
  create mode 100644 ibus/xkbxml.py.in
  create mode 100644 setup/xkbsetup.py
@@ -1153,7 +1153,7 @@ index 2fd8876..7383177 100644
 +        self.__title = title
  
 diff --git a/setup/main.py b/setup/main.py
-index a22bb0c..7f4a040 100644
+index 6c0fb0e..97e05a4 100644
 --- a/setup/main.py
 +++ b/setup/main.py
 @@ -37,6 +37,7 @@ from gtk import gdk
@@ -1164,7 +1164,7 @@ index a22bb0c..7f4a040 100644
  from i18n import DOMAINNAME, _, N_, init as i18n_init
  
  (
-@@ -241,6 +242,8 @@ class Setup(object):
+@@ -245,6 +246,8 @@ class Setup(object):
          self.__combobox.connect("notify::active-engine", self.__combobox_notify_active_engine_cb)
          self.__treeview.connect("notify", self.__treeview_notify_cb)
  
@@ -1174,7 +1174,7 @@ index a22bb0c..7f4a040 100644
          engine = self.__combobox.get_active_engine()
          button = self.__builder.get_object("button_engine_add")
 diff --git a/setup/setup.ui b/setup/setup.ui
-index 0a69df8..f1e6d0b 100644
+index c7ff564..57cb597 100644
 --- a/setup/setup.ui
 +++ b/setup/setup.ui
 @@ -117,7 +117,6 @@
@@ -1201,7 +1201,7 @@ index 0a69df8..f1e6d0b 100644
                                          <property name="can_focus">True</property>
                                          <property name="receives_default">False</property>
                                          <property name="use_underline">True</property>
-@@ -825,6 +822,7 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
+@@ -841,6 +838,7 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
                                      <property name="visible">True</property>
                                      <property name="orientation">vertical</property>
                                      <property name="spacing">6</property>
@@ -1209,7 +1209,7 @@ index 0a69df8..f1e6d0b 100644
                                      <child>
                                        <object class="GtkCheckButton" id="checkbutton_use_sys_layout">
                                          <property name="label" translatable="yes">Use system keyboard layout</property>
-@@ -840,6 +838,57 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
+@@ -856,6 +854,57 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
                                          <property name="position">0</property>
                                        </packing>
                                      </child>
@@ -1267,7 +1267,7 @@ index 0a69df8..f1e6d0b 100644
                                    </object>
                                  </child>
                                </object>
-@@ -1038,4 +1087,558 @@ Homepage: http://code.google.com/p/ibus
+@@ -1054,4 +1103,558 @@ Homepage: http://code.google.com/p/ibus
        </object>
      </child>
    </object>
@@ -1828,10 +1828,10 @@ index 0a69df8..f1e6d0b 100644
  </interface>
 diff --git a/setup/xkbsetup.py b/setup/xkbsetup.py
 new file mode 100644
-index 0000000..af9ec53
+index 0000000..e777cea
 --- /dev/null
 +++ b/setup/xkbsetup.py
-@@ -0,0 +1,457 @@
+@@ -0,0 +1,490 @@
 +# vim:set et sts=4 sw=4:
 +#
 +# ibus - The Input Bus
@@ -2061,7 +2061,15 @@ index 0000000..af9ec53
 +            self.__treeview_system_keyboard_layout.set_engines([engine])
 +            button_reset.set_sensitive(False)
 +        else:
-+            for layout in text.split(','):
++            # The saved string 'cz,us(qwerty,)' needs to be rearranged to
++            # ['cz(qwerty)', 'us'] for each engine.
++            [l, v] = self.__get_model_from_layout(text)
++            variants = []
++            if v != 'default' and v != None:
++                variants = v.split(',')
++            for i, layout in enumerate(l.split(',')):
++                if i < len(variants) and len(variants[i]) > 0:
++                    layout = '%s(%s)' % (layout, variants[i])
 +                layout_engine = None
 +                for engine in xkb_engines:
 +                    if layout == engine.layout:
@@ -2143,6 +2151,14 @@ index 0000000..af9ec53
 +        self.__init_system_keyboard_layout()
 +        self.__init_system_keyboard_option()
 +
++    def __get_model_from_layout(self, layout):
++        left_bracket = layout.find('(')
++        right_bracket = layout.find(')')
++        if left_bracket >= 0 and right_bracket > left_bracket:
++            return (layout[:left_bracket] + layout[right_bracket + 1:], \
++                    layout[left_bracket + 1:right_bracket])
++        return (layout, 'default')
++
 +    def __combobox_notify_active_system_keyboard_layout_cb(self, combobox, property):
 +        engine = self.__combobox_system_keyboard_layout.get_active_engine()
 +        button = self.__builder.get_object("button_system_keyboard_layout_engine_add")
@@ -2168,6 +2184,9 @@ index 0000000..af9ec53
 +    def __button_system_keyboard_layout_add_cb(self, button):
 +        engines = self.__treeview_system_keyboard_layout.get_engines()
 +        engine = self.__combobox_system_keyboard_layout.get_active_engine()
++        if engine == None:
++            return
++        # If engines[0] is the default dummy engine:
 +        if len(engines) > 0 and engines[0].layout == "default":
 +            self.__treeview_system_keyboard_layout.set_engines([engine])
 +        else:
@@ -2226,12 +2245,26 @@ index 0000000..af9ec53
 +
 +    def __button_system_keyboard_layout_ok_cb(self, button):
 +        self.__dialog_system_keyboard_layout.hide()
-+        layout = "default"
++        layout = 'default'
++        variant = ''
++        has_variant = False
++        # if the string is 'cz(qwerty),us[options,...]', it would difficult
++        # to separate layouts by comma. So we rearrange this likes
++        # 'cz,us(qwerty,)[options,...]' here.
 +        for engine in self.__treeview_system_keyboard_layout.get_engines():
++            [l, v] = self.__get_model_from_layout(engine.layout)
++            if v == 'default' or v == None:
++                v = ''
++            if len(v) > 0:
++                has_variant = True
 +            if layout == "default":
-+                layout = engine.layout
++                layout = l
++                variant = v
 +            else:
-+                layout = "%s,%s" % (layout, engine.layout)
++                layout = '%s,%s' % (layout, l)
++                variant = '%s,%s' % (variant, v)
++        if has_variant:
++            layout = '%s(%s)' % (layout, variant)
 +        if layout == None or layout == "":
 +            layout = "default"
 +        org_layout = str(self.__config.get_value("general", "system_keyboard_layout", None))
@@ -8097,10 +8130,10 @@ index 0000000..255e952
 +#endif
 diff --git a/xkb/ibus-simple-engine.c b/xkb/ibus-simple-engine.c
 new file mode 100644
-index 0000000..815311b
+index 0000000..4b5bd83
 --- /dev/null
 +++ b/xkb/ibus-simple-engine.c
-@@ -0,0 +1,1003 @@
+@@ -0,0 +1,1007 @@
 +/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
 +/* vim:set et sts=4: */
 +#ifdef HAVE_CONFIG_H
@@ -8891,7 +8924,11 @@ index 0000000..815311b
 +        }
 +
 +        ch = ibus_keyval_to_unicode (keyval);
-+        if (ch != 0 && !g_unichar_iscntrl (ch)) {
++        /* IBUS_CHANGE: RH#769133
++         * Since we use ibus xkb engines as the disable state,
++         * do not commit the characters locally without in_hex_sequence. */
++        if (ch != 0 && !g_unichar_iscntrl (ch) &&
++            simple->in_hex_sequence) {
 +            ibus_simple_engine_commit_char (simple, ch);
 +            return TRUE;
 +        }
@@ -10126,5 +10163,5 @@ index 0000000..6c00f1d
 +G_END_DECLS
 +#endif
 -- 
-1.7.6.4
+1.7.7.4
 
