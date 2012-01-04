@@ -33,7 +33,7 @@
 
 Name:       ibus
 Version:    1.4.0
-Release:    16%{?dist}
+Release:    17%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -55,6 +55,7 @@ Patch91:    ibus-gjs-xx-gnome-shell-3.1.4-build-failure.patch
 # Workaround to disable preedit on gnome-shell until bug 658420 is fixed.
 # https://bugzilla.gnome.org/show_bug.cgi?id=658420
 Patch92:    ibus-xx-g-s-disable-preedit.patch
+Patch93:    ibus-771115-property-compatible.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -213,6 +214,10 @@ cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
 mv data/ibus.schemas.in data/ibus.schemas.in.in
 %patch3 -p1 -b .bridge-key
 %patch4 -p1 -b .setup-frequent-lang
+
+%if 0%{?fedora} <= 16
+%patch93 -p1 -b .compat
+%endif
 
 %build
 %if %have_libxkbfile
@@ -435,6 +440,10 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Jan 04 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-17
+- Added ibus-771115-property-compatible.patch for f16
+  Fixed Bug 771115 - IBusProperty back compatibility.
+
 * Fri Dec 30 2011 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-16
 - Enhanced ibus-gnome3 shell lookup window.
 - Updated ibus-HEAD.patch from upstream
