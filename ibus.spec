@@ -4,24 +4,14 @@
 
 %define have_libxkbfile 1
 %define have_gjsfile 1
+%define have_dconf 1
 
 %if 0%{?fedora} > 16
-%define have_bridge_hotkey 1
-%define ibus_gjs_version 3.2.1.20111230
+%define ibus_gjs_version 3.3.3.20120203
 %define ibus_gjs_build_failure 1
-%define have_dconf 1
 %else
-%if 0%{?fedora} > 15
-%define have_bridge_hotkey 1
 %define ibus_gjs_version 3.2.1.20111230
 %define ibus_gjs_build_failure 0
-%define have_dconf 1
-%else
-%define have_bridge_hotkey 0
-%define ibus_gjs_version 3.0.2.20111118
-%define ibus_gjs_build_failure 0
-%define have_dconf 0
-%endif
 %endif
 
 %define ibus_api_version 1.0
@@ -32,22 +22,25 @@
 %define gnome_icon_theme_legacy_version 2.91.6
 
 Name:       ibus
-Version:    1.4.0
-Release:    17%{?dist}
+Version:    1.4.99.20120203
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
 URL:        http://code.google.com/p/ibus/
-Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
+# Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
+Source0:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
 %if %have_gjsfile
 Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/ibus-gjs-%{ibus_gjs_version}.tar.gz
+# Workaround for glib2 bug:
+# https://bugzilla.gnome.org/show_bug.cgi?id=669253
+Source3:    ibus-gsettings-db
 %endif
 Patch0:     ibus-HEAD.patch
-Patch1:     ibus-530711-preload-sys.patch
-Patch2:     ibus-541492-xkb.patch
-Patch3:     ibus-xx-bridge-hotkey.patch
-Patch4:     ibus-xx-setup-frequent-lang.patch
+Patch1:     ibus-541492-xkb.patch
+Patch2:     ibus-xx-setup-frequent-lang.patch
+# Patch3:     ibus-530711-preload-sys.patch
 
 # Workaround gnome-shell build failure
 # http://koji.fedoraproject.org/koji/getfile?taskID=3317917&name=root.log
@@ -74,6 +67,8 @@ BuildRequires:  gtk-doc
 %if %have_dconf
 BuildRequires:  dconf-devel
 BuildRequires:  dbus-x11
+BuildRequires:  vala
+BuildRequires:  vala-tools
 %endif
 # for AM_GCONF_SOURCE_2 in configure.ac
 BuildRequires:  GConf2-devel
@@ -82,6 +77,7 @@ BuildRequires:  intltool
 BuildRequires:  iso-codes-devel
 %if %have_libxkbfile
 BuildRequires:  libxkbfile-devel
+BuildRequires:  libgnomekbd-devel
 %endif
 # for ibus-gjs-xx.tar.gz
 BuildRequires:  gjs
@@ -107,6 +103,7 @@ Requires:   dconf
 Requires:   GConf2
 %endif
 Requires:   notify-python
+Requires:   libgnomekbd
 Requires:   librsvg2
 Requires:   gnome-icon-theme-legacy >= %{gnome_icon_theme_legacy_version}
 Requires:   gnome-icon-theme-symbolic
@@ -206,14 +203,12 @@ cd ..
 %endif
 %patch0 -p1
 %patch92 -p1 -b .g-s-preedit
-cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
-%patch1 -p1 -b .preload-sys
+cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 %if %have_libxkbfile
-%patch2 -p1 -b .xkb
+%patch1 -p1 -b .xkb
 %endif
-mv data/ibus.schemas.in data/ibus.schemas.in.in
-%patch3 -p1 -b .bridge-key
-%patch4 -p1 -b .setup-frequent-lang
+%patch2 -p1 -b .setup-frequent-lang
+# %patch3 -p1 -b .preload-sys
 
 %if 0%{?fedora} <= 16
 %patch93 -p1 -b .compat
@@ -227,7 +222,7 @@ XKB_PRELOAD_LAYOUTS=\
 "gb,ge,ge(dsb),ge(ru),ge(os),gh,gh(akan),gh(ewe),gh(fula),gh(ga),gh(hausa),"\
 "gn,gr,hu,hr,ie,ie(CloGaelach),il,"\
 "in,"\
-"in(tel),in(bolnagri),iq,iq(ku),ir,ir(ku),is,it,"\
+"in(tel),in(bolnagri),iq,iq(ku),ir,ir(ku),is,it,jp,"\
 "kg,kh,kz,la,latam,lk,lk(tam_unicode),lt,lv,ma,ma(tifinagh),mal,mao,"\
 "me,mk,mm,mt,mv,ng,ng(hausa),ng,ng(igbo),ng(yoruba),nl,no,no(smi),np,"\
 "pk,pl,pl(csb),pt,ro,rs,ru,ru(cv),ru(kom),ru(sah),ru(tt),ru(xal),"\
@@ -242,24 +237,32 @@ automake -a -c -f
     --enable-gtk2 \
     --enable-gtk3 \
     --enable-xim \
-    --disable-gtk-doc \
+    --enable-gtk-doc \
     --with-no-snooper-apps='gnome-do,Do.*,firefox.*,.*chrome.*,.*chromium.*' \
     --enable-surrounding-text \
 %if %have_libxkbfile
     --with-xkb-preload-layouts=$XKB_PRELOAD_LAYOUTS \
-%endif
-%if %have_bridge_hotkey
-    --enable-bridge-hotkey \
+    --enable-xkb \
+    --enable-libgnomekbd \
 %endif
 %if %have_dconf
     --enable-dconf \
     --disable-gconf \
 %endif
+    --enable-python-library \
     --enable-introspection
 
-# make -C po update-gmo
-make %{?_smp_mflags}
+# Workaround for glib2 bug:
+# https://bugzilla.gnome.org/show_bug.cgi?id=669253
+cd data/dconf
+make org.freedesktop.ibus.gschema.valid
+mkdir db
+cp %SOURCE3 db/ibus
+cd ../..
 
+# make -C po update-gmo
+make %{?_smp_mflags} \
+  PKG_CONFIG_PATH=..:/usr/lib64/pkgconfig:/usr/lib/pkgconfig
 
 %if %have_gjsfile
 d=`basename %SOURCE2 .tar.gz`
@@ -357,6 +360,18 @@ if [ "$1" = "0" ]; then
   # if alternative was set to manual, reset to auto
   [ -L %{_sysconfdir}/alternatives/xinputrc -a "`readlink %{_sysconfdir}/alternatives/xinputrc`" = "%{_xinputconf}" ] && %{_sbindir}/alternatives --auto xinputrc || :
 fi
+%if %have_dconf
+if [ $1 -eq 0 ]; then
+  glib-compile-schemas %{_datadir}/glib-2.0/schemas
+fi
+%endif
+
+%posttrans
+%if %have_dconf
+if [ $1 -eq 0 ]; then
+  glib-compile-schemas %{_datadir}/glib-2.0/schemas
+fi
+%endif
 
 %post libs -p /sbin/ldconfig
 
@@ -381,6 +396,7 @@ fi
 %dir %{python_sitelib}/ibus
 %{python_sitelib}/ibus/*
 %dir %{_datadir}/ibus/
+%{_bindir}/ibus
 %{_bindir}/ibus-daemon
 %{_bindir}/ibus-setup
 %{_datadir}/ibus/*
@@ -389,13 +405,15 @@ fi
 %if %have_dconf
 %{_datadir}/GConf/gsettings/*
 %{_datadir}/glib-2.0/schemas/*.xml
+%{_libexecdir}/ibus-engine-simple
 %{_libexecdir}/ibus-dconf
 %else
 %{_libexecdir}/ibus-gconf
 %endif
-%{_libexecdir}/ibus-ui-gtk
+%{_libexecdir}/ibus-ui-gtk3
 %{_libexecdir}/ibus-x11
 # %{_sysconfdir}/xdg/autostart/ibus.desktop
+%{_sysconfdir}/bash_completion.d/ibus.bash
 %if %have_dconf
 %{_sysconfdir}/dconf/db/ibus
 %{_sysconfdir}/dconf/profile/ibus
@@ -404,7 +422,6 @@ fi
 %endif
 %config %{_xinputconf}
 %if %have_libxkbfile
-%{_libexecdir}/ibus-engine-xkb
 %{_libexecdir}/ibus-xkb
 %endif
 
@@ -440,6 +457,12 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Feb 03 2021 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120203-1
+- Updated to 1.4.99.20120203
+- Removed ibus-xx-bridge-hotkey.patch
+- Updated ibus-541492-xkb.patch to use libgnomekbd.
+- Updated ibus-xx-setup-frequent-lang.patch for 1.4.99.20120203
+
 * Wed Jan 04 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.0-17
 - Added ibus-771115-property-compatible.patch for f16
   Fixed Bug 771115 - IBusProperty back compatibility.
