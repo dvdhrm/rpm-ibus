@@ -23,7 +23,7 @@
 
 Name:       ibus
 Version:    1.4.99.20120203
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -33,9 +33,6 @@ Source0:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/%{name}-%{version}
 Source1:    xinput-ibus
 %if %have_gjsfile
 Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/ibus-gjs-%{ibus_gjs_version}.tar.gz
-# Workaround for glib2 bug:
-# https://bugzilla.gnome.org/show_bug.cgi?id=669253
-Source3:    ibus-gsettings-db
 %endif
 Patch0:     ibus-HEAD.patch
 Patch1:     ibus-541492-xkb.patch
@@ -252,14 +249,6 @@ automake -a -c -f
     --enable-python-library \
     --enable-introspection
 
-# Workaround for glib2 bug:
-# https://bugzilla.gnome.org/show_bug.cgi?id=669253
-cd data/dconf
-make org.freedesktop.ibus.gschema.valid
-mkdir db
-cp %SOURCE3 db/ibus
-cd ../..
-
 # make -C po update-gmo
 make %{?_smp_mflags} \
   PKG_CONFIG_PATH=..:/usr/lib64/pkgconfig:/usr/lib/pkgconfig
@@ -457,7 +446,12 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Fri Feb 03 2021 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120203-1
+* Tue Feb 07 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120203-2
+- Fixed ibus-setup on C locale
+- Fixed to show no registered engines from g-c-c.
+- Enabled Alt_R keybinding on ko locales for ibus gtk only.
+
+* Fri Feb 03 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120203-1
 - Updated to 1.4.99.20120203
 - Removed ibus-xx-bridge-hotkey.patch
 - Updated ibus-541492-xkb.patch to use libgnomekbd.

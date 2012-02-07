@@ -1,6 +1,6 @@
-From 2aea99b5872c741c413e995a50f9ac0842f3af96 Mon Sep 17 00:00:00 2001
+From 629d0a5383b3d42d7cad980bc5efe01867a01359 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Fri, 3 Feb 2012 12:12:29 +0900
+Date: Tue, 7 Feb 2012 20:13:59 +0900
 Subject: [PATCH] Add ibus-xkb and libgnomekbd.
 
 ---
@@ -15,7 +15,8 @@ Subject: [PATCH] Add ibus-xkb and libgnomekbd.
  engine/xkblib.c                    |  327 ++++++++++++++++++++++
  engine/xkblib.h                    |   41 +++
  ibus-1.0.pc.in                     |    4 +
- setup/main.py                      |   29 ++-
+ setup/enginecombobox.py            |    6 +-
+ setup/main.py                      |   31 ++-
  src/Makefile.am                    |    5 +
  src/ibus.h                         |    1 +
  src/ibusxkbxml.c                   |  454 ++++++++++++++++++++++++++++++
@@ -24,9 +25,9 @@ Subject: [PATCH] Add ibus-xkb and libgnomekbd.
  ui/gtk3/Makefile.am                |   47 ++++
  ui/gtk3/gkbdlayout.vala.false      |   63 +++++
  ui/gtk3/gkbdlayout.vala.true       |  111 ++++++++
- ui/gtk3/panel.vala                 |  211 ++++++++++++++-
+ ui/gtk3/panel.vala                 |  274 +++++++++++++++++--
  ui/gtk3/xkblayout.vala             |  466 +++++++++++++++++++++++++++++++
- 22 files changed, 2321 insertions(+), 547 deletions(-)
+ 23 files changed, 2381 insertions(+), 558 deletions(-)
  create mode 100644 engine/ibus-xkb-main.c
  create mode 100644 engine/xkblib.c
  create mode 100644 engine/xkblib.h
@@ -1464,11 +1465,28 @@ index 9f593ab..66b902a 100644
  
  Name: IBus
  Description: IBus Library
+diff --git a/setup/enginecombobox.py b/setup/enginecombobox.py
+index 8d1424b..0ac7368 100644
+--- a/setup/enginecombobox.py
++++ b/setup/enginecombobox.py
+@@ -75,7 +75,11 @@ class EngineComboBox(Gtk.ComboBox):
+ 
+         keys = langs.keys()
+         keys.sort(locale.strcoll)
+-        current_lang = IBus.get_language_name(locale.getlocale()[0])
++        loc = locale.getlocale()[0]
++        # None on C locale
++        if loc == None:
++            loc = 'en_US'
++        current_lang = IBus.get_language_name(loc)
+         # move current language to the first place
+         if current_lang in keys:
+             keys.remove(current_lang)
 diff --git a/setup/main.py b/setup/main.py
-index 7cd3e37..47a34e3 100644
+index 7cd3e37..bbc5422 100644
 --- a/setup/main.py
 +++ b/setup/main.py
-@@ -182,7 +182,20 @@ class Setup(object):
+@@ -182,12 +182,25 @@ class Setup(object):
                  self.__checkbutton_use_global_engine_toggled_cb)
  
          # init engine page
@@ -1490,6 +1508,12 @@ index 7cd3e37..47a34e3 100644
          self.__combobox = self.__builder.get_object("combobox_engines")
          self.__combobox.set_engines(self.__engines)
  
+         tmp_dict = {}
+-        for e in self.__engines:
++        for e in self.__bus.list_engines():
+             tmp_dict[e.get_name()] = e
+         engine_names = values.get("preload_engines", [])
+         engines = [tmp_dict[name] for name in engine_names if name in tmp_dict]
 @@ -254,7 +267,7 @@ class Setup(object):
              args = setup.split()
              args.insert(1, path.basename(args[0]))
@@ -2491,10 +2515,10 @@ index 0000000..adacd81
 +    */
 +}
 diff --git a/ui/gtk3/panel.vala b/ui/gtk3/panel.vala
-index e851b24..5847fd0 100644
+index e851b24..7c5b4ed 100644
 --- a/ui/gtk3/panel.vala
 +++ b/ui/gtk3/panel.vala
-@@ -40,6 +40,13 @@ class Panel : IBus.PanelService {
+@@ -40,8 +40,16 @@ class Panel : IBus.PanelService {
      private PropertyManager m_property_manager;
      private GLib.Pid m_setup_pid = 0;
      private Gtk.AboutDialog m_about_dialog;
@@ -2507,11 +2531,36 @@ index e851b24..5847fd0 100644
 +    private GLib.Timer m_changed_layout_timer;
      private const string ACCELERATOR_SWITCH_IME_FOREWARD = "<Control>space";
      private const string ACCELERATOR_SWITCH_IME_BACKWARD = "<Control><Shift>space";
++    private string[] ACCELERATOR_IME_HOTKEYS = {};
  
-@@ -82,6 +89,14 @@ class Panel : IBus.PanelService {
+     public Panel(IBus.Bus bus) {
+         GLib.assert(bus.is_connected());
+@@ -63,13 +71,6 @@ class Panel : IBus.PanelService {
+ 
+         m_switcher = new Switcher();
+ 
+-        var keybinding_manager = KeybindingManager.get_instance();
+-        keybinding_manager.bind(ACCELERATOR_SWITCH_IME_FOREWARD,
+-                (e) => handle_engine_switch(e, false));
+-
+-        keybinding_manager.bind(ACCELERATOR_SWITCH_IME_BACKWARD,
+-                (e) => handle_engine_switch(e, true));
+-
+         m_property_manager = new PropertyManager();
+         m_property_manager.property_activate.connect((k, s) => {
+             property_activate(k, s);
+@@ -80,8 +81,66 @@ class Panel : IBus.PanelService {
+ 
+     ~Panel() {
          var keybinding_manager = KeybindingManager.get_instance();
-         keybinding_manager.unbind(ACCELERATOR_SWITCH_IME_FOREWARD);
-         keybinding_manager.unbind(ACCELERATOR_SWITCH_IME_BACKWARD);
+-        keybinding_manager.unbind(ACCELERATOR_SWITCH_IME_FOREWARD);
+-        keybinding_manager.unbind(ACCELERATOR_SWITCH_IME_BACKWARD);
++        foreach (string keybinding in ACCELERATOR_IME_HOTKEYS) {
++            keybinding_manager.unbind(keybinding);
++            if (keybinding == ACCELERATOR_SWITCH_IME_FOREWARD) {
++                keybinding_manager.unbind(ACCELERATOR_SWITCH_IME_BACKWARD);
++            }
++        }
 +
 +        if (HAVE_IBUS_GKBD && m_gkbdlayout != null) {
 +            m_gkbdlayout.changed.disconnect(gkbdlayout_changed_cb);
@@ -2520,18 +2569,67 @@ index e851b24..5847fd0 100644
 +        }
 +
 +        m_xkblayout = null;
++    }
++
++    // ToDo: Customize the input method with ibus-setup
++    private void set_keybinding() {
++        string locale = GLib.Intl.setlocale(GLib.LocaleCategory.ALL,
++                                            null);
++        if (locale == null) {
++            locale = "C";
++        }
++
++        ACCELERATOR_IME_HOTKEYS += ACCELERATOR_SWITCH_IME_FOREWARD;
++
++        if (m_config != null) {
++            GLib.Variant variant = m_config.get_value("general/hotkey",
++                                                      "trigger_accel");
++            if (variant != null) {
++                ACCELERATOR_IME_HOTKEYS = {};
++                for (int i = 0; i < variant.n_children(); i++) {
++                    ACCELERATOR_IME_HOTKEYS += variant.get_child_value(i).dup_string();
++                }
++            }
++        }
++
++        if (ACCELERATOR_IME_HOTKEYS.length == 1 &&
++            ACCELERATOR_IME_HOTKEYS[0] == ACCELERATOR_SWITCH_IME_FOREWARD) {
++            // FIXME: When us keyboard is used, Zenkaku_Hankaku does not work.
++            /*
++            if (locale[0:2] == "ja") {
++                ACCELERATOR_IME_HOTKEYS += "Zenkaku_Hankaku";
++            }
++            */
++            if (locale[0:2] == "ko") {
++                ACCELERATOR_IME_HOTKEYS += "Hangul";
++                ACCELERATOR_IME_HOTKEYS += "Alt_R";
++            }
++        }
++
++        var keybinding_manager = KeybindingManager.get_instance();
++        foreach (string keybinding in ACCELERATOR_IME_HOTKEYS) {
++            keybinding_manager.bind(keybinding,
++                (e) => handle_engine_switch(e, false));
++            if (keybinding == ACCELERATOR_SWITCH_IME_FOREWARD) {
++                keybinding_manager.bind(ACCELERATOR_SWITCH_IME_BACKWARD,
++                    (e) => handle_engine_switch(e, true));
++            }
++        }
      }
  
      public void set_config(IBus.Config config) {
-@@ -93,6 +108,7 @@ class Panel : IBus.PanelService {
+@@ -91,8 +150,10 @@ class Panel : IBus.PanelService {
+         }
+ 
          m_config = config;
++        set_keybinding();
          if (m_config != null) {
              m_config.value_changed.connect(config_value_changed_cb);
 +            init_engines_order();
              update_engines(m_config.get_value("general", "preload_engines"),
                             m_config.get_value("general", "engines_order"));
          } else {
-@@ -100,6 +116,191 @@ class Panel : IBus.PanelService {
+@@ -100,6 +161,191 @@ class Panel : IBus.PanelService {
          }
      }
  
@@ -2723,7 +2821,7 @@ index e851b24..5847fd0 100644
      private void switch_engine(int i, bool force = false) {
          GLib.assert(i >= 0 && i < m_engines.length);
  
-@@ -119,15 +320,7 @@ class Panel : IBus.PanelService {
+@@ -119,15 +365,7 @@ class Panel : IBus.PanelService {
              return;
          }
          // set xkb layout

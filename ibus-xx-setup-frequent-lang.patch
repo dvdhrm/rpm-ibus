@@ -1,6 +1,6 @@
-From 6e9cdc7d5b10cb043e8709670ea5ad487ab3d937 Mon Sep 17 00:00:00 2001
+From 723721bd15eb80da9f735ac4feba4f25306ba965 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Fri, 3 Feb 2012 19:20:27 +0900
+Date: Tue, 7 Feb 2012 20:15:18 +0900
 Subject: [PATCH] Enable ibus-setup to show the frequently used languages only
  in IME list.
 
@@ -190,7 +190,7 @@ index 34de9b4..bf50645 100644
        <applyto>/desktop/ibus/panel/custom_font</applyto>
        <owner>ibus</owner>
 diff --git a/setup/enginecombobox.py b/setup/enginecombobox.py
-index 8d1424b..9fbe476 100644
+index 0ac7368..9af2651 100644
 --- a/setup/enginecombobox.py
 +++ b/setup/enginecombobox.py
 @@ -45,6 +45,9 @@ class EngineComboBox(Gtk.ComboBox):
@@ -267,8 +267,8 @@ index 8d1424b..9fbe476 100644
 +    def __model_append_langs(self, model, langs, visible):
          keys = langs.keys()
          keys.sort(locale.strcoll)
-         current_lang = IBus.get_language_name(locale.getlocale()[0])
-@@ -86,29 +119,86 @@ class EngineComboBox(Gtk.ComboBox):
+         loc = locale.getlocale()[0]
+@@ -90,29 +123,86 @@ class EngineComboBox(Gtk.ComboBox):
              keys.remove(IBus.get_language_name("Other"))
              keys += [IBus.get_language_name("Other")]
          for l in keys:
@@ -310,8 +310,7 @@ index 8d1424b..9fbe476 100644
 +        self.__model_append_langs(self.__model, lang, True)
 +        iter1 = self.__model.append(None)
 +        self.__model.set(iter1, 0, -1)
- 
--        self.set_model(self.__model)
++
 +        self.__all_model = Gtk.TreeStore(object)
 +        iter1 = self.__all_model.append(None)
 +        self.__all_model.set(iter1, 0, 0)
@@ -321,7 +320,8 @@ index 8d1424b..9fbe476 100644
 +        self.__model_append_langs(self.__all_model, sub_lang, False)
 +
 +        self.__toggle_sub_lang()
-+
+ 
+-        self.set_model(self.__model)
 +    def __toggle_sub_lang(self):
 +        self.set_model(None)
 +        if self.__show_sub_lang:
@@ -363,7 +363,7 @@ index 8d1424b..9fbe476 100644
          else:
              renderer.set_property("visible", True)
              renderer.set_property("sensitive", True)
-@@ -121,7 +211,8 @@ class EngineComboBox(Gtk.ComboBox):
+@@ -125,7 +215,8 @@ class EngineComboBox(Gtk.ComboBox):
              renderer.set_property("pixbuf", pixbuf)
  
      def __name_cell_data_cb(self, celllayout, renderer, model, iter, data):
@@ -373,7 +373,7 @@ index 8d1424b..9fbe476 100644
  
          if isinstance (engine, str) or isinstance (engine, unicode):
              renderer.set_property("sensitive", False)
-@@ -129,8 +220,15 @@ class EngineComboBox(Gtk.ComboBox):
+@@ -133,8 +224,15 @@ class EngineComboBox(Gtk.ComboBox):
              renderer.set_property("weight", Pango.Weight.NORMAL)
          elif isinstance(engine, int):
              renderer.set_property("sensitive", True)
@@ -391,7 +391,7 @@ index 8d1424b..9fbe476 100644
          else:
              renderer.set_property("sensitive", True)
              renderer.set_property("text", engine.get_longname())
-@@ -146,10 +244,18 @@ class EngineComboBox(Gtk.ComboBox):
+@@ -150,10 +248,18 @@ class EngineComboBox(Gtk.ComboBox):
              if i == 0 or i == -1:
                  return None
              iter = self.get_active_iter()
@@ -412,7 +412,7 @@ index 8d1424b..9fbe476 100644
          return self.get_property("active-engine")
  
 diff --git a/setup/main.py b/setup/main.py
-index 47a34e3..16bfeea 100644
+index bbc5422..9456e01 100644
 --- a/setup/main.py
 +++ b/setup/main.py
 @@ -197,6 +197,7 @@ class Setup(object):
