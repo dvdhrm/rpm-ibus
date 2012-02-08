@@ -23,7 +23,7 @@
 
 Name:       ibus
 Version:    1.4.99.20120203
-Release:    2%{?dist}
+Release:    3%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -446,7 +446,7 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Tue Feb 07 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120203-2
+* Wed Feb 08 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120203-3
 - Fixed ibus-setup on C locale
 - Fixed to show no registered engines from g-c-c.
 - Enabled Alt_R keybinding on ko locales for ibus gtk only.

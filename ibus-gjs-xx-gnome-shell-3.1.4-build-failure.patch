@@ -1,13 +1,13 @@
---- ibus-gjs/configure.ac.orig	2012-02-03 20:24:22.331320102 +0900
-+++ ibus-gjs/configure.ac	2012-02-03 20:31:03.628265181 +0900
-@@ -164,8 +164,8 @@ try {
+--- ibus-gjs/configure.ac.orig	2012-01-13 18:11:33.152447345 +0900
++++ ibus-gjs/configure.ac	2012-02-08 14:21:59.671562482 +0900
+@@ -174,8 +174,8 @@ try {
          $GREP -v "DEBUG:"
  }
  
 -GNOME_SHELL_VERSION=`GET_JS_VERSION 'Config.PACKAGE_VERSION'`
 -GJS_VERSION=`GET_JS_VERSION 'Config.GJS_VERSION'`
-+GNOME_SHELL_VERSION='3.3.4", "3.3.3", "3.2'
-+GJS_VERSION='1.31.6", "1.31.11", "1.30'
++GNOME_SHELL_VERSION='3.3.5", "3.3.4", "3.3.3", "3.2'
++GJS_VERSION='1.31.10", "1.31.6", "1.31.11", "1.30'
  AC_SUBST(GNOME_SHELL_VERSION)
  AC_SUBST(GJS_VERSION)
  
