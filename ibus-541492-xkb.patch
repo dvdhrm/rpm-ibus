@@ -1,33 +1,31 @@
-From 629d0a5383b3d42d7cad980bc5efe01867a01359 Mon Sep 17 00:00:00 2001
+From 571e4ab3e28acb90466ac58e3fe9f4efc4b8ba0e Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Tue, 7 Feb 2012 20:13:59 +0900
+Date: Sun, 4 Mar 2012 22:16:01 +0900
 Subject: [PATCH] Add ibus-xkb and libgnomekbd.
 
 ---
- bindings/vala/ibus-1.0.vapi        |   11 +
- bindings/vala/ibus-1.0/ibus-1.0.gi |   45 +++
- configure.ac                       |   59 ++++
- data/ibus.schemas.in               |   58 ++++
- engine/Makefile.am                 |   22 ++
- engine/ibus-xkb-main.c             |  111 ++++++++
- engine/main.vala                   |   84 ++++++
- engine/simple.xml.in.in            |  531 +-----------------------------------
- engine/xkblib.c                    |  327 ++++++++++++++++++++++
- engine/xkblib.h                    |   41 +++
- ibus-1.0.pc.in                     |    4 +
- setup/enginecombobox.py            |    6 +-
- setup/main.py                      |   31 ++-
- src/Makefile.am                    |    5 +
- src/ibus.h                         |    1 +
- src/ibusxkbxml.c                   |  454 ++++++++++++++++++++++++++++++
- src/ibusxkbxml.h                   |  187 +++++++++++++
- ui/gtk3/Gkbd-3.0.metadata          |    1 +
- ui/gtk3/Makefile.am                |   47 ++++
- ui/gtk3/gkbdlayout.vala.false      |   63 +++++
- ui/gtk3/gkbdlayout.vala.true       |  111 ++++++++
- ui/gtk3/panel.vala                 |  274 +++++++++++++++++--
- ui/gtk3/xkblayout.vala             |  466 +++++++++++++++++++++++++++++++
- 23 files changed, 2381 insertions(+), 558 deletions(-)
+ configure.ac                  |   59 +++++
+ data/ibus.schemas.in          |   58 +++++
+ engine/Makefile.am            |   22 ++
+ engine/ibus-xkb-main.c        |  111 +++++++++
+ engine/main.vala              |   86 +++++++
+ engine/simple.xml.in.in       |  531 +----------------------------------------
+ engine/xkblib.c               |  327 +++++++++++++++++++++++++
+ engine/xkblib.h               |   41 ++++
+ ibus-1.0.pc.in                |    4 +
+ setup/enginecombobox.py       |    6 +-
+ setup/main.py                 |   17 ++-
+ src/Makefile.am               |    5 +
+ src/ibus.h                    |    1 +
+ src/ibusxkbxml.c              |  466 ++++++++++++++++++++++++++++++++++++
+ src/ibusxkbxml.h              |  187 +++++++++++++++
+ ui/gtk3/Gkbd-3.0.metadata     |    1 +
+ ui/gtk3/Makefile.am           |   45 ++++
+ ui/gtk3/gkbdlayout.vala.false |   63 +++++
+ ui/gtk3/gkbdlayout.vala.true  |  111 +++++++++
+ ui/gtk3/panel.vala            |  275 ++++++++++++++++++++--
+ ui/gtk3/xkblayout.vala        |  466 ++++++++++++++++++++++++++++++++++++
+ 21 files changed, 2331 insertions(+), 551 deletions(-)
  create mode 100644 engine/ibus-xkb-main.c
  create mode 100644 engine/xkblib.c
  create mode 100644 engine/xkblib.h
@@ -38,89 +36,11 @@ Subject: [PATCH] Add ibus-xkb and libgnomekbd.
  create mode 100644 ui/gtk3/gkbdlayout.vala.true
  create mode 100644 ui/gtk3/xkblayout.vala
 
-diff --git a/bindings/vala/ibus-1.0.vapi b/bindings/vala/ibus-1.0.vapi
-index bf3ae61..c5baa1c 100644
---- a/bindings/vala/ibus-1.0.vapi
-+++ b/bindings/vala/ibus-1.0.vapi
-@@ -527,6 +527,17 @@ namespace IBus {
- 		public unowned string get_text ();
- 	}
- 	[CCode (cheader_filename = "ibus.h")]
-+	public class XKBConfigRegistry : IBus.Object {
-+		[CCode (has_construct_function = false)]
-+		public XKBConfigRegistry ();
-+		public unowned GLib.HashTable get_layout_list ();
-+		public unowned string layout_desc_get_desc (string layout);
-+		public unowned GLib.List layout_lang_get_langs (string layout);
-+		public unowned GLib.List layout_list_get_layouts ();
-+		public unowned GLib.List layout_list_get_variants (string layout);
-+		public unowned string variant_desc_get_desc (string variant);
-+	}
-+	[CCode (cheader_filename = "ibus.h")]
- 	[Compact]
- 	public class XMLNode {
- 		public weak string attributes;
-diff --git a/bindings/vala/ibus-1.0/ibus-1.0.gi b/bindings/vala/ibus-1.0/ibus-1.0.gi
-index 65852f1..9e062fd 100644
---- a/bindings/vala/ibus-1.0/ibus-1.0.gi
-+++ b/bindings/vala/ibus-1.0/ibus-1.0.gi
-@@ -2878,6 +2878,51 @@
- 			<field name="text" type="gchar*"/>
- 			<field name="attrs" type="IBusAttrList*"/>
- 		</object>
-+		<object name="IBusXKBConfigRegistry" parent="IBusObject" type-name="IBusXKBConfigRegistry" get-type="ibus_xkb_config_registry_get_type">
-+			<method name="get_layout_list" symbol="ibus_xkb_config_registry_get_layout_list">
-+				<return-type type="GHashTable*"/>
-+				<parameters>
-+					<parameter name="xkb_config" type="IBusXKBConfigRegistry*"/>
-+				</parameters>
-+			</method>
-+			<method name="layout_desc_get_desc" symbol="ibus_xkb_config_registry_layout_desc_get_desc">
-+				<return-type type="gchar*"/>
-+				<parameters>
-+					<parameter name="xkb_config" type="IBusXKBConfigRegistry*"/>
-+					<parameter name="layout" type="gchar*"/>
-+				</parameters>
-+			</method>
-+			<method name="layout_lang_get_langs" symbol="ibus_xkb_config_registry_layout_lang_get_langs">
-+				<return-type type="GList*"/>
-+				<parameters>
-+					<parameter name="xkb_config" type="IBusXKBConfigRegistry*"/>
-+					<parameter name="layout" type="gchar*"/>
-+				</parameters>
-+			</method>
-+			<method name="layout_list_get_layouts" symbol="ibus_xkb_config_registry_layout_list_get_layouts">
-+				<return-type type="GList*"/>
-+				<parameters>
-+					<parameter name="xkb_config" type="IBusXKBConfigRegistry*"/>
-+				</parameters>
-+			</method>
-+			<method name="layout_list_get_variants" symbol="ibus_xkb_config_registry_layout_list_get_variants">
-+				<return-type type="GList*"/>
-+				<parameters>
-+					<parameter name="xkb_config" type="IBusXKBConfigRegistry*"/>
-+					<parameter name="layout" type="gchar*"/>
-+				</parameters>
-+			</method>
-+			<method name="variant_desc_get_desc" symbol="ibus_xkb_config_registry_variant_desc_get_desc">
-+				<return-type type="gchar*"/>
-+				<parameters>
-+					<parameter name="xkb_config" type="IBusXKBConfigRegistry*"/>
-+					<parameter name="variant" type="gchar*"/>
-+				</parameters>
-+			</method>
-+			<constructor name="new" symbol="ibus_xkb_config_registry_new">
-+				<return-type type="IBusXKBConfigRegistry*"/>
-+			</constructor>
-+		</object>
- 		<constant name="IBUS_INTERFACE_CONFIG" type="char*" value="org.freedesktop.IBus.Config"/>
- 		<constant name="IBUS_INTERFACE_ENGINE" type="char*" value="org.freedesktop.IBus.Engine"/>
- 		<constant name="IBUS_INTERFACE_FACTORY" type="char*" value="org.freedesktop.IBus.Factory"/>
 diff --git a/configure.ac b/configure.ac
-index 74f6d93..fe0cd4e 100644
+index aeb22b4..a516c94 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -222,6 +222,63 @@ else
+@@ -249,6 +249,63 @@ else
      enable_xim="no (disabled, use --enable-xim to enable)"
  fi
  
@@ -184,19 +104,19 @@ index 74f6d93..fe0cd4e 100644
  # GObject introspection
  GOBJECT_INTROSPECTION_CHECK([0.6.8])
  
-@@ -517,5 +574,7 @@ Build options:
-   No snooper regexes        "$NO_SNOOPER_APPS"
+@@ -545,5 +602,7 @@ Build options:
    Panel icon                "$IBUS_ICON_KEYBOARD"
    Enable surrounding-text   $enable_surrounding_text
+   Run test cases            $enable_tests
 +  Build XKB                 $enable_xkb
 +  Build libgnomebkd         $enable_libgnomekbd
  ])
  
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 68def40..34de9b4 100644
+index 53ba05c..3ca0fbc 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
-@@ -26,6 +26,18 @@
+@@ -38,6 +38,18 @@
        </locale>
      </schema>
      <schema>
@@ -215,7 +135,7 @@ index 68def40..34de9b4 100644
        <key>/schemas/desktop/ibus/general/hotkey/enable_unconditional</key>
        <applyto>/desktop/ibus/general/hotkey/enable_unconditional</applyto>
        <owner>ibus</owner>
-@@ -191,6 +203,52 @@
+@@ -203,6 +215,52 @@
        </locale>
      </schema>
      <schema>
@@ -426,10 +346,10 @@ index 0000000..75f6679
 +    return 0;
 +}
 diff --git a/engine/main.vala b/engine/main.vala
-index e1fd129..0dd15ce 100644
+index e1fd129..377fa2f 100644
 --- a/engine/main.vala
 +++ b/engine/main.vala
-@@ -21,6 +21,83 @@
+@@ -21,6 +21,85 @@
   */
  
  using IBus;
@@ -477,9 +397,9 @@ index e1fd129..0dd15ce 100644
 +
 +private void print_component() {
 +    IBus.XKBConfigRegistry registry = new IBus.XKBConfigRegistry();
-+    unowned GLib.List layouts = registry.layout_list_get_layouts();
-+    unowned GLib.List variants;
-+    unowned GLib.List langs;
++    GLib.List layouts = registry.layout_list_get_layouts();
++    GLib.List variants;
++    GLib.List langs;
 +    string layout_desc;
 +    const string header = "<engines>";
 +    const string footer = "
@@ -495,7 +415,9 @@ index e1fd129..0dd15ce 100644
 +        }
 +        for (unowned GLib.List<string> v = variants; v != null; v = v.next) {
 +            var l_v = "%s(%s)".printf(l.data, v.data);
-+            unowned GLib.List<string> l_v_langs = registry.layout_lang_get_langs(l_v);
++            unowned GLib.List<string> l_v_langs = null;
++            GLib.List<string> _l_v_langs = registry.layout_lang_get_langs(l_v);
++            l_v_langs = _l_v_langs;
 +            if (l_v_langs == null) {
 +                l_v_langs = langs;
 +            }
@@ -513,7 +435,7 @@ index e1fd129..0dd15ce 100644
  
  class DummyEngine : IBus.EngineSimple {
  }
-@@ -28,6 +105,13 @@ class DummyEngine : IBus.EngineSimple {
+@@ -28,6 +107,13 @@ class DummyEngine : IBus.EngineSimple {
  public int main(string[] args) {
      IBus.init();
  
@@ -1483,7 +1405,7 @@ index 8d1424b..0ac7368 100644
          if current_lang in keys:
              keys.remove(current_lang)
 diff --git a/setup/main.py b/setup/main.py
-index 7cd3e37..bbc5422 100644
+index 274b25a..e3027a5 100644
 --- a/setup/main.py
 +++ b/setup/main.py
 @@ -182,12 +182,25 @@ class Setup(object):
@@ -1514,43 +1436,8 @@ index 7cd3e37..bbc5422 100644
              tmp_dict[e.get_name()] = e
          engine_names = values.get("preload_engines", [])
          engines = [tmp_dict[name] for name in engine_names if name in tmp_dict]
-@@ -254,7 +267,7 @@ class Setup(object):
-             args = setup.split()
-             args.insert(1, path.basename(args[0]))
-             return args
--        name = str(engine.name)
-+        name = str(engine.props.name)
-         libexecdir = os.environ['IBUS_LIBEXECDIR']
-         setup_path = (libexecdir + '/' + 'ibus-setup-' if libexecdir != None \
-             else 'ibus-setup-') + name.split(':')[0]
-@@ -275,11 +288,11 @@ class Setup(object):
-         self.__builder.get_object("button_engine_up").set_sensitive(engine not in engines[:1])
-         self.__builder.get_object("button_engine_down").set_sensitive(engine not in engines[-1:])
- 
--        # obj = self.__builder.get_object("button_engine_preferences")
--        # if len(self.__get_engine_setup_exec_args(engine)) != 0:
--        #     obj.set_sensitive(True)
--        # else:
--        #     obj.set_sensitive(False)
-+        obj = self.__builder.get_object("button_engine_preferences")
-+        if len(self.__get_engine_setup_exec_args(engine)) != 0:
-+            obj.set_sensitive(True)
-+        else:
-+            obj.set_sensitive(False)
- 
-         if prop.name == "engines":
-             engine_names = map(lambda e: e.get_name(), engines)
-@@ -302,7 +315,7 @@ class Setup(object):
-         args = self.__get_engine_setup_exec_args(engine)
-         if len(args) == 0:
-             return
--        name = engine.name
-+        name = engine.props.name
-         if name in self.__engine_setup_exec_list.keys():
-             try:
-                 wpid, sts = os.waitpid(self.__engine_setup_exec_list[name],
 diff --git a/src/Makefile.am b/src/Makefile.am
-index a53c277..0c8a820 100644
+index b4d0dcf..1631cae 100644
 --- a/src/Makefile.am
 +++ b/src/Makefile.am
 @@ -190,6 +190,11 @@ typelibs_DATA = $(INTROSPECTION_GIRS:.gir=.typelib)
@@ -1579,10 +1466,10 @@ index ef811a4..f82a162 100644
  #include <ibusobservedpath.h>
 diff --git a/src/ibusxkbxml.c b/src/ibusxkbxml.c
 new file mode 100644
-index 0000000..af30c0c
+index 0000000..4792664
 --- /dev/null
 +++ b/src/ibusxkbxml.c
-@@ -0,0 +1,454 @@
+@@ -0,0 +1,466 @@
 +/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
 +/* vim:set et sts=4: */
 +/* bus - The Input Bus
@@ -2006,16 +1893,28 @@ index 0000000..af30c0c
 +    return list;
 +}
 +
++/* vala could use GLib.List<string> for the returned pointer and
++ * the declaration calls g_list_foreach (retval, g_free, NULL).
++ * When I think about GLib.List<string> v.s. GLib.List, probably
++ * I think GLib.List<string> is better for the function and set
++ * g_strdup() here. I do not know about GJS implementation.
++ */
 +#define TABLE_LOOKUP_LIST_FUNC(field_name, value) GList *               \
 +ibus_xkb_config_registry_##field_name##_get_##value  (IBusXKBConfigRegistry *xkb_config, const gchar *key) \
 +{                                                                       \
 +    GHashTable *table;                                                  \
 +    GList *list = NULL;                                                 \
++    GList *retval= NULL;                                                \
++    GList *p = NULL;                                                    \
 +                                                                        \
 +    table = (GHashTable *)                                              \
 +        ibus_xkb_config_registry_get_##field_name (xkb_config);         \
 +    list = (GList *) g_hash_table_lookup (table, key);                  \
-+    return g_list_copy (list);                                          \
++    retval = g_list_copy (list);                                        \
++    for (p = retval; p; p = p->next) {                                  \
++        p->data = g_strdup (p->data);                                   \
++    }                                                                   \
++    return retval;                                                      \
 +}
 +
 +#define TABLE_LOOKUP_STRING_FUNC(field_name, value) gchar *             \
@@ -2238,7 +2137,7 @@ index 0000000..661e6fd
 @@ -0,0 +1 @@
 +Configuration cheader_filename="libgnomekbd/gkbd-configuration.h"
 diff --git a/ui/gtk3/Makefile.am b/ui/gtk3/Makefile.am
-index 0fb9d3c..b6907d7 100644
+index 0fb9d3c..33aaaa3 100644
 --- a/ui/gtk3/Makefile.am
 +++ b/ui/gtk3/Makefile.am
 @@ -42,6 +42,9 @@ INCLUDES = \
@@ -2262,7 +2161,7 @@ index 0fb9d3c..b6907d7 100644
  	-Wno-unused-variable \
  	-Wno-unused-but-set-variable \
  	-Wno-unused-function \
-@@ -86,6 +93,7 @@ ibus_ui_gtk3_SOURCES = \
+@@ -86,6 +93,7 @@ ibus_ui_gtk3_valas = \
  	application.vala \
  	candidatearea.vala \
  	candidatepanel.vala \
@@ -2270,15 +2169,15 @@ index 0fb9d3c..b6907d7 100644
  	handle.vala \
  	iconwidget.vala \
  	keybindingmanager.vala \
-@@ -94,6 +102,7 @@ ibus_ui_gtk3_SOURCES = \
+@@ -94,6 +102,7 @@ ibus_ui_gtk3_valas = \
  	property.vala \
  	separator.vala \
  	switcher.vala \
 +	xkblayout.vala \
- 	grabkeycode.c \
  	$(NULL)
+ ibus_ui_gtk3_vala_cfiles = $(ibus_ui_gtk3_valas:.vala=.c)
  
-@@ -101,11 +110,49 @@ ibus_ui_gtk3_LDADD = \
+@@ -106,12 +115,48 @@ ibus_ui_gtk3_LDADD = \
  	$(AM_LDADD) \
  	$(NULL)
  
@@ -2300,8 +2199,6 @@ index 0fb9d3c..b6907d7 100644
 +	--pkg=gkbd \
 +	$(NULL)
 +
-+VAPIGEN = vapigen
-+
 +$(srcdir)/gkbd.vapi:
 +	$(VAPIGEN) --metadatadir . --library gkbd \
 +	    --pkg gtk+-3.0 --pkg glib-2.0 --pkg gmodule-2.0 \
@@ -2319,6 +2216,7 @@ index 0fb9d3c..b6907d7 100644
 +	gkbd.vapi \
 +	gkbdlayout.vala \
  	gtkpanel.xml \
+ 	$(ibus_ui_gtk3_vala_cfiles) \
  	$(NULL)
  
  EXTRA_DIST = \
@@ -2515,7 +2413,7 @@ index 0000000..adacd81
 +    */
 +}
 diff --git a/ui/gtk3/panel.vala b/ui/gtk3/panel.vala
-index e851b24..7c5b4ed 100644
+index b83d7e3..2a386a0 100644
 --- a/ui/gtk3/panel.vala
 +++ b/ui/gtk3/panel.vala
 @@ -40,8 +40,16 @@ class Panel : IBus.PanelService {
@@ -2535,7 +2433,7 @@ index e851b24..7c5b4ed 100644
  
      public Panel(IBus.Bus bus) {
          GLib.assert(bus.is_connected());
-@@ -63,13 +71,6 @@ class Panel : IBus.PanelService {
+@@ -65,13 +73,6 @@ class Panel : IBus.PanelService {
  
          m_switcher = new Switcher();
  
@@ -2549,7 +2447,7 @@ index e851b24..7c5b4ed 100644
          m_property_manager = new PropertyManager();
          m_property_manager.property_activate.connect((k, s) => {
              property_activate(k, s);
-@@ -80,8 +81,66 @@ class Panel : IBus.PanelService {
+@@ -82,8 +83,66 @@ class Panel : IBus.PanelService {
  
      ~Panel() {
          var keybinding_manager = KeybindingManager.get_instance();
@@ -2618,7 +2516,7 @@ index e851b24..7c5b4ed 100644
      }
  
      public void set_config(IBus.Config config) {
-@@ -91,8 +150,10 @@ class Panel : IBus.PanelService {
+@@ -93,8 +152,10 @@ class Panel : IBus.PanelService {
          }
  
          m_config = config;
@@ -2629,7 +2527,7 @@ index e851b24..7c5b4ed 100644
              update_engines(m_config.get_value("general", "preload_engines"),
                             m_config.get_value("general", "engines_order"));
          } else {
-@@ -100,6 +161,191 @@ class Panel : IBus.PanelService {
+@@ -102,6 +163,192 @@ class Panel : IBus.PanelService {
          }
      }
  
@@ -2696,13 +2594,13 @@ index e851b24..7c5b4ed 100644
 +        string[] var_xkb_engine_names = {};
 +        for (int i = 0; i < m_layouts.length; i++) {
 +            string name = m_layouts[i];
-+            unowned GLib.List<string> langs = null;
 +            string lang = null;
 +
 +            if (i < m_variants.length && m_variants[i] != "") {
 +                name = "%s:%s".printf(name, m_variants[i]);
 +                string layout = "%s(%s)".printf(name, m_variants[i]);
-+                langs = registry.layout_lang_get_langs(layout);
++                GLib.List<string> langs =
++                        registry.layout_lang_get_langs(layout);
 +                if (langs.length() != 0) {
 +                    lang = langs.data;
 +                }
@@ -2711,7 +2609,8 @@ index e851b24..7c5b4ed 100644
 +            }
 +
 +            if (lang == null) {
-+                langs = registry.layout_lang_get_langs(m_layouts[i]);
++                GLib.List<string> langs =
++                        registry.layout_lang_get_langs(m_layouts[i]);
 +                if (langs.length() != 0) {
 +                    lang = langs.data;
 +                }
@@ -2821,7 +2720,7 @@ index e851b24..7c5b4ed 100644
      private void switch_engine(int i, bool force = false) {
          GLib.assert(i >= 0 && i < m_engines.length);
  
-@@ -119,15 +365,7 @@ class Panel : IBus.PanelService {
+@@ -121,15 +368,7 @@ class Panel : IBus.PanelService {
              return;
          }
          // set xkb layout
@@ -3311,5 +3210,5 @@ index 0000000..8b75387
 +    */
 +}
 -- 
-1.7.7.4
+1.7.9.1
 

@@ -1,8 +1,8 @@
-From 723721bd15eb80da9f735ac4feba4f25306ba965 Mon Sep 17 00:00:00 2001
+From fc525080c668267339baef480f53bdb8256f3239 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Tue, 7 Feb 2012 20:15:18 +0900
-Subject: [PATCH] Enable ibus-setup to show the frequently used languages only
- in IME list.
+Date: Sun, 4 Mar 2012 20:18:30 +0900
+Subject: [PATCH] Enable ibus-setup to show the frequently used languages
+ only in IME list.
 
 ---
  data/ibus.schemas.in    |  168 +++++++++++++++++++++++++++++++++++++++++++++++
@@ -11,10 +11,10 @@ Subject: [PATCH] Enable ibus-setup to show the frequently used languages only
  3 files changed, 300 insertions(+), 25 deletions(-)
 
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 34de9b4..bf50645 100644
+index 3ca0fbc..a3a9a5f 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
-@@ -260,6 +260,174 @@ se,si,sk,sy,sy(ku),th,tj,tr,ua,uz,vn
+@@ -272,6 +272,174 @@ se,si,sk,sy,sy(ku),th,tj,tr,ua,uz,vn
        </locale>
      </schema>
      <schema>
@@ -412,7 +412,7 @@ index 0ac7368..9af2651 100644
          return self.get_property("active-engine")
  
 diff --git a/setup/main.py b/setup/main.py
-index bbc5422..9456e01 100644
+index e3027a5..614737f 100644
 --- a/setup/main.py
 +++ b/setup/main.py
 @@ -197,6 +197,7 @@ class Setup(object):
@@ -424,5 +424,5 @@ index bbc5422..9456e01 100644
  
          tmp_dict = {}
 -- 
-1.7.7.4
+1.7.9.1
 

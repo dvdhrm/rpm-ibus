@@ -5,6 +5,8 @@
 %define have_libxkbfile 1
 %define have_gjsfile 1
 %define have_dconf 1
+%define have_pygobject2 1
+%define have_pygobject3 1
 
 %if 0%{?fedora} > 16
 %define ibus_gjs_version 3.3.3.20120203
@@ -22,8 +24,8 @@
 %define gnome_icon_theme_legacy_version 2.91.6
 
 Name:       ibus
-Version:    1.4.99.20120203
-Release:    3%{?dist}
+Version:    1.4.99.20120304
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -34,7 +36,7 @@ Source1:    xinput-ibus
 %if %have_gjsfile
 Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/ibus-gjs-%{ibus_gjs_version}.tar.gz
 %endif
-Patch0:     ibus-HEAD.patch
+# Patch0:     ibus-HEAD.patch
 Patch1:     ibus-541492-xkb.patch
 Patch2:     ibus-xx-setup-frequent-lang.patch
 # Patch3:     ibus-530711-preload-sys.patch
@@ -69,7 +71,9 @@ BuildRequires:  vala-tools
 %endif
 # for AM_GCONF_SOURCE_2 in configure.ac
 BuildRequires:  GConf2-devel
-BuildRequires:  pygobject2-devel
+%if %have_pygobject3
+BuildRequires:  pygobject3-devel
+%endif
 BuildRequires:  intltool
 BuildRequires:  iso-codes-devel
 %if %have_libxkbfile
@@ -88,7 +92,12 @@ Requires:   %{name}-gtk2 = %{version}-%{release}
 Requires:   %{name}-gtk3 = %{version}-%{release}
 %endif
 
+%if %have_pygobject2
 Requires:   pygtk2
+%endif
+%if %have_pygobject3
+Requires:   pygobject3
+%endif
 Requires:   pyxdg
 Requires:   iso-codes
 Requires:   dbus-python >= %{dbus_python_version}
@@ -198,11 +207,12 @@ cd $d
 cd ..
 %endif
 %endif
-%patch0 -p1
+# %patch0 -p1
 %patch92 -p1 -b .g-s-preedit
 cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 %if %have_libxkbfile
 %patch1 -p1 -b .xkb
+rm -f bindings/vala/ibus-1.0.vapi
 %endif
 %patch2 -p1 -b .setup-frequent-lang
 # %patch3 -p1 -b .preload-sys
@@ -224,10 +234,7 @@ XKB_PRELOAD_LAYOUTS=\
 "me,mk,mm,mt,mv,ng,ng(hausa),ng,ng(igbo),ng(yoruba),nl,no,no(smi),np,"\
 "pk,pl,pl(csb),pt,ro,rs,ru,ru(cv),ru(kom),ru(sah),ru(tt),ru(xal),"\
 "se,si,sk,sy,sy(ku),th,tj,tr,ua,uz,vn"
-aclocal -I m4
-autoheader
-autoconf -f
-automake -a -c -f
+autoreconf -f -i
 %endif
 %configure \
     --disable-static \
@@ -246,7 +253,9 @@ automake -a -c -f
     --enable-dconf \
     --disable-gconf \
 %endif
+%if %have_pygobject2
     --enable-python-library \
+%endif
     --enable-introspection
 
 # make -C po update-gmo
@@ -382,13 +391,17 @@ fi
 %files -f %{name}10.lang
 %defattr(-,root,root,-)
 %doc AUTHORS COPYING README
+%if %have_pygobject2
 %dir %{python_sitelib}/ibus
 %{python_sitelib}/ibus/*
+%endif
 %dir %{_datadir}/ibus/
 %{_bindir}/ibus
 %{_bindir}/ibus-daemon
 %{_bindir}/ibus-setup
+%if %have_pygobject3
 %{_datadir}/ibus/*
+%endif
 %{_datadir}/applications/*
 %{_datadir}/icons/hicolor/*/apps/*
 %if %have_dconf
@@ -417,7 +430,9 @@ fi
 %files libs
 %defattr(-,root,root,-)
 %{_libdir}/libibus-%{ibus_api_version}.so.*
+%if %have_pygobject3
 %{_libdir}/girepository-1.0/IBus-1.0.typelib
+%endif
 
 %files gtk2
 %defattr(-,root,root,-)
@@ -446,6 +461,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Sun Mar 04 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120303-1
+- Bumped to 1.4.99.20120303
+
 * Wed Feb 08 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120203-3
 - Fixed ibus-setup on C locale
 - Fixed to show no registered engines from g-c-c.
