@@ -25,7 +25,7 @@
 
 Name:       ibus
 Version:    1.4.99.20120304
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -36,7 +36,7 @@ Source1:    xinput-ibus
 %if %have_gjsfile
 Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/ibus-gjs-%{ibus_gjs_version}.tar.gz
 %endif
-# Patch0:     ibus-HEAD.patch
+Patch0:     ibus-HEAD.patch
 Patch1:     ibus-541492-xkb.patch
 Patch2:     ibus-xx-setup-frequent-lang.patch
 # Patch3:     ibus-530711-preload-sys.patch
@@ -207,7 +207,7 @@ cd $d
 cd ..
 %endif
 %endif
-# %patch0 -p1
+%patch0 -p1
 %patch92 -p1 -b .g-s-preedit
 cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 %if %have_libxkbfile
@@ -461,6 +461,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon Mar 05 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120303-2
+- Added ibus-HEAD.patch to fix python library to load libibus.so.
+
 * Sun Mar 04 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120303-1
 - Bumped to 1.4.99.20120303
 

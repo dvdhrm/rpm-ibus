@@ -1,1 +1,52 @@
+From 35f6353b89726878fa99de2588fb6be5aef8686c Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Mon, 5 Mar 2012 11:16:23 +0900
+Subject: [PATCH] Fix python library to load libibus.so.Y
+
+---
+ ibus/_config.py.in |    2 ++
+ ibus/common.py     |    3 ++-
+ 2 files changed, 4 insertions(+), 1 deletions(-)
+
+diff --git a/ibus/_config.py.in b/ibus/_config.py.in
+index 098d805..c9d11bb 100644
+--- a/ibus/_config.py.in
++++ b/ibus/_config.py.in
+@@ -25,6 +25,7 @@ __all__ = (
+     "get_copyright",
+     "get_license",
+     "get_ICON_KEYBOARD",
++    "LIBIBUS_SONAME",
+     "ISOCODES_PREFIX",
+     "_"
+ )
+@@ -55,4 +56,5 @@ def get_ICON_KEYBOARD():
+         return fallback_icon
+     return icon
+ 
++LIBIBUS_SONAME='libibus-@IBUS_API_VERSION@.so.@LT_CURRENT_MINUS_AGE@'
+ ISOCODES_PREFIX='@ISOCODES_PREFIX@'
+diff --git a/ibus/common.py b/ibus/common.py
+index 6483aae..fb39d56 100644
+--- a/ibus/common.py
++++ b/ibus/common.py
+@@ -59,6 +59,7 @@ import os
+ import sys
+ from xdg import BaseDirectory
+ import ctypes
++import _config
+ 
+ # __display = os.environ["DISPLAY"]
+ # __hostname, __display_screen = __display.split(":", 1)
+@@ -104,7 +105,7 @@ import ctypes
+ #         return None
+ #     return address
+ 
+-libibus = ctypes.CDLL("libibus-1.0.so.0")
++libibus = ctypes.CDLL(_config.LIBIBUS_SONAME)
+ get_address = libibus.ibus_get_address
+ get_address.restype=ctypes.c_char_p
+ 
+-- 
+1.7.9.1
 
