@@ -50,3 +50,42 @@ index 6483aae..fb39d56 100644
 -- 
 1.7.9.1
 
+From 401f881314abce57a0979aa4ef08fc5462dfe3ca Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Sat, 10 Mar 2012 09:45:07 +0900
+Subject: [PATCH] Fix to ungrab ui/gtk3/switcher for GTK 3.3.18 and GLib
+ 2.31.20
+
+---
+ ui/gtk3/switcher.vala |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
+
+diff --git a/ui/gtk3/switcher.vala b/ui/gtk3/switcher.vala
+index 76c67ec..131cad5 100644
+--- a/ui/gtk3/switcher.vala
++++ b/ui/gtk3/switcher.vala
+@@ -127,6 +127,9 @@ class Switcher : Gtk.Window {
+         m_loop.run();
+         m_loop = null;
+ 
++        keyboard.ungrab(Gdk.CURRENT_TIME);
++        pointer.ungrab(Gdk.CURRENT_TIME);
++
+         hide();
+         // Make sure the switcher is hidden before returning from this function.
+         while (Gtk.events_pending())
+@@ -239,6 +242,11 @@ class Switcher : Gtk.Window {
+             return true;
+         }
+ 
++        // if e.type == Gdk.EventType.KEY_RELEASE, m_loop is already null.
++        if (m_loop == null) {
++            return false;
++        }
++
+         m_loop.quit();
+         m_result = (int)m_selected_engine;
+         return true;
+-- 
+1.7.9.1
+

@@ -8,8 +8,10 @@
 %define have_pygobject2 1
 %define have_pygobject3 1
 
+%define vala_build_failure 1
+
 %if 0%{?fedora} > 16
-%define ibus_gjs_version 3.3.3.20120203
+%define ibus_gjs_version 3.3.90.20120308
 %define ibus_gjs_build_failure 1
 %else
 %define ibus_gjs_version 3.2.1.20111230
@@ -25,7 +27,7 @@
 
 Name:       ibus
 Version:    1.4.99.20120304
-Release:    2%{?dist}
+Release:    3%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -43,11 +45,16 @@ Patch2:     ibus-xx-setup-frequent-lang.patch
 
 # Workaround gnome-shell build failure
 # http://koji.fedoraproject.org/koji/getfile?taskID=3317917&name=root.log
-Patch91:    ibus-gjs-xx-gnome-shell-3.1.4-build-failure.patch
+# Patch91:    ibus-gjs-xx-gnome-shell-3.1.4-build-failure.patch
 # Workaround to disable preedit on gnome-shell until bug 658420 is fixed.
 # https://bugzilla.gnome.org/show_bug.cgi?id=658420
 Patch92:    ibus-xx-g-s-disable-preedit.patch
 Patch93:    ibus-771115-property-compatible.patch
+%if %vala_build_failure
+# Xkl-1.0.gir cannot be converted to vapi.
+# https://bugs.freedesktop.org/show_bug.cgi?id=47141
+Patch94:    ibus-xx-vapi-build-failure.diff
+%endif
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -56,7 +63,6 @@ BuildRequires:  cvs
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
 BuildRequires:  python
-BuildRequires:  gobject-introspection-devel
 BuildRequires:  gtk2-devel
 BuildRequires:  gtk3-devel
 BuildRequires:  dbus-glib-devel
@@ -72,7 +78,7 @@ BuildRequires:  vala-tools
 # for AM_GCONF_SOURCE_2 in configure.ac
 BuildRequires:  GConf2-devel
 %if %have_pygobject3
-BuildRequires:  pygobject3-devel
+BuildRequires:  gobject-introspection-devel
 %endif
 BuildRequires:  intltool
 BuildRequires:  iso-codes-devel
@@ -163,6 +169,7 @@ Requires(post): glib2 >= %{glib_ver}
 %description gtk3
 This package contains ibus im module for gtk3
 
+%ifnarch ppc ppc64 s390 s390x
 %package gnome3
 Summary:    IBus gnome-shell-extension for GNOME3
 Group:      System Environment/Libraries
@@ -174,6 +181,7 @@ Requires:   gnome-shell
 This is a transitional package which allows users to try out new IBus
 GUI for GNOME3 in development.  Note that this package will be marked
 as obsolete once the integration has completed in the GNOME3 upstream.
+%endif
 
 %package devel
 Summary:    Development tools for ibus
@@ -198,20 +206,26 @@ The ibus-devel-docs package contains developer documentation for ibus
 
 %prep
 %setup -q
+%ifnarch ppc ppc64 s390 s390x
 %if %have_gjsfile
 zcat %SOURCE2 | tar xf -
 %if %ibus_gjs_build_failure
 d=`basename %SOURCE2 .tar.gz`
 cd $d
-%patch91 -p1 -b .fail-g-s
+#%patch91 -p1 -b .fail-g-s
 cd ..
 %endif
 %endif
+%endif
+
 %patch0 -p1
 %patch92 -p1 -b .g-s-preedit
 cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 %if %have_libxkbfile
 %patch1 -p1 -b .xkb
+%if %vala_build_failure
+%patch94 -p1 -b .vala-fail
+%endif
 rm -f bindings/vala/ibus-1.0.vapi
 %endif
 %patch2 -p1 -b .setup-frequent-lang
@@ -258,10 +272,18 @@ autoreconf -f -i
 %endif
     --enable-introspection
 
+%if %vala_build_failure
+touch ui/gtk3/ibus_ui_gtk3_vala.stamp
+touch ui/gtk3/*.c
+cp ui/gtk3/gkbdlayout.c.true ui/gtk3/gkbdlayout.c
+%endif
+
 # make -C po update-gmo
 make %{?_smp_mflags} \
+  AM_DEFAULT_VERBOSITY=1 \
   PKG_CONFIG_PATH=..:/usr/lib64/pkgconfig:/usr/lib/pkgconfig
 
+%ifnarch ppc ppc64 s390 s390x
 %if %have_gjsfile
 d=`basename %SOURCE2 .tar.gz`
 cd $d
@@ -269,9 +291,12 @@ cd $d
 autoreconf
 %endif
 export PKG_CONFIG_PATH=..:/usr/lib64/pkgconfig:/usr/lib/pkgconfig
-%configure
+%configure \
+  --with-gnome-shell-version="3.3.90,3.3.5,3.3.4,3.3.3,3.2" \
+  --with-gjs-version="1.31.20,1.31.10,1.31.6,1.31.11,1.30"
 make %{?_smp_mflags}
 cd ..
+%endif
 %endif
 
 %install
@@ -303,6 +328,7 @@ desktop-file-install --delete-original          \
   --dir $RPM_BUILD_ROOT%{_datadir}/applications \
   $RPM_BUILD_ROOT%{_datadir}/applications/*
 
+%ifnarch ppc ppc64 s390 s390x
 %if %have_gjsfile
 # https://bugzilla.redhat.com/show_bug.cgi?id=657165
 d=`basename %SOURCE2 .tar.gz`
@@ -310,6 +336,7 @@ cd $d
 make DESTDIR=$RPM_BUILD_ROOT install
 rm -f $RPM_BUILD_ROOT%{_datadir}/locale/*/LC_MESSAGES/ibus-gjs.mo
 cd ..
+%endif
 %endif
 
 # FIXME: no version number
@@ -442,10 +469,12 @@ fi
 %defattr(-,root,root,-)
 %{_libdir}/gtk-3.0/%{gtk3_binary_version}/immodules/im-ibus.so
 
+%ifnarch ppc ppc64 s390 s390x
 %files gnome3
 %defattr(-,root,root,-)
 %{_datadir}/gnome-shell/js/ui/status/ibus
 %{_datadir}/gnome-shell/extensions/ibus-indicator@example.com
+%endif
 
 %files devel
 %defattr(-,root,root,-)
@@ -461,11 +490,18 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Mar 08 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120303-3
+- Bumped to ibus-gjs 3.3.90.20120308 to work with gnome-shell 3.3.90
+- Fixed Bug 786906 - Added ifnarch ppc ppc64 s390 s390x
+- Updated ibus-HEAD.patch
+  Fixed Bug 800897 - After doing "ctrl+space", ibus tray icon freezes
+
 * Mon Mar 05 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120303-2
 - Added ibus-HEAD.patch to fix python library to load libibus.so.
 
 * Sun Mar 04 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120303-1
 - Bumped to 1.4.99.20120303
+  Fixed Bug 796070 - ibus-setup without no ibus-daemon
 
 * Wed Feb 08 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120203-3
 - Fixed ibus-setup on C locale
