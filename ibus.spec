@@ -3,12 +3,17 @@
 %{!?gtk3_binary_version: %define gtk3_binary_version %(pkg-config  --variable=gtk_binary_version gtk+-3.0)}
 
 %define have_libxkbfile 1
-%define have_gjsfile 1
 %define have_dconf 1
 %define have_pygobject2 1
 %define have_pygobject3 1
 
 %define vala_build_failure 1
+
+%ifarch ppc ppc64 s390 s390x
+%define have_gjsfile 0
+%else
+%define have_gjsfile 1
+%endif
 
 %if 0%{?fedora} > 16
 %define ibus_gjs_version 3.3.90.20120308
@@ -169,7 +174,7 @@ Requires(post): glib2 >= %{glib_ver}
 %description gtk3
 This package contains ibus im module for gtk3
 
-%ifnarch ppc ppc64 s390 s390x
+%if %have_gjsfile
 %package gnome3
 Summary:    IBus gnome-shell-extension for GNOME3
 Group:      System Environment/Libraries
@@ -206,7 +211,6 @@ The ibus-devel-docs package contains developer documentation for ibus
 
 %prep
 %setup -q
-%ifnarch ppc ppc64 s390 s390x
 %if %have_gjsfile
 zcat %SOURCE2 | tar xf -
 %if %ibus_gjs_build_failure
@@ -214,7 +218,6 @@ d=`basename %SOURCE2 .tar.gz`
 cd $d
 #%patch91 -p1 -b .fail-g-s
 cd ..
-%endif
 %endif
 %endif
 
@@ -283,7 +286,6 @@ make %{?_smp_mflags} \
   AM_DEFAULT_VERBOSITY=1 \
   PKG_CONFIG_PATH=..:/usr/lib64/pkgconfig:/usr/lib/pkgconfig
 
-%ifnarch ppc ppc64 s390 s390x
 %if %have_gjsfile
 d=`basename %SOURCE2 .tar.gz`
 cd $d
@@ -296,7 +298,6 @@ export PKG_CONFIG_PATH=..:/usr/lib64/pkgconfig:/usr/lib/pkgconfig
   --with-gjs-version="1.31.20,1.31.10,1.31.6,1.31.11,1.30"
 make %{?_smp_mflags}
 cd ..
-%endif
 %endif
 
 %install
@@ -328,7 +329,6 @@ desktop-file-install --delete-original          \
   --dir $RPM_BUILD_ROOT%{_datadir}/applications \
   $RPM_BUILD_ROOT%{_datadir}/applications/*
 
-%ifnarch ppc ppc64 s390 s390x
 %if %have_gjsfile
 # https://bugzilla.redhat.com/show_bug.cgi?id=657165
 d=`basename %SOURCE2 .tar.gz`
@@ -336,7 +336,6 @@ cd $d
 make DESTDIR=$RPM_BUILD_ROOT install
 rm -f $RPM_BUILD_ROOT%{_datadir}/locale/*/LC_MESSAGES/ibus-gjs.mo
 cd ..
-%endif
 %endif
 
 # FIXME: no version number
@@ -469,7 +468,7 @@ fi
 %defattr(-,root,root,-)
 %{_libdir}/gtk-3.0/%{gtk3_binary_version}/immodules/im-ibus.so
 
-%ifnarch ppc ppc64 s390 s390x
+%if %have_gjsfile
 %files gnome3
 %defattr(-,root,root,-)
 %{_datadir}/gnome-shell/js/ui/status/ibus
