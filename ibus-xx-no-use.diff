@@ -1,0 +1,221 @@
+--- ibus-1.4.99.20120317/setup/main.py.orig	2012-03-16 14:58:17.228279261 +0900
++++ ibus-1.4.99.20120317/setup/main.py	2012-03-16 14:58:50.316202253 +0900
+@@ -75,22 +75,30 @@ class Setup(object):
+         self.__init_ui()
+ 
+     def __init_hotkey(self):
++        '''
+         default_values = {
+             "trigger" : (N_("trigger"), ["Control+space"]),
+             "enable_unconditional" : (N_("enable"), []),
+             "disable_unconditional" : (N_("disable"), [])
+         }
++        '''
++        default_values = {
++            'trigger_accel' : ('trigger', ['<Control>space']),
++        }
+ 
+         values = dict(self.__config.get_values("general/hotkey"))
+ 
+-        for name, (label, shortcuts) in default_values.items():
++        for name, (id, shortcuts) in default_values.items():
+             shortcuts = values.get(name, shortcuts)
+-            button = self.__builder.get_object("button_%s" % name)
+-            entry = self.__builder.get_object("entry_%s" % name)
++            button = self.__builder.get_object("button_%s" % id)
++            entry = self.__builder.get_object("entry_%s" % id)
+             entry.set_text("; ".join(shortcuts))
+-            entry.set_tooltip_text("\n".join(shortcuts))
+-            button.connect("clicked", self.__shortcut_button_clicked_cb,
+-                    label, "general/hotkey", name, entry)
++            text = '\n'.join(shortcuts)
++            text = "Use ';' separated values\n" + text
++            entry.set_tooltip_text(text)
++            button.connect("clicked", self.__shortcut_button_clicked_cb2,
++                    name, "general/hotkey", id, entry)
++            button.set_tooltip_text("Save the left entry string")
+ 
+     def __init_panel(self):
+         values = dict(self.__config.get_values("panel"))
+@@ -446,6 +454,37 @@ class Setup(object):
+         entry.set_text(text)
+         entry.set_tooltip_text(text)
+ 
++    def __shortcut_button_clicked_cb2(self, button, name, section, id, entry):
++        text = entry.get_text()
++        if text:
++            text = text.replace(' ', '')
++            shortcuts = text.split(';')
++        else:
++            shortcuts = []
++        orig_list =['<Control>space']
++        variant = self.__config.get_value(section, name)
++        if variant != None:
++            orig_list = variant.dup_strv()[0]
++        orig_text = ';'.join(orig_list)
++        if text == orig_text:
++            return
++        is_valid = True
++        for shortcut in shortcuts:
++            (key, mods) = Gtk.accelerator_parse(shortcut)
++            if not Gtk.accelerator_valid(key, mods):
++                is_valid = False
++                dlg = Gtk.MessageDialog(type = Gtk.MessageType.ERROR,
++                        buttons = Gtk.ButtonsType.CLOSE,
++                        message_format = "Invalid key %s" % shortcut)
++                dlg.run()
++                dlg.destroy()
++                break
++        if not is_valid:
++            return
++        self.__config.set_value(section, name, GLib.Variant.new_strv(shortcuts))
++        text = '\n'.join(shortcuts)
++        text = "Use ';' separated values\n" + text
++        entry.set_tooltip_text(text)
+ 
+     def __item_started_column_toggled_cb(self, cell, path_str, model):
+ 
+--- ibus-1.4.99.20120317/setup/setup.ui.orig	2012-03-16 14:58:23.948466373 +0900
++++ ibus-1.4.99.20120317/setup/setup.ui	2012-03-16 14:59:22.242094469 +0900
+@@ -102,7 +102,7 @@
+                                 <property name="row_spacing">6</property>
+                                 <child>
+                                   <object class="GtkLabel" id="label8">
+-                                    <property name="visible">True</property>
++                                    <property name="no_show_all">True</property>
+                                     <property name="tooltip_text" translatable="yes">The shortcut keys for switching to next input method in the list</property>
+                                     <property name="xalign">0</property>
+                                     <property name="label" translatable="yes">Next input method:</property>
+@@ -116,7 +116,7 @@
+                                 </child>
+                                 <child>
+                                   <object class="GtkLabel" id="label9">
+-                                    <property name="visible">True</property>
++                                    <property name="no_show_all">True</property>
+                                     <property name="sensitive">False</property>
+                                     <property name="tooltip_text" translatable="yes">The shortcut keys for switching to previous input method in the list</property>
+                                     <property name="xalign">0</property>
+@@ -137,7 +137,7 @@
+                                       <object class="GtkEntry" id="entry_trigger">
+                                         <property name="visible">True</property>
+                                         <property name="can_focus">True</property>
+-                                        <property name="editable">False</property>
++                                        <!-- property name="editable">False</property -->
+                                       </object>
+                                       <packing>
+                                         <property name="position">0</property>
+@@ -145,7 +145,9 @@
+                                     </child>
+                                     <child>
+                                       <object class="GtkButton" id="button_trigger">
+-                                        <property name="label" translatable="yes">...</property>
++                                        <!-- property name="label" translatable="yes">...</property -->
++                                        <property name="label">gtk-apply</property>
++                                        <property name="use_stock">True</property>
+                                         <property name="visible">True</property>
+                                         <property name="can_focus">True</property>
+                                         <property name="receives_default">False</property>
+@@ -160,11 +162,12 @@
+                                   <packing>
+                                     <property name="left_attach">1</property>
+                                     <property name="right_attach">2</property>
++                                    <property name="y_options">GTK_FILL</property>
+                                   </packing>
+                                 </child>
+                                 <child>
+                                   <object class="GtkHBox" id="hbox5">
+-                                    <property name="visible">True</property>
++                                    <property name="no_show_all">True</property>
+                                     <property name="spacing">6</property>
+                                     <child>
+                                       <object class="GtkEntry" id="entry_next_engine">
+@@ -199,7 +202,7 @@
+                                 </child>
+                                 <child>
+                                   <object class="GtkHBox" id="hbox6">
+-                                    <property name="visible">True</property>
++                                    <property name="no_show_all">True</property>
+                                     <property name="spacing">6</property>
+                                     <child>
+                                       <object class="GtkEntry" id="entry_prev_engine">
+@@ -248,7 +251,7 @@
+                                 </child>
+                                 <child>
+                                   <object class="GtkLabel" id="label18">
+-                                    <property name="visible">True</property>
++                                    <property name="no_show_all">True</property>
+                                     <property name="xalign">0</property>
+                                     <property name="label" translatable="yes">Enable:</property>
+                                   </object>
+@@ -261,7 +264,7 @@
+                                 </child>
+                                 <child>
+                                   <object class="GtkHBox" id="hbox2">
+-                                    <property name="visible">True</property>
++                                    <property name="no_show_all">True</property>
+                                     <property name="spacing">6</property>
+                                     <child>
+                                       <object class="GtkEntry" id="entry_enable_unconditional">
+@@ -296,7 +299,7 @@
+                                 </child>
+                                 <child>
+                                   <object class="GtkLabel" id="label19">
+-                                    <property name="visible">True</property>
++                                    <property name="no_show_all">True</property>
+                                     <property name="xalign">0</property>
+                                     <property name="label" translatable="yes">Disable:</property>
+                                   </object>
+@@ -309,7 +312,7 @@
+                                 </child>
+                                 <child>
+                                   <object class="GtkHBox" id="hbox3">
+-                                    <property name="visible">True</property>
++                                    <property name="no_show_all">True</property>
+                                     <property name="spacing">6</property>
+                                     <child>
+                                       <object class="GtkEntry" id="entry_disable_unconditional">
+@@ -406,7 +409,7 @@
+                                 </child>
+                                 <child>
+                                   <object class="GtkLabel" id="label10">
+-                                    <property name="visible">True</property>
++                                    <property name="no_show_all">True</property>
+                                     <property name="tooltip_text" translatable="yes">Set the behavior of ibus how to show or hide language bar</property>
+                                     <property name="xalign">0</property>
+                                     <property name="label" translatable="yes">Show language panel:</property>
+@@ -433,7 +436,7 @@
+                                 </child>
+                                 <child>
+                                   <object class="GtkComboBox" id="combobox_panel_show">
+-                                    <property name="visible">True</property>
++                                    <property name="no_show_all">True</property>
+                                     <property name="model">model_panel_show_mode</property>
+                                     <child>
+                                       <object class="GtkCellRendererText" id="renderer2"/>
+@@ -470,7 +473,7 @@
+                                 <child>
+                                   <object class="GtkCheckButton" id="checkbutton_show_icon_on_systray">
+                                     <property name="label" translatable="yes">Show icon on system tray</property>
+-                                    <property name="visible">True</property>
++                                    <property name="no_show_all">True</property>
+                                     <property name="can_focus">True</property>
+                                     <property name="receives_default">False</property>
+                                     <property name="tooltip_text" translatable="yes">Show icon on system tray</property>
+@@ -486,7 +489,7 @@
+                                 <child>
+                                   <object class="GtkCheckButton" id="checkbutton_show_im_name">
+                                     <property name="label" translatable="yes">Show input method name on language bar</property>
+-                                    <property name="visible">True</property>
++                                    <property name="no_show_all">True</property>
+                                     <property name="can_focus">True</property>
+                                     <property name="receives_default">False</property>
+                                     <property name="tooltip_text" translatable="yes">Show input method's name on language bar when check the checkbox</property>
+@@ -893,7 +896,7 @@ You may use up/down buttons to change it
+                     </child>
+                     <child>
+                       <object class="GtkFrame" id="frame5">
+-                        <property name="visible">True</property>
++                        <property name="no_show_all">True</property>
+                         <property name="label_xalign">0</property>
+                         <property name="shadow_type">none</property>
+                         <child>

@@ -1,11 +1,11 @@
-From 571e4ab3e28acb90466ac58e3fe9f4efc4b8ba0e Mon Sep 17 00:00:00 2001
+From c58730dd0d9c161a7824105d320f60af769e1f05 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Sun, 4 Mar 2012 22:16:01 +0900
+Date: Fri, 16 Mar 2012 20:45:03 +0900
 Subject: [PATCH] Add ibus-xkb and libgnomekbd.
 
 ---
  configure.ac                  |   59 +++++
- data/ibus.schemas.in          |   58 +++++
+ data/ibus.schemas.in          |   60 +++++-
  engine/Makefile.am            |   22 ++
  engine/ibus-xkb-main.c        |  111 +++++++++
  engine/main.vala              |   86 +++++++
@@ -14,30 +14,32 @@ Subject: [PATCH] Add ibus-xkb and libgnomekbd.
  engine/xkblib.h               |   41 ++++
  ibus-1.0.pc.in                |    4 +
  setup/enginecombobox.py       |    6 +-
- setup/main.py                 |   17 ++-
+ setup/main.py                 |   28 ++-
  src/Makefile.am               |    5 +
  src/ibus.h                    |    1 +
  src/ibusxkbxml.c              |  466 ++++++++++++++++++++++++++++++++++++
  src/ibusxkbxml.h              |  187 +++++++++++++++
  ui/gtk3/Gkbd-3.0.metadata     |    1 +
- ui/gtk3/Makefile.am           |   45 ++++
+ ui/gtk3/Makefile.am           |   48 ++++
+ ui/gtk3/Xkl-1.0.metadata      |    3 +
  ui/gtk3/gkbdlayout.vala.false |   63 +++++
  ui/gtk3/gkbdlayout.vala.true  |  111 +++++++++
  ui/gtk3/panel.vala            |  275 ++++++++++++++++++++--
  ui/gtk3/xkblayout.vala        |  466 ++++++++++++++++++++++++++++++++++++
- 21 files changed, 2331 insertions(+), 551 deletions(-)
+ 22 files changed, 2346 insertions(+), 555 deletions(-)
  create mode 100644 engine/ibus-xkb-main.c
  create mode 100644 engine/xkblib.c
  create mode 100644 engine/xkblib.h
  create mode 100644 src/ibusxkbxml.c
  create mode 100644 src/ibusxkbxml.h
  create mode 100644 ui/gtk3/Gkbd-3.0.metadata
+ create mode 100644 ui/gtk3/Xkl-1.0.metadata
  create mode 100644 ui/gtk3/gkbdlayout.vala.false
  create mode 100644 ui/gtk3/gkbdlayout.vala.true
  create mode 100644 ui/gtk3/xkblayout.vala
 
 diff --git a/configure.ac b/configure.ac
-index aeb22b4..a516c94 100644
+index 1c4b283..596b30e 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -249,6 +249,63 @@ else
@@ -113,28 +115,30 @@ index aeb22b4..a516c94 100644
  ])
  
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 53ba05c..3ca0fbc 100644
+index 53ba05c..05c0174 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
-@@ -38,6 +38,18 @@
-       </locale>
-     </schema>
-     <schema>
-+      <key>/schemas/desktop/ibus/general/hotkey/trigger-accel</key>
-+      <applyto>/desktop/ibus/general/hotkey/trigger-accel</applyto>
+@@ -34,7 +34,19 @@
+       <default>[Control+space,Zenkaku_Hankaku,Alt+Kanji,Alt+grave,Hangul,Alt+Release+Alt_R]</default>
+       <locale name="C">
+         <short>Trigger shortcut keys</short>
+-	    <long>The shortcut keys for turning input method on or off</long>
++            <long>The shortcut keys for turning input method on or off</long>
++      </locale>
++    </schema>
++    <schema>
++      <key>/schemas/desktop/ibus/general/hotkey/trigger_accel</key>
++      <applyto>/desktop/ibus/general/hotkey/trigger_accel</applyto>
 +      <owner>ibus</owner>
 +      <type>list</type>
 +      <list_type>string</list_type>
 +      <default>[&lt;Control&gt;space]</default>
 +      <locale name="C">
 +        <short>Trigger shortcut keys for gtk_accelerator_parse</short>
-+	    <long>The shortcut keys for turning input method on or off</long>
-+      </locale>
-+    </schema>
-+    <schema>
-       <key>/schemas/desktop/ibus/general/hotkey/enable_unconditional</key>
-       <applyto>/desktop/ibus/general/hotkey/enable_unconditional</applyto>
-       <owner>ibus</owner>
++            <long>The shortcut keys for turning input method on or off</long>
+       </locale>
+     </schema>
+     <schema>
 @@ -203,6 +215,52 @@
        </locale>
      </schema>
@@ -1405,42 +1409,59 @@ index 8d1424b..0ac7368 100644
          if current_lang in keys:
              keys.remove(current_lang)
 diff --git a/setup/main.py b/setup/main.py
-index 274b25a..e3027a5 100644
+index fdfb33a..9638da0 100644
 --- a/setup/main.py
 +++ b/setup/main.py
-@@ -182,12 +182,25 @@ class Setup(object):
-                 self.__checkbutton_use_global_engine_toggled_cb)
+@@ -183,14 +183,25 @@ class Setup(object):
  
          # init engine page
--        self.__engines = self.__bus.list_engines()
-+        self.__engines = []
+         self.__engines = self.__bus.list_engines()
 +        value = self.__config.get_value("general", "load_xkb_layouts")
 +        load_layouts = []
 +        if value != None:
-+            load_layouts = map(lambda l: str(l), list(value))
++            load_layouts = value.dup_strv()[0]
 +        if len(load_layouts) == 0:
-+            self.__engines = self.__bus.list_engines()
++            engines = self.__engines
 +        else:
-+            for engine in self.__bus.list_engines():
-+                if not engine.props.name.startswith('xkb:'):
-+                    self.__engines.append(engine)
-+                elif engine.props.layout in load_layouts:
-+                    self.__engines.append(engine)
++            engines = []
++            for engine in self.__engines:
++                if not engine.get_name().startswith('xkb:'):
++                    engines.append(engine)
++                elif engine.get_layout() in load_layouts:
++                    engines.append(engine)
 +
          self.__combobox = self.__builder.get_object("combobox_engines")
-         self.__combobox.set_engines(self.__engines)
+-        self.__combobox.set_engines(self.__engines)
++        self.__combobox.set_engines(engines)
  
-         tmp_dict = {}
+-        tmp_dict = {}
 -        for e in self.__engines:
-+        for e in self.__bus.list_engines():
-             tmp_dict[e.get_name()] = e
+-            tmp_dict[e.get_name()] = e
          engine_names = values.get("preload_engines", [])
-         engines = [tmp_dict[name] for name in engine_names if name in tmp_dict]
+-        engines = [tmp_dict[name] for name in engine_names if name in tmp_dict]
++        engines = self.__get_engine_descs_from_names(engine_names)
+ 
+         self.__treeview = self.__builder.get_object("treeview_engines")
+         self.__treeview.set_engines(engines)
+@@ -263,6 +274,13 @@ class Setup(object):
+             args.append(path.basename(setup_path))
+         return args
+ 
++    def __get_engine_descs_from_names(self, engine_names):
++        tmp_dict = {}
++        for e in self.__engines:
++            tmp_dict[e.get_name()] = e
++        engines = [tmp_dict[name] for name in engine_names if name in tmp_dict]
++        return engines
++
+     def __treeview_notify_cb(self, treeview, prop):
+         if prop.name not in ("active-engine", "engines"):
+             return
 diff --git a/src/Makefile.am b/src/Makefile.am
-index b4d0dcf..1631cae 100644
+index b1d1766..29f0d58 100644
 --- a/src/Makefile.am
 +++ b/src/Makefile.am
-@@ -190,6 +190,11 @@ typelibs_DATA = $(INTROSPECTION_GIRS:.gir=.typelib)
+@@ -194,6 +194,11 @@ typelibs_DATA = $(INTROSPECTION_GIRS:.gir=.typelib)
  CLEANFILES += $(dist_gir_DATA) $(typelibs_DATA)
  endif
  
@@ -2137,7 +2158,7 @@ index 0000000..661e6fd
 @@ -0,0 +1 @@
 +Configuration cheader_filename="libgnomekbd/gkbd-configuration.h"
 diff --git a/ui/gtk3/Makefile.am b/ui/gtk3/Makefile.am
-index 0fb9d3c..33aaaa3 100644
+index 0fb9d3c..5ccf8b0 100644
 --- a/ui/gtk3/Makefile.am
 +++ b/ui/gtk3/Makefile.am
 @@ -42,6 +42,9 @@ INCLUDES = \
@@ -2161,7 +2182,7 @@ index 0fb9d3c..33aaaa3 100644
  	-Wno-unused-variable \
  	-Wno-unused-but-set-variable \
  	-Wno-unused-function \
-@@ -86,6 +93,7 @@ ibus_ui_gtk3_valas = \
+@@ -86,6 +93,7 @@ ibus_ui_gtk3_SOURCES = \
  	application.vala \
  	candidatearea.vala \
  	candidatepanel.vala \
@@ -2169,15 +2190,15 @@ index 0fb9d3c..33aaaa3 100644
  	handle.vala \
  	iconwidget.vala \
  	keybindingmanager.vala \
-@@ -94,6 +102,7 @@ ibus_ui_gtk3_valas = \
+@@ -94,6 +102,7 @@ ibus_ui_gtk3_SOURCES = \
  	property.vala \
  	separator.vala \
  	switcher.vala \
 +	xkblayout.vala \
+ 	grabkeycode.c \
  	$(NULL)
- ibus_ui_gtk3_vala_cfiles = $(ibus_ui_gtk3_valas:.vala=.c)
  
-@@ -106,12 +115,48 @@ ibus_ui_gtk3_LDADD = \
+@@ -101,12 +110,51 @@ ibus_ui_gtk3_LDADD = \
  	$(AM_LDADD) \
  	$(NULL)
  
@@ -2194,9 +2215,11 @@ index 0fb9d3c..33aaaa3 100644
 +
 +AM_VALAFLAGS += \
 +	--vapidir=. \
++	--metadatadir=. \
 +	--pkg=glib-2.0 \
 +	--pkg=gmodule-2.0 \
 +	--pkg=gkbd \
++	--pkg=Xkl-1.0 \
 +	$(NULL)
 +
 +$(srcdir)/gkbd.vapi:
@@ -2216,7 +2239,6 @@ index 0fb9d3c..33aaaa3 100644
 +	gkbd.vapi \
 +	gkbdlayout.vala \
  	gtkpanel.xml \
- 	$(ibus_ui_gtk3_vala_cfiles) \
  	$(NULL)
  
  EXTRA_DIST = \
@@ -2224,8 +2246,19 @@ index 0fb9d3c..33aaaa3 100644
 +	gkbdlayout.vala.false \
 +	gkbdlayout.vala.true \
  	gtkpanel.xml.in.in \
++	Xkl-1.0.metadata \
  	$(NULL)
  
+ 
+diff --git a/ui/gtk3/Xkl-1.0.metadata b/ui/gtk3/Xkl-1.0.metadata
+new file mode 100644
+index 0000000..4961d0c
+--- /dev/null
++++ b/ui/gtk3/Xkl-1.0.metadata
+@@ -0,0 +1,3 @@
++Xkl cheader_filename="libxklavier/xklavier.h"
++Engine
++    .filter_events.evt ref type="X.Event"
 diff --git a/ui/gtk3/gkbdlayout.vala.false b/ui/gtk3/gkbdlayout.vala.false
 new file mode 100644
 index 0000000..a387de9
@@ -2413,7 +2446,7 @@ index 0000000..adacd81
 +    */
 +}
 diff --git a/ui/gtk3/panel.vala b/ui/gtk3/panel.vala
-index b83d7e3..2a386a0 100644
+index d927491..f8805e0 100644
 --- a/ui/gtk3/panel.vala
 +++ b/ui/gtk3/panel.vala
 @@ -40,8 +40,16 @@ class Panel : IBus.PanelService {
@@ -2515,20 +2548,24 @@ index b83d7e3..2a386a0 100644
 +        }
      }
  
-     public void set_config(IBus.Config config) {
-@@ -93,8 +152,10 @@ class Panel : IBus.PanelService {
+     private void set_custom_font() {
+@@ -124,12 +183,14 @@ class Panel : IBus.PanelService {
          }
  
          m_config = config;
 +        set_keybinding();
          if (m_config != null) {
              m_config.value_changed.connect(config_value_changed_cb);
+             m_config.watch("general", "preload_engines");
+             m_config.watch("general", "engines_order");
+             m_config.watch("panel", "custom_font");
+             m_config.watch("panel", "use_custom_font");
 +            init_engines_order();
              update_engines(m_config.get_value("general", "preload_engines"),
                             m_config.get_value("general", "engines_order"));
          } else {
-@@ -102,6 +163,192 @@ class Panel : IBus.PanelService {
-         }
+@@ -139,6 +200,192 @@ class Panel : IBus.PanelService {
+         set_custom_font();
      }
  
 +    private void gkbdlayout_changed_cb() {
@@ -2720,7 +2757,7 @@ index b83d7e3..2a386a0 100644
      private void switch_engine(int i, bool force = false) {
          GLib.assert(i >= 0 && i < m_engines.length);
  
-@@ -121,15 +368,7 @@ class Panel : IBus.PanelService {
+@@ -158,15 +405,7 @@ class Panel : IBus.PanelService {
              return;
          }
          // set xkb layout

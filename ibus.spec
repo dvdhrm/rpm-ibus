@@ -2,21 +2,19 @@
 %{!?gtk2_binary_version: %define gtk2_binary_version %(pkg-config  --variable=gtk_binary_version gtk+-2.0)}
 %{!?gtk3_binary_version: %define gtk3_binary_version %(pkg-config  --variable=gtk_binary_version gtk+-3.0)}
 
-%define have_libxkbfile 1
-%define have_dconf 1
-%define have_pygobject2 1
-%define have_pygobject3 1
-
-%define vala_build_failure 1
+%define with_xkbfile 1
+%define with_dconf 1
+%define with_pygobject2 1
+%define with_pygobject3 1
 
 %ifarch ppc ppc64 s390 s390x
-%define have_gjsfile 0
+%define with_gjs 0
 %else
-%define have_gjsfile 1
+%define with_gjs 1
 %endif
 
 %if 0%{?fedora} > 16
-%define ibus_gjs_version 3.3.90.20120308
+%define ibus_gjs_version 3.3.90.20120317
 %define ibus_gjs_build_failure 1
 %else
 %define ibus_gjs_version 3.2.1.20111230
@@ -31,8 +29,8 @@
 %define gnome_icon_theme_legacy_version 2.91.6
 
 Name:       ibus
-Version:    1.4.99.20120304
-Release:    3%{?dist}
+Version:    1.4.99.20120317
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -40,26 +38,18 @@ URL:        http://code.google.com/p/ibus/
 # Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source0:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
-%if %have_gjsfile
 Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/ibus-gjs-%{ibus_gjs_version}.tar.gz
-%endif
 Patch0:     ibus-HEAD.patch
 Patch1:     ibus-541492-xkb.patch
-Patch2:     ibus-xx-setup-frequent-lang.patch
-# Patch3:     ibus-530711-preload-sys.patch
+Patch2:     ibus-530711-preload-sys.patch
+Patch3:     ibus-xx-setup-frequent-lang.patch
 
-# Workaround gnome-shell build failure
-# http://koji.fedoraproject.org/koji/getfile?taskID=3317917&name=root.log
-# Patch91:    ibus-gjs-xx-gnome-shell-3.1.4-build-failure.patch
 # Workaround to disable preedit on gnome-shell until bug 658420 is fixed.
 # https://bugzilla.gnome.org/show_bug.cgi?id=658420
 Patch92:    ibus-xx-g-s-disable-preedit.patch
 Patch93:    ibus-771115-property-compatible.patch
-%if %vala_build_failure
-# Xkl-1.0.gir cannot be converted to vapi.
-# https://bugs.freedesktop.org/show_bug.cgi?id=47141
-Patch94:    ibus-xx-vapi-build-failure.diff
-%endif
+# Hide no nused properties in f17.
+Patch94:    ibus-xx-no-use.diff
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -74,7 +64,7 @@ BuildRequires:  dbus-glib-devel
 BuildRequires:  dbus-python-devel >= %{dbus_python_version}
 BuildRequires:  desktop-file-utils
 BuildRequires:  gtk-doc
-%if %have_dconf
+%if %with_dconf
 BuildRequires:  dconf-devel
 BuildRequires:  dbus-x11
 BuildRequires:  vala
@@ -82,12 +72,12 @@ BuildRequires:  vala-tools
 %endif
 # for AM_GCONF_SOURCE_2 in configure.ac
 BuildRequires:  GConf2-devel
-%if %have_pygobject3
+%if %with_pygobject3
 BuildRequires:  gobject-introspection-devel
 %endif
 BuildRequires:  intltool
 BuildRequires:  iso-codes-devel
-%if %have_libxkbfile
+%if %with_xkbfile
 BuildRequires:  libxkbfile-devel
 BuildRequires:  libgnomekbd-devel
 %endif
@@ -103,10 +93,10 @@ Requires:   %{name}-gtk2 = %{version}-%{release}
 Requires:   %{name}-gtk3 = %{version}-%{release}
 %endif
 
-%if %have_pygobject2
+%if %with_pygobject2
 Requires:   pygtk2
 %endif
-%if %have_pygobject3
+%if %with_pygobject3
 Requires:   pygobject3
 %endif
 Requires:   pyxdg
@@ -114,7 +104,7 @@ Requires:   iso-codes
 Requires:   dbus-python >= %{dbus_python_version}
 Requires:   dbus-x11
 Requires:   im-chooser
-%if %have_dconf
+%if %with_dconf
 Requires:   dconf
 %else
 Requires:   GConf2
@@ -174,7 +164,7 @@ Requires(post): glib2 >= %{glib_ver}
 %description gtk3
 This package contains ibus im module for gtk3
 
-%if %have_gjsfile
+%if %with_gjs
 %package gnome3
 Summary:    IBus gnome-shell-extension for GNOME3
 Group:      System Environment/Libraries
@@ -211,35 +201,28 @@ The ibus-devel-docs package contains developer documentation for ibus
 
 %prep
 %setup -q
-%if %have_gjsfile
+%if %with_gjs
 zcat %SOURCE2 | tar xf -
-%if %ibus_gjs_build_failure
-d=`basename %SOURCE2 .tar.gz`
-cd $d
-#%patch91 -p1 -b .fail-g-s
-cd ..
-%endif
 %endif
 
 %patch0 -p1
 %patch92 -p1 -b .g-s-preedit
 cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
-%if %have_libxkbfile
+%if %with_xkbfile
 %patch1 -p1 -b .xkb
-%if %vala_build_failure
-%patch94 -p1 -b .vala-fail
-%endif
 rm -f bindings/vala/ibus-1.0.vapi
 %endif
-%patch2 -p1 -b .setup-frequent-lang
-# %patch3 -p1 -b .preload-sys
+%patch2 -p1 -b .preload-sys
+%patch3 -p1 -b .setup-frequent-lang
 
 %if 0%{?fedora} <= 16
 %patch93 -p1 -b .compat
 %endif
 
+%patch94 -p1 -b .no-used
+
 %build
-%if %have_libxkbfile
+%if %with_xkbfile
 XKB_PRELOAD_LAYOUTS=\
 "us,us(chr),us(dvorak),ad,al,am,ara,az,ba,bd,be,bg,br,bt,by,"\
 "de,dk,ca,ch,cn(tib),cz,ee,epo,es,et,fi,fo,fr,"\
@@ -261,41 +244,33 @@ autoreconf -f -i
     --enable-gtk-doc \
     --with-no-snooper-apps='gnome-do,Do.*,firefox.*,.*chrome.*,.*chromium.*' \
     --enable-surrounding-text \
-%if %have_libxkbfile
+%if %with_xkbfile
     --with-xkb-preload-layouts=$XKB_PRELOAD_LAYOUTS \
     --enable-xkb \
     --enable-libgnomekbd \
 %endif
-%if %have_dconf
+%if %with_dconf
     --enable-dconf \
     --disable-gconf \
 %endif
-%if %have_pygobject2
+%if %with_pygobject2
     --enable-python-library \
 %endif
     --enable-introspection
 
-%if %vala_build_failure
-touch ui/gtk3/ibus_ui_gtk3_vala.stamp
-touch ui/gtk3/*.c
-cp ui/gtk3/gkbdlayout.c.true ui/gtk3/gkbdlayout.c
+%if %with_xkbfile
+make -C ui/gtk3 maintainer-clean-generic
 %endif
-
 # make -C po update-gmo
-make %{?_smp_mflags} \
-  AM_DEFAULT_VERBOSITY=1 \
-  PKG_CONFIG_PATH=..:/usr/lib64/pkgconfig:/usr/lib/pkgconfig
+make %{?_smp_mflags}
 
-%if %have_gjsfile
+%if %with_gjs
 d=`basename %SOURCE2 .tar.gz`
 cd $d
-%if %ibus_gjs_build_failure
-autoreconf
-%endif
 export PKG_CONFIG_PATH=..:/usr/lib64/pkgconfig:/usr/lib/pkgconfig
 %configure \
-  --with-gnome-shell-version="3.3.90,3.3.5,3.3.4,3.3.3,3.2" \
-  --with-gjs-version="1.31.20,1.31.10,1.31.6,1.31.11,1.30"
+  --with-gnome-shell-version="3.4,3.3.90,3.3.5,3.3.4,3.3.3,3.2" \
+  --with-gjs-version="1.32,1.31.20,1.31.10,1.31.6,1.31.11,1.30"
 make %{?_smp_mflags}
 cd ..
 %endif
@@ -329,7 +304,7 @@ desktop-file-install --delete-original          \
   --dir $RPM_BUILD_ROOT%{_datadir}/applications \
   $RPM_BUILD_ROOT%{_datadir}/applications/*
 
-%if %have_gjsfile
+%if %with_gjs
 # https://bugzilla.redhat.com/show_bug.cgi?id=657165
 d=`basename %SOURCE2 .tar.gz`
 cd $d
@@ -352,13 +327,13 @@ touch --no-create %{_datadir}/icons/hicolor || :
 
 %{_sbindir}/alternatives --install %{_sysconfdir}/X11/xinit/xinputrc xinputrc %{_xinputconf} 83 || :
 
-%if !%have_dconf
+%if !%with_dconf
 export GCONF_CONFIG_SOURCE=`gconftool-2 --get-default-source`
 gconftool-2 --makefile-install-rule %{_sysconfdir}/gconf/schemas/ibus.schemas > /dev/null 2>&1 || :
 %endif
 
 %pre
-%if !%have_dconf
+%if !%with_dconf
 if [ "$1" -gt 1 ]; then
     export GCONF_CONFIG_SOURCE=`gconftool-2 --get-default-source`
     gconftool-2 --makefile-uninstall-rule %{_sysconfdir}/gconf/schemas/ibus.schemas > /dev/null 2>&1 || :
@@ -366,7 +341,7 @@ fi
 %endif
 
 %preun
-%if !%have_dconf
+%if !%with_dconf
 if [ "$1" -eq 0 ]; then
     export GCONF_CONFIG_SOURCE=`gconftool-2 --get-default-source`
     gconftool-2 --makefile-uninstall-rule %{_sysconfdir}/gconf/schemas/ibus.schemas > /dev/null 2>&1 || :
@@ -384,14 +359,14 @@ if [ "$1" = "0" ]; then
   # if alternative was set to manual, reset to auto
   [ -L %{_sysconfdir}/alternatives/xinputrc -a "`readlink %{_sysconfdir}/alternatives/xinputrc`" = "%{_xinputconf}" ] && %{_sbindir}/alternatives --auto xinputrc || :
 fi
-%if %have_dconf
+%if %with_dconf
 if [ $1 -eq 0 ]; then
   glib-compile-schemas %{_datadir}/glib-2.0/schemas
 fi
 %endif
 
 %posttrans
-%if %have_dconf
+%if %with_dconf
 if [ $1 -eq 0 ]; then
   glib-compile-schemas %{_datadir}/glib-2.0/schemas
 fi
@@ -417,7 +392,7 @@ fi
 %files -f %{name}10.lang
 %defattr(-,root,root,-)
 %doc AUTHORS COPYING README
-%if %have_pygobject2
+%if %with_pygobject2
 %dir %{python_sitelib}/ibus
 %{python_sitelib}/ibus/*
 %endif
@@ -425,12 +400,12 @@ fi
 %{_bindir}/ibus
 %{_bindir}/ibus-daemon
 %{_bindir}/ibus-setup
-%if %have_pygobject3
+%if %with_pygobject3
 %{_datadir}/ibus/*
 %endif
 %{_datadir}/applications/*
 %{_datadir}/icons/hicolor/*/apps/*
-%if %have_dconf
+%if %with_dconf
 %{_datadir}/GConf/gsettings/*
 %{_datadir}/glib-2.0/schemas/*.xml
 %{_libexecdir}/ibus-engine-simple
@@ -442,21 +417,21 @@ fi
 %{_libexecdir}/ibus-x11
 # %{_sysconfdir}/xdg/autostart/ibus.desktop
 %{_sysconfdir}/bash_completion.d/ibus.bash
-%if %have_dconf
+%if %with_dconf
 %{_sysconfdir}/dconf/db/ibus
 %{_sysconfdir}/dconf/profile/ibus
 %else
 %{_sysconfdir}/gconf/schemas/ibus.schemas
 %endif
 %config %{_xinputconf}
-%if %have_libxkbfile
+%if %with_xkbfile
 %{_libexecdir}/ibus-xkb
 %endif
 
 %files libs
 %defattr(-,root,root,-)
 %{_libdir}/libibus-%{ibus_api_version}.so.*
-%if %have_pygobject3
+%if %with_pygobject3
 %{_libdir}/girepository-1.0/IBus-1.0.typelib
 %endif
 
@@ -468,7 +443,7 @@ fi
 %defattr(-,root,root,-)
 %{_libdir}/gtk-3.0/%{gtk3_binary_version}/immodules/im-ibus.so
 
-%if %have_gjsfile
+%if %with_gjs
 %files gnome3
 %defattr(-,root,root,-)
 %{_datadir}/gnome-shell/js/ui/status/ibus
@@ -489,6 +464,19 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Sat Mar 17 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120317-1
+- Bumped to 1.4.99.20120317
+  Fixed Bug 718668 - focus move is slow with ibus-gnome3
+  Fixed Bug 749497 - Enhance IME descriptions in status icon active menu
+- Bumped to ibus-gjs 3.3.90.20120317
+- Added ibus-xx-no-use.diff
+  Fixed Bug 803260 - Disable non-global input method mode
+- Updated ibus-HEAD.patch
+  Fixed Bug 803250 - ibus lookup window font customization
+  Fixed Bug 803177 - language id on ibus-ui-gtk3 switcher
+- Update ibus-530711-preload-sys.patch
+  Fixed Bug 797023 - port preload engines
+
 * Thu Mar 08 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120303-3
 - Bumped to ibus-gjs 3.3.90.20120308 to work with gnome-shell 3.3.90
 - Fixed Bug 786906 - Added ifnarch ppc ppc64 s390 s390x

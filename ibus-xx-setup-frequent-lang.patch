@@ -1,6 +1,6 @@
-From fc525080c668267339baef480f53bdb8256f3239 Mon Sep 17 00:00:00 2001
+From cad2c8af84966ab88822c834bd5547067307b35d Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Sun, 4 Mar 2012 20:18:30 +0900
+Date: Fri, 16 Mar 2012 20:48:10 +0900
 Subject: [PATCH] Enable ibus-setup to show the frequently used languages
  only in IME list.
 
@@ -11,10 +11,10 @@ Subject: [PATCH] Enable ibus-setup to show the frequently used languages
  3 files changed, 300 insertions(+), 25 deletions(-)
 
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 3ca0fbc..a3a9a5f 100644
+index 8ca33ac..7420a35 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
-@@ -272,6 +272,174 @@ se,si,sk,sy,sy(ku),th,tj,tr,ua,uz,vn
+@@ -296,6 +296,174 @@ se,si,sk,sy,sy(ku),th,tj,tr,ua,uz,vn
        </locale>
      </schema>
      <schema>
@@ -190,7 +190,7 @@ index 3ca0fbc..a3a9a5f 100644
        <applyto>/desktop/ibus/panel/custom_font</applyto>
        <owner>ibus</owner>
 diff --git a/setup/enginecombobox.py b/setup/enginecombobox.py
-index 0ac7368..9af2651 100644
+index 0ac7368..578098c 100644
 --- a/setup/enginecombobox.py
 +++ b/setup/enginecombobox.py
 @@ -45,6 +45,9 @@ class EngineComboBox(Gtk.ComboBox):
@@ -347,9 +347,9 @@ index 0ac7368..9af2651 100644
 +                renderer.set_property("pixbuf", None)
 +            elif engine < 0:
 +                if not self.__show_sub_lang:
-+                    pixbuf = load_icon("list-add", Gtk.IconSize.LARGE_TOOLBAR)
++                    pixbuf = load_icon("go-bottom", Gtk.IconSize.LARGE_TOOLBAR)
 +                else:
-+                    pixbuf = load_icon("list-remove", Gtk.IconSize.LARGE_TOOLBAR)
++                    pixbuf = load_icon("go-up", Gtk.IconSize.LARGE_TOOLBAR)
 +                if pixbuf == None:
 +                    pixbuf = load_icon(Gtk.STOCK_MISSING_IMAGE,
 +                                       Gtk.IconSize.LARGE_TOOLBAR)
@@ -412,17 +412,17 @@ index 0ac7368..9af2651 100644
          return self.get_property("active-engine")
  
 diff --git a/setup/main.py b/setup/main.py
-index e3027a5..614737f 100644
+index 132e9f4..367cea8 100644
 --- a/setup/main.py
 +++ b/setup/main.py
-@@ -197,6 +197,7 @@ class Setup(object):
-                     self.__engines.append(engine)
+@@ -212,6 +212,7 @@ class Setup(object):
+                     engines.append(engine)
  
          self.__combobox = self.__builder.get_object("combobox_engines")
 +        self.__combobox.set_config(self.__config)
-         self.__combobox.set_engines(self.__engines)
+         self.__combobox.set_engines(engines)
  
-         tmp_dict = {}
+         engine_names = values.get("preload_engines", [])
 -- 
 1.7.9.1
 
