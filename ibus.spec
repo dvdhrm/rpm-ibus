@@ -14,7 +14,7 @@
 %endif
 
 %if 0%{?fedora} > 16
-%define ibus_gjs_version 3.3.90.20120317
+%define ibus_gjs_version 3.3.92.20120327
 %define ibus_gjs_build_failure 1
 %else
 %define ibus_gjs_version 3.2.1.20111230
@@ -30,7 +30,7 @@
 
 Name:       ibus
 Version:    1.4.99.20120317
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -269,8 +269,8 @@ d=`basename %SOURCE2 .tar.gz`
 cd $d
 export PKG_CONFIG_PATH=..:/usr/lib64/pkgconfig:/usr/lib/pkgconfig
 %configure \
-  --with-gnome-shell-version="3.4,3.3.90,3.3.5,3.3.4,3.3.3,3.2" \
-  --with-gjs-version="1.32,1.31.20,1.31.10,1.31.6,1.31.11,1.30"
+  --with-gnome-shell-version="3.4,3.3.92,3.3.90,3.3.5,3.3.4,3.3.3,3.2" \
+  --with-gjs-version="1.32,1.31.22,1.31.20,1.31.10,1.31.6,1.31.11,1.30"
 make %{?_smp_mflags}
 cd ..
 %endif
@@ -464,6 +464,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Tue Mar 27 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120317-2
+- Bumped to ibus-gjs 3.3.92.20120327
+  
 * Sat Mar 17 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120317-1
 - Bumped to 1.4.99.20120317
   Fixed Bug 718668 - focus move is slow with ibus-gnome3
