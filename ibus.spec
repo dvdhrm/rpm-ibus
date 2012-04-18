@@ -30,7 +30,7 @@
 
 Name:       ibus
 Version:    1.4.99.20120317
-Release:    2%{?dist}
+Release:    3%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -464,6 +464,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Apr 18 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120317-3
+- Added a RHEL flag.
+
 * Tue Mar 27 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120317-2
 - Bumped to ibus-gjs 3.3.92.20120327
   
