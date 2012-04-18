@@ -13,7 +13,7 @@
 %define with_gjs 1
 %endif
 
-%if 0%{?fedora} > 16
+%if (0%{?fedora} > 16 || 0%{?rhel} > 6)
 %define ibus_gjs_version 3.3.92.20120327
 %define ibus_gjs_build_failure 1
 %else
