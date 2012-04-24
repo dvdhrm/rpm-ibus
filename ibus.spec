@@ -30,7 +30,7 @@
 
 Name:       ibus
 Version:    1.4.99.20120317
-Release:    3%{?dist}
+Release:    4%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -321,9 +321,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %post
 # recreate icon cache
-touch --no-create %{_datadir}/icons/hicolor || :
-[ -x %{_bindir}/gtk-update-icon-cache ] && \
-  %{_bindir}/gtk-update-icon-cache --quiet %{_datadir}/icons/hicolor || :
+touch --no-create %{_datadir}/icons/hicolor &>/dev/null || :
 
 %{_sbindir}/alternatives --install %{_sysconfdir}/X11/xinit/xinputrc xinputrc %{_xinputconf} 83 || :
 
@@ -349,27 +347,24 @@ fi
 %endif
 
 %postun
-# recreate icon cache
-touch --no-create %{_datadir}/icons/hicolor || :
-[ -x %{_bindir}/gtk-update-icon-cache ] && \
-  %{_bindir}/gtk-update-icon-cache --quiet %{_datadir}/icons/hicolor || :
+if [ "$1" -eq 0 ]; then
+  # recreate icon cache
+  touch --no-create %{_datadir}/icons/hicolor &>/dev/null || :
+  gtk-update-icon-cache %{_datadir}/icons/hicolor &>/dev/null || :
 
-if [ "$1" = "0" ]; then
   %{_sbindir}/alternatives --remove xinputrc %{_xinputconf} || :
   # if alternative was set to manual, reset to auto
   [ -L %{_sysconfdir}/alternatives/xinputrc -a "`readlink %{_sysconfdir}/alternatives/xinputrc`" = "%{_xinputconf}" ] && %{_sbindir}/alternatives --auto xinputrc || :
-fi
+
 %if %with_dconf
-if [ $1 -eq 0 ]; then
-  glib-compile-schemas %{_datadir}/glib-2.0/schemas
-fi
+  glib-compile-schemas %{_datadir}/glib-2.0/schemas &>/dev/null || :
 %endif
+fi
 
 %posttrans
+gtk-update-icon-cache %{_datadir}/icons/hicolor &>/dev/null || :
 %if %with_dconf
-if [ $1 -eq 0 ]; then
-  glib-compile-schemas %{_datadir}/glib-2.0/schemas
-fi
+glib-compile-schemas %{_datadir}/glib-2.0/schemas &>/dev/null || :
 %endif
 
 %post libs -p /sbin/ldconfig
@@ -464,6 +459,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Tue Apr 24 2012 Kalev Lember <kalevlember@gmail.com> - 1.4.99.20120317-4
+- Update the dconf and icon cache rpm scriptlets
+
 * Wed Apr 18 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120317-3
 - Added a RHEL flag.
 
