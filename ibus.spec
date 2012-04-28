@@ -14,7 +14,7 @@
 %endif
 
 %if (0%{?fedora} > 16 || 0%{?rhel} > 6)
-%define ibus_gjs_version 3.3.92.20120327
+%define ibus_gjs_version 3.4.1.20120428
 %define ibus_gjs_build_failure 1
 %else
 %define ibus_gjs_version 3.2.1.20111230
@@ -29,8 +29,8 @@
 %define gnome_icon_theme_legacy_version 2.91.6
 
 Name:       ibus
-Version:    1.4.99.20120317
-Release:    4%{?dist}
+Version:    1.4.99.20120428
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -39,7 +39,7 @@ URL:        http://code.google.com/p/ibus/
 Source0:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
 Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/ibus-gjs-%{ibus_gjs_version}.tar.gz
-Patch0:     ibus-HEAD.patch
+# Patch0:     ibus-HEAD.patch
 Patch1:     ibus-541492-xkb.patch
 Patch2:     ibus-530711-preload-sys.patch
 Patch3:     ibus-xx-setup-frequent-lang.patch
@@ -48,8 +48,10 @@ Patch3:     ibus-xx-setup-frequent-lang.patch
 # https://bugzilla.gnome.org/show_bug.cgi?id=658420
 Patch92:    ibus-xx-g-s-disable-preedit.patch
 Patch93:    ibus-771115-property-compatible.patch
+# Apply GNOME Alt+Tab UI to IME switcher UI.
+Patch94:    ibus-xx-branding-switcher-ui.patch
 # Hide no nused properties in f17.
-Patch94:    ibus-xx-no-use.diff
+Patch95:    ibus-xx-no-use.diff
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -205,7 +207,7 @@ The ibus-devel-docs package contains developer documentation for ibus
 zcat %SOURCE2 | tar xf -
 %endif
 
-%patch0 -p1
+# %patch0 -p1
 %patch92 -p1 -b .g-s-preedit
 cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 %if %with_xkbfile
@@ -219,7 +221,8 @@ rm -f bindings/vala/ibus-1.0.vapi
 %patch93 -p1 -b .compat
 %endif
 
-%patch94 -p1 -b .no-used
+%patch94 -p1 -b .ime-ui
+%patch95 -p1 -b .no-used
 
 %build
 %if %with_xkbfile
@@ -459,6 +462,14 @@ glib-compile-schemas %{_datadir}/glib-2.0/schemas &>/dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Apr 27 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120428-1
+- Bumped to 1.4.99.20120428
+  Fixed Bug 799571 - no IME list at the session login.
+  Fixed Bug 810415 - ibus does not handle Ctrl+space with BUTTON_PRESS.
+- Bumped to ibus-gjs 3.4.1.20120428
+  Fixed Bug 802052 - no modifiers trigger keys.
+  Fixed Bug 803244 - IME switch Ctrl+space not working on shell text entry.
+
 * Tue Apr 24 2012 Kalev Lember <kalevlember@gmail.com> - 1.4.99.20120317-4
 - Update the dconf and icon cache rpm scriptlets
 

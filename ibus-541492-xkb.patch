@@ -1,20 +1,20 @@
-From c58730dd0d9c161a7824105d320f60af769e1f05 Mon Sep 17 00:00:00 2001
+From 5de26fdf6f300a4e532a39f8c3778e94ff629125 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Fri, 16 Mar 2012 20:45:03 +0900
+Date: Sat, 28 Apr 2012 13:07:30 +0900
 Subject: [PATCH] Add ibus-xkb and libgnomekbd.
 
 ---
+ client/x11/gdk-private.c      |    3 +-
  configure.ac                  |   59 +++++
- data/ibus.schemas.in          |   60 +++++-
- engine/Makefile.am            |   22 ++
+ data/ibus.schemas.in          |  102 ++++++++
+ engine/Makefile.am            |   20 ++
  engine/ibus-xkb-main.c        |  111 +++++++++
  engine/main.vala              |   86 +++++++
  engine/simple.xml.in.in       |  531 +----------------------------------------
  engine/xkblib.c               |  327 +++++++++++++++++++++++++
  engine/xkblib.h               |   41 ++++
  ibus-1.0.pc.in                |    4 +
- setup/enginecombobox.py       |    6 +-
- setup/main.py                 |   28 ++-
+ setup/main.py                 |   25 +-
  src/Makefile.am               |    5 +
  src/ibus.h                    |    1 +
  src/ibusxkbxml.c              |  466 ++++++++++++++++++++++++++++++++++++
@@ -24,9 +24,9 @@ Subject: [PATCH] Add ibus-xkb and libgnomekbd.
  ui/gtk3/Xkl-1.0.metadata      |    3 +
  ui/gtk3/gkbdlayout.vala.false |   63 +++++
  ui/gtk3/gkbdlayout.vala.true  |  111 +++++++++
- ui/gtk3/panel.vala            |  275 ++++++++++++++++++++--
+ ui/gtk3/panel.vala            |  275 +++++++++++++++++++--
  ui/gtk3/xkblayout.vala        |  466 ++++++++++++++++++++++++++++++++++++
- 22 files changed, 2346 insertions(+), 555 deletions(-)
+ 22 files changed, 2380 insertions(+), 555 deletions(-)
  create mode 100644 engine/ibus-xkb-main.c
  create mode 100644 engine/xkblib.c
  create mode 100644 engine/xkblib.h
@@ -38,11 +38,25 @@ Subject: [PATCH] Add ibus-xkb and libgnomekbd.
  create mode 100644 ui/gtk3/gkbdlayout.vala.true
  create mode 100644 ui/gtk3/xkblayout.vala
 
+diff --git a/client/x11/gdk-private.c b/client/x11/gdk-private.c
+index 009a5b0..20689c3 100644
+--- a/client/x11/gdk-private.c
++++ b/client/x11/gdk-private.c
+@@ -27,8 +27,7 @@
+ #include <gdk/gdkx.h>
+ #include <gdk/gdkkeysyms.h>
+ 
+-#ifdef HAVE_X11_XKBLIB_H
+-#  define HAVE_XKB
++#ifdef HAVE_XKB
+ #  include <X11/XKBlib.h>
+ #endif
+ 
 diff --git a/configure.ac b/configure.ac
-index 1c4b283..596b30e 100644
+index 8498efe..731cdf5 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -249,6 +249,63 @@ else
+@@ -252,6 +252,63 @@ else
      enable_xim="no (disabled, use --enable-xim to enable)"
  fi
  
@@ -106,7 +120,7 @@ index 1c4b283..596b30e 100644
  # GObject introspection
  GOBJECT_INTROSPECTION_CHECK([0.6.8])
  
-@@ -545,5 +602,7 @@ Build options:
+@@ -574,5 +631,7 @@ Build options:
    Panel icon                "$IBUS_ICON_KEYBOARD"
    Enable surrounding-text   $enable_surrounding_text
    Run test cases            $enable_tests
@@ -115,14 +129,13 @@ index 1c4b283..596b30e 100644
  ])
  
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 53ba05c..05c0174 100644
+index 53ba05c..5e6c2d7 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
-@@ -34,7 +34,19 @@
+@@ -34,6 +34,62 @@
        <default>[Control+space,Zenkaku_Hankaku,Alt+Kanji,Alt+grave,Hangul,Alt+Release+Alt_R]</default>
        <locale name="C">
          <short>Trigger shortcut keys</short>
--	    <long>The shortcut keys for turning input method on or off</long>
 +            <long>The shortcut keys for turning input method on or off</long>
 +      </locale>
 +    </schema>
@@ -136,10 +149,53 @@ index 53ba05c..05c0174 100644
 +      <locale name="C">
 +        <short>Trigger shortcut keys for gtk_accelerator_parse</short>
 +            <long>The shortcut keys for turning input method on or off</long>
++      </locale>
++    </schema>
++    <schema>
++      <key>/schemas/desktop/ibus/general/hotkey/trigger_shift</key>
++      <applyto>/desktop/ibus/general/hotkey/trigger_shift</applyto>
++      <owner>ibus</owner>
++      <type>list</type>
++      <list_type>string</list_type>
++      <default>[]</default>
++      <locale name="C">
++        <short>This is used for gnome-shell to work shift + modifiers</short>
++            <long>This is used for gnome-shell to work shift + modifiers
++                  Currently gnome-shell assigns the shift reverse by
++                  dconf key and the shift reverse works with modifiers.
++                  But ibus supports multiple trigger keys;
++                  &lt;Control&gt;space  (with modifiers)
++                  Zenkaku_hankaku  (without modifiers)
++                  I copy the modifier trigger keys here to set
++                  the shift reverse at the moment.
++            </long>
++      </locale>
++    </schema>
++    <schema>
++      <key>/schemas/desktop/ibus/general/hotkey/trigger_ja</key>
++      <applyto>/desktop/ibus/general/hotkey/trigger_ja</applyto>
++      <owner>ibus</owner>
++      <type>list</type>
++      <list_type>string</list_type>
++      <default>[Zenkaku_Hankaku]</default>
++      <locale name="C">
++        <short>Trigger shortcut keys for ja gtk_accelerator_parse</short>
++	    <long>The shortcut keys for turning input method on or off</long>
++      </locale>
++    </schema>
++    <schema>
++      <key>/schemas/desktop/ibus/general/hotkey/trigger_ko</key>
++      <applyto>/desktop/ibus/general/hotkey/trigger_ko</applyto>
++      <owner>ibus</owner>
++      <type>list</type>
++      <list_type>string</list_type>
++      <default>[Hangul, Alt_R]</default>
++      <locale name="C">
++        <short>Trigger shortcut keys for ko gtk_accelerator_parse</short>
+ 	    <long>The shortcut keys for turning input method on or off</long>
        </locale>
      </schema>
-     <schema>
-@@ -203,6 +215,52 @@
+@@ -203,6 +259,52 @@
        </locale>
      </schema>
      <schema>
@@ -193,19 +249,10 @@ index 53ba05c..05c0174 100644
        <applyto>/desktop/ibus/panel/use_custom_font</applyto>
        <owner>ibus</owner>
 diff --git a/engine/Makefile.am b/engine/Makefile.am
-index b3b46be..af4747d 100644
+index b3b46be..a95736b 100644
 --- a/engine/Makefile.am
 +++ b/engine/Makefile.am
-@@ -25,6 +25,8 @@ libibus = $(top_builddir)/src/libibus-@IBUS_API_VERSION@.la
- INCLUDES = \
- 	-I$(top_srcdir)/src \
- 	-I$(top_builddir)/src \
-+	-DIBUS_LOCALEDIR=\"$(datadir)/locale\" \
-+	-DLIBEXECDIR=\""$(libexecdir)"\" \
- 	$(NULL)
- 
- AM_CFLAGS = \
-@@ -78,6 +80,26 @@ component_DATA = \
+@@ -78,6 +78,26 @@ component_DATA = \
  
  componentdir = $(pkgdatadir)/component
  
@@ -234,7 +281,7 @@ index b3b46be..af4747d 100644
  	$(NULL)
 diff --git a/engine/ibus-xkb-main.c b/engine/ibus-xkb-main.c
 new file mode 100644
-index 0000000..75f6679
+index 0000000..2529e4d
 --- /dev/null
 +++ b/engine/ibus-xkb-main.c
 @@ -0,0 +1,111 @@
@@ -302,7 +349,7 @@ index 0000000..75f6679
 +#ifdef ENABLE_NLS
 +    setlocale (LC_ALL, "");
 +
-+    bindtextdomain (GETTEXT_PACKAGE, IBUS_LOCALEDIR);
++    bindtextdomain (GETTEXT_PACKAGE, GLIB_LOCALE_DIR);
 +    bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
 +#endif
 +
@@ -1391,28 +1438,11 @@ index 9f593ab..66b902a 100644
  
  Name: IBus
  Description: IBus Library
-diff --git a/setup/enginecombobox.py b/setup/enginecombobox.py
-index 8d1424b..0ac7368 100644
---- a/setup/enginecombobox.py
-+++ b/setup/enginecombobox.py
-@@ -75,7 +75,11 @@ class EngineComboBox(Gtk.ComboBox):
- 
-         keys = langs.keys()
-         keys.sort(locale.strcoll)
--        current_lang = IBus.get_language_name(locale.getlocale()[0])
-+        loc = locale.getlocale()[0]
-+        # None on C locale
-+        if loc == None:
-+            loc = 'en_US'
-+        current_lang = IBus.get_language_name(loc)
-         # move current language to the first place
-         if current_lang in keys:
-             keys.remove(current_lang)
 diff --git a/setup/main.py b/setup/main.py
-index fdfb33a..9638da0 100644
+index fdfb33a..4f57106 100644
 --- a/setup/main.py
 +++ b/setup/main.py
-@@ -183,14 +183,25 @@ class Setup(object):
+@@ -183,14 +183,22 @@ class Setup(object):
  
          # init engine page
          self.__engines = self.__bus.list_engines()
@@ -1420,15 +1450,12 @@ index fdfb33a..9638da0 100644
 +        load_layouts = []
 +        if value != None:
 +            load_layouts = value.dup_strv()[0]
-+        if len(load_layouts) == 0:
-+            engines = self.__engines
-+        else:
-+            engines = []
-+            for engine in self.__engines:
-+                if not engine.get_name().startswith('xkb:'):
-+                    engines.append(engine)
-+                elif engine.get_layout() in load_layouts:
-+                    engines.append(engine)
++        engines = []
++        for engine in self.__engines:
++            if not engine.get_name().startswith('xkb:'):
++                engines.append(engine)
++            elif engine.get_layout() in load_layouts:
++                engines.append(engine)
 +
          self.__combobox = self.__builder.get_object("combobox_engines")
 -        self.__combobox.set_engines(self.__engines)
@@ -1443,7 +1470,7 @@ index fdfb33a..9638da0 100644
  
          self.__treeview = self.__builder.get_object("treeview_engines")
          self.__treeview.set_engines(engines)
-@@ -263,6 +274,13 @@ class Setup(object):
+@@ -263,6 +271,13 @@ class Setup(object):
              args.append(path.basename(setup_path))
          return args
  
@@ -1458,7 +1485,7 @@ index fdfb33a..9638da0 100644
          if prop.name not in ("active-engine", "engines"):
              return
 diff --git a/src/Makefile.am b/src/Makefile.am
-index b1d1766..29f0d58 100644
+index df4ada3..e249ada 100644
 --- a/src/Makefile.am
 +++ b/src/Makefile.am
 @@ -194,6 +194,11 @@ typelibs_DATA = $(INTROSPECTION_GIRS:.gir=.typelib)
@@ -2158,7 +2185,7 @@ index 0000000..661e6fd
 @@ -0,0 +1 @@
 +Configuration cheader_filename="libgnomekbd/gkbd-configuration.h"
 diff --git a/ui/gtk3/Makefile.am b/ui/gtk3/Makefile.am
-index 0fb9d3c..5ccf8b0 100644
+index 87a7373..6a426fa 100644
 --- a/ui/gtk3/Makefile.am
 +++ b/ui/gtk3/Makefile.am
 @@ -42,6 +42,9 @@ INCLUDES = \
@@ -2171,7 +2198,7 @@ index 0fb9d3c..5ccf8b0 100644
  AM_CFLAGS = \
  	@GLIB2_CFLAGS@ \
  	@GIO2_CFLAGS@ \
-@@ -56,6 +59,10 @@ AM_CFLAGS = \
+@@ -57,6 +60,10 @@ AM_CFLAGS = \
  	-DBINDIR=\"@bindir@\" \
      -DIBUS_DISABLE_DEPRECATED \
  	-DIBUS_VERSION=\"@IBUS_VERSION@\" \
@@ -2182,7 +2209,7 @@ index 0fb9d3c..5ccf8b0 100644
  	-Wno-unused-variable \
  	-Wno-unused-but-set-variable \
  	-Wno-unused-function \
-@@ -86,6 +93,7 @@ ibus_ui_gtk3_SOURCES = \
+@@ -87,6 +94,7 @@ ibus_ui_gtk3_SOURCES = \
  	application.vala \
  	candidatearea.vala \
  	candidatepanel.vala \
@@ -2190,7 +2217,7 @@ index 0fb9d3c..5ccf8b0 100644
  	handle.vala \
  	iconwidget.vala \
  	keybindingmanager.vala \
-@@ -94,6 +102,7 @@ ibus_ui_gtk3_SOURCES = \
+@@ -95,6 +103,7 @@ ibus_ui_gtk3_SOURCES = \
  	property.vala \
  	separator.vala \
  	switcher.vala \
@@ -2198,7 +2225,7 @@ index 0fb9d3c..5ccf8b0 100644
  	grabkeycode.c \
  	$(NULL)
  
-@@ -101,12 +110,51 @@ ibus_ui_gtk3_LDADD = \
+@@ -102,12 +111,51 @@ ibus_ui_gtk3_LDADD = \
  	$(AM_LDADD) \
  	$(NULL)
  
@@ -2446,13 +2473,13 @@ index 0000000..adacd81
 +    */
 +}
 diff --git a/ui/gtk3/panel.vala b/ui/gtk3/panel.vala
-index d927491..f8805e0 100644
+index 251a65e..c08f188 100644
 --- a/ui/gtk3/panel.vala
 +++ b/ui/gtk3/panel.vala
-@@ -40,8 +40,16 @@ class Panel : IBus.PanelService {
-     private PropertyManager m_property_manager;
+@@ -41,8 +41,16 @@ class Panel : IBus.PanelService {
      private GLib.Pid m_setup_pid = 0;
      private Gtk.AboutDialog m_about_dialog;
+     private Gtk.CssProvider m_css_provider;
 +    private GkbdLayout m_gkbdlayout = null;
 +    private XKBLayout m_xkblayout = null;
 +    private string[] m_layouts = {};
@@ -2466,7 +2493,7 @@ index d927491..f8805e0 100644
  
      public Panel(IBus.Bus bus) {
          GLib.assert(bus.is_connected());
-@@ -65,13 +73,6 @@ class Panel : IBus.PanelService {
+@@ -66,13 +74,6 @@ class Panel : IBus.PanelService {
  
          m_switcher = new Switcher();
  
@@ -2480,7 +2507,7 @@ index d927491..f8805e0 100644
          m_property_manager = new PropertyManager();
          m_property_manager.property_activate.connect((k, s) => {
              property_activate(k, s);
-@@ -82,8 +83,66 @@ class Panel : IBus.PanelService {
+@@ -83,8 +84,66 @@ class Panel : IBus.PanelService {
  
      ~Panel() {
          var keybinding_manager = KeybindingManager.get_instance();
@@ -2549,7 +2576,7 @@ index d927491..f8805e0 100644
      }
  
      private void set_custom_font() {
-@@ -124,12 +183,14 @@ class Panel : IBus.PanelService {
+@@ -152,12 +211,14 @@ class Panel : IBus.PanelService {
          }
  
          m_config = config;
@@ -2564,7 +2591,7 @@ index d927491..f8805e0 100644
              update_engines(m_config.get_value("general", "preload_engines"),
                             m_config.get_value("general", "engines_order"));
          } else {
-@@ -139,6 +200,192 @@ class Panel : IBus.PanelService {
+@@ -167,6 +228,192 @@ class Panel : IBus.PanelService {
          set_custom_font();
      }
  
@@ -2757,7 +2784,7 @@ index d927491..f8805e0 100644
      private void switch_engine(int i, bool force = false) {
          GLib.assert(i >= 0 && i < m_engines.length);
  
-@@ -158,15 +405,7 @@ class Panel : IBus.PanelService {
+@@ -186,15 +433,7 @@ class Panel : IBus.PanelService {
              return;
          }
          // set xkb layout
@@ -3247,5 +3274,5 @@ index 0000000..8b75387
 +    */
 +}
 -- 
-1.7.9.1
+1.7.10
 

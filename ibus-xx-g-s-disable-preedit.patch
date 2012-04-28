@@ -19,7 +19,7 @@ index 327a5d9..39d2d0c 100644
 +    if (!g_getenv ("IBUS_GNOME_SHELL_ENABLE_PREEDIT_TEXT")) {
 +        const gchar * prgname = g_get_prgname ();
 +        if (g_strcmp0 (prgname, "gnome-shell") == 0) {
-+            if (ibusimcontext->caps | IBUS_CAP_PREEDIT_TEXT) {
++            if (ibusimcontext->caps & IBUS_CAP_PREEDIT_TEXT) {
 +                ibusimcontext->caps ^= IBUS_CAP_PREEDIT_TEXT;
 +            }
 +        }

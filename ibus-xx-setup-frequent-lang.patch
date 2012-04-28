@@ -1,6 +1,6 @@
-From cad2c8af84966ab88822c834bd5547067307b35d Mon Sep 17 00:00:00 2001
+From f4e54576688df705f20fb25597852a451e063cef Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Fri, 16 Mar 2012 20:48:10 +0900
+Date: Sat, 28 Apr 2012 13:08:12 +0900
 Subject: [PATCH] Enable ibus-setup to show the frequently used languages
  only in IME list.
 
@@ -11,10 +11,10 @@ Subject: [PATCH] Enable ibus-setup to show the frequently used languages
  3 files changed, 300 insertions(+), 25 deletions(-)
 
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 8ca33ac..7420a35 100644
+index 20c1bc3..f6b55d6 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
-@@ -296,6 +296,174 @@ se,si,sk,sy,sy(ku),th,tj,tr,ua,uz,vn
+@@ -340,6 +340,174 @@ se,si,sk,sy,sy(ku),th,tj,tr,ua,uz,vn
        </locale>
      </schema>
      <schema>
@@ -412,11 +412,11 @@ index 0ac7368..578098c 100644
          return self.get_property("active-engine")
  
 diff --git a/setup/main.py b/setup/main.py
-index 132e9f4..367cea8 100644
+index 7612407..1cb3e60 100644
 --- a/setup/main.py
 +++ b/setup/main.py
-@@ -212,6 +212,7 @@ class Setup(object):
-                     engines.append(engine)
+@@ -209,6 +209,7 @@ class Setup(object):
+                 engines.append(engine)
  
          self.__combobox = self.__builder.get_object("combobox_engines")
 +        self.__combobox.set_config(self.__config)
@@ -424,5 +424,5 @@ index 132e9f4..367cea8 100644
  
          engine_names = values.get("preload_engines", [])
 -- 
-1.7.9.1
+1.7.10
 
