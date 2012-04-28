@@ -1,5 +1,5 @@
---- ibus-1.4.99.20120317/ui/gtk3/switcher.vala.orig	2012-04-25 18:58:37.209092997 +0900
-+++ ibus-1.4.99.20120317/ui/gtk3/switcher.vala	2012-04-25 18:59:43.017227590 +0900
+--- ibus-1.4.99.20120428/ui/gtk3/switcher.vala.orig	2012-04-28 13:49:41.000000000 +0900
++++ ibus-1.4.99.20120428/ui/gtk3/switcher.vala	2012-04-28 16:26:16.595996905 +0900
 @@ -23,15 +23,20 @@
  using IBus;
  using GLib;
@@ -47,7 +47,15 @@
  
          grab_focus();
      }
-@@ -138,6 +158,35 @@ class Switcher : Gtk.Window {
+@@ -59,6 +79,7 @@ class Switcher : Gtk.Window {
+ 
+         update_engines(engines);
+         m_selected_engine = index;
++        m_label.set_text(m_buttons[index].get_data("longname"));
+         m_buttons[index].grab_focus();
+ 
+         Gdk.Device device = event.get_device();
+@@ -138,6 +159,35 @@ class Switcher : Gtk.Window {
          return m_result;
      }
  
@@ -83,7 +91,7 @@
      private void update_engines(IBus.EngineDesc[] engines) {
          foreach (var button in m_buttons) {
              button.destroy();
-@@ -149,28 +198,15 @@ class Switcher : Gtk.Window {
+@@ -149,28 +199,15 @@ class Switcher : Gtk.Window {
              return;
          }
  
@@ -115,7 +123,7 @@
              button.show();
  
              button.enter_notify_event.connect((e) => {
-@@ -186,12 +222,40 @@ class Switcher : Gtk.Window {
+@@ -186,12 +223,40 @@ class Switcher : Gtk.Window {
                  return true;
              });
  
@@ -158,7 +166,7 @@
      }
  
      private void next_engine() {
-@@ -199,6 +263,7 @@ class Switcher : Gtk.Window {
+@@ -199,6 +264,7 @@ class Switcher : Gtk.Window {
              m_selected_engine = 0;
          else
              m_selected_engine ++;
@@ -166,7 +174,7 @@
          set_focus(m_buttons[m_selected_engine]);
      }
  
-@@ -207,6 +272,7 @@ class Switcher : Gtk.Window {
+@@ -207,6 +273,7 @@ class Switcher : Gtk.Window {
              m_selected_engine = m_engines.length - 1;
          else
              m_selected_engine --;
