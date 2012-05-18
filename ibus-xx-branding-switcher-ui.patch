@@ -1,27 +1,34 @@
---- ibus-1.4.99.20120428/ui/gtk3/switcher.vala.orig	2012-04-28 13:49:41.000000000 +0900
-+++ ibus-1.4.99.20120428/ui/gtk3/switcher.vala	2012-04-28 16:26:16.595996905 +0900
-@@ -23,15 +23,20 @@
- using IBus;
+diff --git a/ui/gtk3/switcher.vala b/ui/gtk3/switcher.vala
+index 52b0577..7821221 100644
+--- a/ui/gtk3/switcher.vala
++++ b/ui/gtk3/switcher.vala
+@@ -24,6 +24,8 @@ using IBus;
  using GLib;
  using Gtk;
+ using Gdk;
 +using Pango;
 +using Atk;
  
  class Switcher : Gtk.Window {
+     private class Keybinding {
+@@ -53,6 +55,7 @@ class Switcher : Gtk.Window {
+         Gdk.ModifierType.BUTTON5_MASK);
+ 
      private Gtk.Box m_box;
 +    private Gtk.Label m_label;
      private Gtk.Button[] m_buttons = {};
      private IBus.EngineDesc[] m_engines;
      private uint m_selected_engine;
-     private uint m_primary_modifier;
+@@ -60,6 +63,8 @@ class Switcher : Gtk.Window {
      private GLib.MainLoop m_loop;
+     private unowned GLib.List<Keybinding> m_keybindings;
      private int m_result;
 +    private int m_default_font_size = 16;
 +    private const int m_desc_label_max_len = 20;
  
      public Switcher() {
          GLib.Object(
-@@ -43,8 +48,23 @@ class Switcher : Gtk.Window {
+@@ -71,8 +76,23 @@ class Switcher : Gtk.Window {
              modal : true,
              focus_visible : true
          );
@@ -47,15 +54,15 @@
  
          grab_focus();
      }
-@@ -59,6 +79,7 @@ class Switcher : Gtk.Window {
- 
+@@ -88,6 +108,7 @@ class Switcher : Gtk.Window {
          update_engines(engines);
+         m_result = 0;
          m_selected_engine = index;
 +        m_label.set_text(m_buttons[index].get_data("longname"));
          m_buttons[index].grab_focus();
+         m_keybindings = (GLib.List<Keybinding>) keybindings;
  
-         Gdk.Device device = event.get_device();
-@@ -138,6 +159,35 @@ class Switcher : Gtk.Window {
+@@ -168,6 +189,35 @@ class Switcher : Gtk.Window {
          return m_result;
      }
  
@@ -91,7 +98,7 @@
      private void update_engines(IBus.EngineDesc[] engines) {
          foreach (var button in m_buttons) {
              button.destroy();
-@@ -149,28 +199,15 @@ class Switcher : Gtk.Window {
+@@ -179,28 +229,15 @@ class Switcher : Gtk.Window {
              return;
          }
  
@@ -123,7 +130,7 @@
              button.show();
  
              button.enter_notify_event.connect((e) => {
-@@ -186,12 +223,40 @@ class Switcher : Gtk.Window {
+@@ -216,12 +253,40 @@ class Switcher : Gtk.Window {
                  return true;
              });
  
@@ -166,7 +173,7 @@
      }
  
      private void next_engine() {
-@@ -199,6 +264,7 @@ class Switcher : Gtk.Window {
+@@ -229,6 +294,7 @@ class Switcher : Gtk.Window {
              m_selected_engine = 0;
          else
              m_selected_engine ++;
@@ -174,7 +181,7 @@
          set_focus(m_buttons[m_selected_engine]);
      }
  
-@@ -207,6 +273,7 @@ class Switcher : Gtk.Window {
+@@ -237,6 +303,7 @@ class Switcher : Gtk.Window {
              m_selected_engine = m_engines.length - 1;
          else
              m_selected_engine --;
@@ -182,3 +189,25 @@
          set_focus(m_buttons[m_selected_engine]);
      }
  
+@@ -267,18 +334,18 @@ class Switcher : Gtk.Window {
+ 
+         switch (pe->keyval) {
+             case 0x08fb: /* leftarrow */
+-            case 0xff51: /* Down */
++            case 0xff51: /* Left */
++                previous_engine();
+                 break;
+             case 0x08fc: /* uparrow */
+             case 0xff52: /* Up */
+-                previous_engine();
+                 break;
+             case 0x08fd: /* rightarrow */
+             case 0xff53: /* Right */
++                next_engine();
+                 break;
+             case 0x08fe: /* downarrow */
+             case 0xff54: /* Down */
+-                next_engine();
+                 break;
+             default:
+                 debug("0x%04x", pe->keyval);

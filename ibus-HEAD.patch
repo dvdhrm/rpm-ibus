@@ -1,1 +1,37 @@
+From 469335730bb9dc7ba1702cfc5108491b6993677b Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Wed, 9 May 2012 17:09:23 +0900
+Subject: [PATCH] Fix not to switch engines by non-trigger keys.
+
+---
+ ui/gtk3/switcher.vala |    7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/ui/gtk3/switcher.vala b/ui/gtk3/switcher.vala
+index 73b58d2..81812ec 100644
+--- a/ui/gtk3/switcher.vala
++++ b/ui/gtk3/switcher.vala
+@@ -58,6 +58,7 @@ class Switcher : Gtk.Window {
+                 event.key.state & KeybindingManager.MODIFIER_FILTER);
+ 
+         update_engines(engines);
++        m_result = 0;
+         m_selected_engine = index;
+         m_buttons[index].grab_focus();
+ 
+@@ -242,7 +243,11 @@ class Switcher : Gtk.Window {
+                 break;
+             default:
+                 debug("0x%04x", pe->keyval);
+-                break;
++                if (m_loop != null) {
++                    m_loop.quit();
++                    m_loop = null;
++                }
++                return false;
+         }
+         return true;
+     }
+-- 
+1.7.10
 

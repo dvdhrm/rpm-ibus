@@ -14,7 +14,7 @@
 %endif
 
 %if (0%{?fedora} > 16 || 0%{?rhel} > 6)
-%define ibus_gjs_version 3.4.1.20120428
+%define ibus_gjs_version 3.4.1.20120518
 %define ibus_gjs_build_failure 1
 %else
 %define ibus_gjs_version 3.2.1.20111230
@@ -30,7 +30,7 @@
 
 Name:       ibus
 Version:    1.4.99.20120428
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -39,7 +39,7 @@ URL:        http://code.google.com/p/ibus/
 Source0:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
 Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/ibus-gjs-%{ibus_gjs_version}.tar.gz
-# Patch0:     ibus-HEAD.patch
+Patch0:     ibus-HEAD.patch
 Patch1:     ibus-541492-xkb.patch
 Patch2:     ibus-530711-preload-sys.patch
 Patch3:     ibus-xx-setup-frequent-lang.patch
@@ -207,7 +207,7 @@ The ibus-devel-docs package contains developer documentation for ibus
 zcat %SOURCE2 | tar xf -
 %endif
 
-# %patch0 -p1
+%patch0 -p1
 %patch92 -p1 -b .g-s-preedit
 cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 %if %with_xkbfile
@@ -462,6 +462,14 @@ glib-compile-schemas %{_datadir}/glib-2.0/schemas &>/dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Apr 27 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120428-2
+- Updated ibus-HEAD.patch
+- Updated ibus-541492-xkb.patch
+- Updated ibus-xx-branding-switcher-ui.patch
+  Fixed Bug 810211 - Cancel Control + space pressing Control key.
+- Updated ibus-xx-no-use.diff
+  Enabled to customize trigger keys with non-modifier trigger keys.
+
 * Fri Apr 27 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120428-1
 - Bumped to 1.4.99.20120428
   Fixed Bug 799571 - no IME list at the session login.
