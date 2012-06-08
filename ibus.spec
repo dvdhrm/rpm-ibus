@@ -30,7 +30,7 @@
 
 Name:       ibus
 Version:    1.4.99.20120428
-Release:    2%{?dist}
+Release:    3%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -462,6 +462,9 @@ glib-compile-schemas %{_datadir}/glib-2.0/schemas &>/dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Jun  8 2012 Matthias Clasen <mclasen@redhat.com> - 1.4.99.20120428-3
+- Rebuild against new libgnomekbd
+
 * Fri Apr 27 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120428-2
 - Updated ibus-HEAD.patch
 - Updated ibus-541492-xkb.patch
