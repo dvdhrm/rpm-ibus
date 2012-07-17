@@ -1,18 +1,18 @@
-From 2238af14b654218696220f83b5ee39ae49c2ad98 Mon Sep 17 00:00:00 2001
+From 027e4a40a37601c6733a8911fd3949a9310b0258 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 7 Sep 2011 15:25:27 +0900
+Date: Wed, 9 May 2012 19:15:00 +0900
 Subject: [PATCH] Added a workaround to disable preedit in gnome-shell
 
 https://bugzilla.gnome.org/show_bug.cgi?id=658420
 ---
  client/gtk2/ibusimcontext.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ 1 file changed, 8 insertions(+)
 
 diff --git a/client/gtk2/ibusimcontext.c b/client/gtk2/ibusimcontext.c
-index 327a5d9..39d2d0c 100644
+index 584b92d..c4c61d3 100644
 --- a/client/gtk2/ibusimcontext.c
 +++ b/client/gtk2/ibusimcontext.c
-@@ -583,6 +583,14 @@ ibus_im_context_init (GObject *obj)
+@@ -584,6 +584,14 @@ ibus_im_context_init (GObject *obj)
  #else
      ibusimcontext->caps = IBUS_CAP_PREEDIT_TEXT | IBUS_CAP_FOCUS;
  #endif
@@ -28,5 +28,5 @@ index 327a5d9..39d2d0c 100644
  
      // Create slave im context
 -- 
-1.7.5.4
+1.7.10.4
 

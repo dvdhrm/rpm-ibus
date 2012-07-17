@@ -1,0 +1,11 @@
+--- ibus-1.4.99.20120712/ui/gtk3/panel.vala.orig
++++ ibus-1.4.99.20120712/ui/gtk3/panel.vala
+@@ -157,7 +157,7 @@ class Panel : IBus.PanelService {
+             if ((switch_modifiers & VIRTUAL_MODIFIERS) != 0) {
+             // workaround a bug in gdk vapi vala > 0.18
+             // https://bugzilla.gnome.org/show_bug.cgi?id=677559
+-#if VALA_0_18
++#if VALA_0_20
+                 Gdk.Keymap.get_default().map_virtual_modifiers(
+                         ref switch_modifiers);
+ #else

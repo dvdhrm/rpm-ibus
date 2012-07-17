@@ -1,6 +1,6 @@
-From f580050ab5612e1841639949781802dc6ee50fa1 Mon Sep 17 00:00:00 2001
+From 9be5aced5397e3558870e4aa1a446e1aacc1730c Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Sat, 28 Apr 2012 13:07:57 +0900
+Date: Tue, 17 Jul 2012 17:43:03 +0900
 Subject: [PATCH] Reload preload engines until users customize the list.
 
 The idea is, if users don't customize the preload_engines with ibus-setup,
@@ -19,13 +19,13 @@ IBUS_PRELOAD_ENGINE_MODE_USER and users can customize the value
 ---
  data/ibus.schemas.in |   24 +++++++++
  setup/main.py        |   61 ++++++++++++++++++++--
- setup/setup.ui       |   21 ++++++--
+ setup/setup.ui       |   22 ++++++--
  src/ibustypes.h      |   10 ++++
  ui/gtk3/panel.vala   |  136 ++++++++++++++++++++++++++++++++++++++++++++++++++
- 5 files changed, 245 insertions(+), 7 deletions(-)
+ 5 files changed, 246 insertions(+), 7 deletions(-)
 
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 5e6c2d7..20c1bc3 100644
+index 3591687..0d127d5 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
 @@ -2,6 +2,30 @@
@@ -60,7 +60,7 @@ index 5e6c2d7..20c1bc3 100644
        <applyto>/desktop/ibus/general/preload_engines</applyto>
        <owner>ibus</owner>
 diff --git a/setup/main.py b/setup/main.py
-index 4f57106..7612407 100644
+index f3fe1c5..b7833e3 100644
 --- a/setup/main.py
 +++ b/setup/main.py
 @@ -181,6 +181,20 @@ class Setup(object):
@@ -160,12 +160,12 @@ index 4f57106..7612407 100644
      def __config_reloaded_cb(self, bus):
          pass
 diff --git a/setup/setup.ui b/setup/setup.ui
-index e37cb32..fec1646 100644
+index 8121d62..2026172 100644
 --- a/setup/setup.ui
 +++ b/setup/setup.ui
-@@ -585,7 +585,22 @@
+@@ -653,7 +653,23 @@
                      <property name="visible">True</property>
-                     <property name="orientation">vertical</property>
+                     <property name="can_focus">False</property>
                      <child>
 -                      <object class="GtkHBox" id="hbox1">
 +                      <object class="GtkCheckButton" id="checkbutton_preload_engine_mode">
@@ -179,27 +179,28 @@ index e37cb32..fec1646 100644
 +                      </object>
 +                      <packing>
 +                        <property name="expand">False</property>
++                        <property name="fill">True</property>
 +                        <property name="position">0</property>
 +                      </packing>
 +                    </child>
 +                    <child>
 +                      <object class="GtkHBox" id="hbox_customize_active_input_methods">
                          <property name="visible">True</property>
+                         <property name="can_focus">False</property>
                          <child>
-                           <object class="GtkAlignment" id="alignment6">
-@@ -752,7 +767,7 @@
-                         </child>
-                       </object>
+@@ -842,7 +858,7 @@
                        <packing>
+                         <property name="expand">True</property>
+                         <property name="fill">True</property>
 -                        <property name="position">0</property>
 +                        <property name="position">1</property>
                        </packing>
                      </child>
                      <child>
-@@ -791,7 +806,7 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
-                       </object>
+@@ -889,7 +905,7 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
                        <packing>
                          <property name="expand">False</property>
+                         <property name="fill">True</property>
 -                        <property name="position">1</property>
 +                        <property name="position">2</property>
                        </packing>
@@ -227,10 +228,10 @@ index d916265..422eb84 100644
   * @x: x coordinate.
   * @y: y coordinate.
 diff --git a/ui/gtk3/panel.vala b/ui/gtk3/panel.vala
-index c08f188..1adb78b 100644
+index 2ecd48b..24acd4c 100644
 --- a/ui/gtk3/panel.vala
 +++ b/ui/gtk3/panel.vala
-@@ -215,6 +215,8 @@ class Panel : IBus.PanelService {
+@@ -279,6 +279,8 @@ class Panel : IBus.PanelService {
          if (m_config != null) {
              m_config.value_changed.connect(config_value_changed_cb);
              m_config.watch("general", "preload_engines");
@@ -239,7 +240,7 @@ index c08f188..1adb78b 100644
              m_config.watch("general", "engines_order");
              m_config.watch("panel", "custom_font");
              m_config.watch("panel", "use_custom_font");
-@@ -274,7 +276,136 @@ class Panel : IBus.PanelService {
+@@ -338,7 +340,136 @@ class Panel : IBus.PanelService {
              init_gkbd();
          }
  
@@ -376,7 +377,7 @@ index c08f188..1adb78b 100644
      }
  
      private void update_xkb_engines() {
-@@ -449,6 +580,11 @@ class Panel : IBus.PanelService {
+@@ -499,6 +630,11 @@ class Panel : IBus.PanelService {
                                           string section,
                                           string name,
                                           Variant variant) {
@@ -389,5 +390,5 @@ index c08f188..1adb78b 100644
              update_engines(variant, null);
              return;
 -- 
-1.7.10
+1.7.10.4
 

@@ -1,17 +1,17 @@
-From f4e54576688df705f20fb25597852a451e063cef Mon Sep 17 00:00:00 2001
+From 3eb162c984dc420b085547b0a590f079262ef97d Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Sat, 28 Apr 2012 13:08:12 +0900
+Date: Tue, 17 Jul 2012 17:43:10 +0900
 Subject: [PATCH] Enable ibus-setup to show the frequently used languages
  only in IME list.
 
 ---
  data/ibus.schemas.in    |  168 +++++++++++++++++++++++++++++++++++++++++++++++
- setup/enginecombobox.py |  156 ++++++++++++++++++++++++++++++++++++-------
+ setup/enginecombobox.py |  155 ++++++++++++++++++++++++++++++++++++-------
  setup/main.py           |    1 +
- 3 files changed, 300 insertions(+), 25 deletions(-)
+ 3 files changed, 300 insertions(+), 24 deletions(-)
 
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 20c1bc3..f6b55d6 100644
+index 0d127d5..1ea4277 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
 @@ -340,6 +340,174 @@ se,si,sk,sy,sy(ku),th,tj,tr,ua,uz,vn
@@ -190,7 +190,7 @@ index 20c1bc3..f6b55d6 100644
        <applyto>/desktop/ibus/panel/custom_font</applyto>
        <owner>ibus</owner>
 diff --git a/setup/enginecombobox.py b/setup/enginecombobox.py
-index 0ac7368..578098c 100644
+index f80b164..578098c 100644
 --- a/setup/enginecombobox.py
 +++ b/setup/enginecombobox.py
 @@ -45,6 +45,9 @@ class EngineComboBox(Gtk.ComboBox):
@@ -203,7 +203,7 @@ index 0ac7368..578098c 100644
  
          renderer = Gtk.CellRendererPixbuf()
          renderer.set_property("xalign", 0)
-@@ -58,21 +61,51 @@ class EngineComboBox(Gtk.ComboBox):
+@@ -58,20 +61,51 @@ class EngineComboBox(Gtk.ComboBox):
          self.pack_start(renderer, True)
          self.set_cell_data_func(renderer, self.__name_cell_data_cb, None)
  
@@ -248,7 +248,6 @@ index 0ac7368..578098c 100644
 -        self.__model.set(iter1, 0, 0)
 -        langs = {}
 -        for e in engines:
--            print e.get_language()
 -            l = IBus.get_language_name(e.get_language())
 -            if l == None:
 -                l = ""
@@ -268,7 +267,7 @@ index 0ac7368..578098c 100644
          keys = langs.keys()
          keys.sort(locale.strcoll)
          loc = locale.getlocale()[0]
-@@ -90,29 +123,86 @@ class EngineComboBox(Gtk.ComboBox):
+@@ -89,29 +123,86 @@ class EngineComboBox(Gtk.ComboBox):
              keys.remove(IBus.get_language_name("Other"))
              keys += [IBus.get_language_name("Other")]
          for l in keys:
@@ -363,7 +362,7 @@ index 0ac7368..578098c 100644
          else:
              renderer.set_property("visible", True)
              renderer.set_property("sensitive", True)
-@@ -125,7 +215,8 @@ class EngineComboBox(Gtk.ComboBox):
+@@ -124,7 +215,8 @@ class EngineComboBox(Gtk.ComboBox):
              renderer.set_property("pixbuf", pixbuf)
  
      def __name_cell_data_cb(self, celllayout, renderer, model, iter, data):
@@ -373,7 +372,7 @@ index 0ac7368..578098c 100644
  
          if isinstance (engine, str) or isinstance (engine, unicode):
              renderer.set_property("sensitive", False)
-@@ -133,8 +224,15 @@ class EngineComboBox(Gtk.ComboBox):
+@@ -132,8 +224,15 @@ class EngineComboBox(Gtk.ComboBox):
              renderer.set_property("weight", Pango.Weight.NORMAL)
          elif isinstance(engine, int):
              renderer.set_property("sensitive", True)
@@ -391,7 +390,7 @@ index 0ac7368..578098c 100644
          else:
              renderer.set_property("sensitive", True)
              renderer.set_property("text", engine.get_longname())
-@@ -150,10 +248,18 @@ class EngineComboBox(Gtk.ComboBox):
+@@ -149,10 +248,18 @@ class EngineComboBox(Gtk.ComboBox):
              if i == 0 or i == -1:
                  return None
              iter = self.get_active_iter()
@@ -412,7 +411,7 @@ index 0ac7368..578098c 100644
          return self.get_property("active-engine")
  
 diff --git a/setup/main.py b/setup/main.py
-index 7612407..1cb3e60 100644
+index b7833e3..408e655 100644
 --- a/setup/main.py
 +++ b/setup/main.py
 @@ -209,6 +209,7 @@ class Setup(object):
@@ -424,5 +423,5 @@ index 7612407..1cb3e60 100644
  
          engine_names = values.get("preload_engines", [])
 -- 
-1.7.10
+1.7.10.4
 

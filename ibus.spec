@@ -29,8 +29,8 @@
 %define gnome_icon_theme_legacy_version 2.91.6
 
 Name:       ibus
-Version:    1.4.99.20120428
-Release:    3%{?dist}
+Version:    1.4.99.20120712
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -48,10 +48,10 @@ Patch3:     ibus-xx-setup-frequent-lang.patch
 # https://bugzilla.gnome.org/show_bug.cgi?id=658420
 Patch92:    ibus-xx-g-s-disable-preedit.patch
 Patch93:    ibus-771115-property-compatible.patch
-# Apply GNOME Alt+Tab UI to IME switcher UI.
-Patch94:    ibus-xx-branding-switcher-ui.patch
 # Hide no nused properties in f17.
-Patch95:    ibus-xx-no-use.diff
+Patch94:    ibus-xx-no-use.diff
+# Workaround since f18 vala is old.
+Patch95:    ibus-xx-f18-build.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -119,6 +119,10 @@ Requires:   gnome-icon-theme-symbolic
 
 Requires(post):  desktop-file-utils
 Requires(postun):  desktop-file-utils
+%if %with_dconf
+Requires(postun):  dconf
+Requires(posttrans): dconf
+%endif
 
 Requires(pre): GConf2
 Requires(post): GConf2
@@ -213,6 +217,7 @@ cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 %if %with_xkbfile
 %patch1 -p1 -b .xkb
 rm -f bindings/vala/ibus-1.0.vapi
+rm -f data/dconf/00-upstream-settings
 %endif
 %patch2 -p1 -b .preload-sys
 %patch3 -p1 -b .setup-frequent-lang
@@ -221,8 +226,8 @@ rm -f bindings/vala/ibus-1.0.vapi
 %patch93 -p1 -b .compat
 %endif
 
-%patch94 -p1 -b .ime-ui
-%patch95 -p1 -b .no-used
+%patch94 -p1 -b .no-used
+%patch95 -p1 -b .f18
 
 %build
 %if %with_xkbfile
@@ -265,15 +270,15 @@ autoreconf -f -i
 make -C ui/gtk3 maintainer-clean-generic
 %endif
 # make -C po update-gmo
-make %{?_smp_mflags}
+make USE_SYMBOL_ICON=TRUE %{?_smp_mflags}
 
 %if %with_gjs
 d=`basename %SOURCE2 .tar.gz`
 cd $d
 export PKG_CONFIG_PATH=..:/usr/lib64/pkgconfig:/usr/lib/pkgconfig
 %configure \
-  --with-gnome-shell-version="3.4,3.3.92,3.3.90,3.3.5,3.3.4,3.3.3,3.2" \
-  --with-gjs-version="1.32,1.31.22,1.31.20,1.31.10,1.31.6,1.31.11,1.30"
+  --with-gnome-shell-version="3.5.3,3.4,3.3.92,3.3.90,3.3.5,3.3.4,3.3.3,3.2" \
+  --with-gjs-version="1.33.3,1.32,1.31.22,1.31.20,1.31.10,1.31.6,1.31.11,1.30"
 make %{?_smp_mflags}
 cd ..
 %endif
@@ -361,6 +366,11 @@ if [ "$1" -eq 0 ]; then
 
 %if %with_dconf
   glib-compile-schemas %{_datadir}/glib-2.0/schemas &>/dev/null || :
+  # 'dconf update' sometimes does not update the db...
+  dconf update
+  if [ -f %{_sysconfdir}/dconf/db/ibus ] ; then
+      rm -f %{_sysconfdir}/dconf/db/ibus
+  fi
 %endif
 fi
 
@@ -368,6 +378,7 @@ fi
 gtk-update-icon-cache %{_datadir}/icons/hicolor &>/dev/null || :
 %if %with_dconf
 glib-compile-schemas %{_datadir}/glib-2.0/schemas &>/dev/null || :
+dconf update
 %endif
 
 %post libs -p /sbin/ldconfig
@@ -416,7 +427,7 @@ glib-compile-schemas %{_datadir}/glib-2.0/schemas &>/dev/null || :
 # %{_sysconfdir}/xdg/autostart/ibus.desktop
 %{_sysconfdir}/bash_completion.d/ibus.bash
 %if %with_dconf
-%{_sysconfdir}/dconf/db/ibus
+%{_sysconfdir}/dconf/db/ibus.d
 %{_sysconfdir}/dconf/profile/ibus
 %else
 %{_sysconfdir}/gconf/schemas/ibus.schemas
@@ -462,6 +473,10 @@ glib-compile-schemas %{_datadir}/glib-2.0/schemas &>/dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Tue Jul 17 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120712-1
+- Bumped to 1.4.99.20120712
+- Removed ibus-xx-branding-switcher-ui.patch as upstreamed.
+
 * Fri Jun  8 2012 Matthias Clasen <mclasen@redhat.com> - 1.4.99.20120428-3
 - Rebuild against new libgnomekbd
 
