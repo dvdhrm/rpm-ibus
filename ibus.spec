@@ -30,7 +30,7 @@
 
 Name:       ibus
 Version:    1.4.99.20120712
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -473,6 +473,10 @@ dconf update
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Jul 19 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120712-2
+- Updated ibus-HEAD.patch
+  Support dconf 0.13.4
+
 * Tue Jul 17 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120712-1
 - Bumped to 1.4.99.20120712
 - Removed ibus-xx-branding-switcher-ui.patch as upstreamed.
