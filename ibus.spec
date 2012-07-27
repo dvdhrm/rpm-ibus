@@ -30,7 +30,7 @@
 
 Name:       ibus
 Version:    1.4.99.20120712
-Release:    2%{?dist}
+Release:    3%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -473,6 +473,9 @@ dconf update
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Jul 27 2012 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.4.99.20120712-3
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_18_Mass_Rebuild
+
 * Thu Jul 19 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120712-2
 - Updated ibus-HEAD.patch
   Support dconf 0.13.4
