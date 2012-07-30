@@ -35,8 +35,7 @@ Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
 URL:        http://code.google.com/p/ibus/
-# Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
-Source0:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/%{name}-%{version}.tar.gz
+Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
 Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/ibus-gjs-%{ibus_gjs_version}.tar.gz
 Patch0:     ibus-HEAD.patch
@@ -424,7 +423,7 @@ dconf update
 %endif
 %{_libexecdir}/ibus-ui-gtk3
 %{_libexecdir}/ibus-x11
-# %{_sysconfdir}/xdg/autostart/ibus.desktop
+# {_sysconfdir}/xdg/autostart/ibus.desktop
 %{_sysconfdir}/bash_completion.d/ibus.bash
 %if %with_dconf
 %{_sysconfdir}/dconf/db/ibus.d
