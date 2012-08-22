@@ -1,6 +1,6 @@
-From 8023a9fcfe7d15a3233f56bfafe182c6555ef70e Mon Sep 17 00:00:00 2001
+From 2e159c7634a02c38729992f5016660585bec4d89 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 15 Aug 2012 18:24:41 +0900
+Date: Wed, 22 Aug 2012 19:50:06 +0900
 Subject: [PATCH] Add ibus-xkb and libgnomekbd.
 
 ---
@@ -27,10 +27,10 @@ Subject: [PATCH] Add ibus-xkb and libgnomekbd.
  ui/gtk3/gkbdlayout.vala.false   |   63 +++++
  ui/gtk3/gkbdlayout.vala.true    |  111 ++++++++
  ui/gtk3/keybindingmanager.vala  |   14 +-
- ui/gtk3/panel.vala              |  364 +++++++++++++++++++++++----
+ ui/gtk3/panel.vala              |  365 +++++++++++++++++++++++----
  ui/gtk3/switcher.vala           |   49 ++--
  ui/gtk3/xkblayout.vala          |  466 ++++++++++++++++++++++++++++++++++
- 26 files changed, 2539 insertions(+), 603 deletions(-)
+ 26 files changed, 2540 insertions(+), 603 deletions(-)
  create mode 100644 engine/ibus-xkb/Makefile.am
  create mode 100644 engine/ibus-xkb/ibus-xkb-main.c
  create mode 100644 engine/ibus-xkb/xkblib.c
@@ -2639,7 +2639,7 @@ index 2e1be4a..14b3fd3 100644
                  }
              }
 diff --git a/ui/gtk3/panel.vala b/ui/gtk3/panel.vala
-index 25d705d..06d1e44 100644
+index 25d705d..8cb5e8c 100644
 --- a/ui/gtk3/panel.vala
 +++ b/ui/gtk3/panel.vala
 @@ -29,6 +29,20 @@ public extern const string IBUS_VERSION;
@@ -2691,7 +2691,7 @@ index 25d705d..06d1e44 100644
  
          m_property_manager = new PropertyManager();
          m_property_manager.property_activate.connect((k, s) => {
-@@ -79,64 +99,134 @@ class Panel : IBus.PanelService {
+@@ -79,64 +99,135 @@ class Panel : IBus.PanelService {
  
      ~Panel() {
          unbind_switch_shortcut();
@@ -2837,25 +2837,26 @@ index 25d705d..06d1e44 100644
 -        if (m_switch_keysym == 0 && m_switch_modifiers == 0)
 -            return;
 +        unowned GLib.List<Keybinding> keybindings = m_keybindings;
++
++        while (keybindings != null) {
++            Keybinding keybinding = keybindings.data;
  
 -        keybinding_manager.unbind(m_switch_keysym, m_switch_modifiers);
 -        keybinding_manager.unbind(m_switch_keysym,
 -                m_switch_modifiers | Gdk.ModifierType.SHIFT_MASK);
-+        for (;
-+             keybindings != null;
-+             keybindings = keybindings.next) {
-+            Keybinding keybinding = keybindings.data;
++            keybinding_manager.unbind(keybinding.keysym,
++                                      keybinding.modifiers);
  
 -        m_switch_keysym = 0;
 -        m_switch_modifiers = 0;
-+            keybinding_manager.unbind(keybinding.keysym,
-+                                      keybinding.modifiers);
++            // Need to get keybindings.next before GList.remove is called.
++            keybindings = keybindings.next;
 +            m_keybindings.remove(keybinding);
 +        }
      }
  
      private void set_custom_font() {
-@@ -204,12 +294,16 @@ class Panel : IBus.PanelService {
+@@ -204,12 +295,16 @@ class Panel : IBus.PanelService {
          }
  
          m_config = config;
@@ -2872,7 +2873,7 @@ index 25d705d..06d1e44 100644
              update_engines(m_config.get_value("general", "preload_engines"),
                             m_config.get_value("general", "engines_order"));
          } else {
-@@ -219,6 +313,192 @@ class Panel : IBus.PanelService {
+@@ -219,6 +314,192 @@ class Panel : IBus.PanelService {
          set_custom_font();
      }
  
@@ -3065,7 +3066,7 @@ index 25d705d..06d1e44 100644
      private void switch_engine(int i, bool force = false) {
          GLib.assert(i >= 0 && i < m_engines.length);
  
-@@ -233,15 +513,7 @@ class Panel : IBus.PanelService {
+@@ -233,15 +514,7 @@ class Panel : IBus.PanelService {
              return;
          }
          // set xkb layout
@@ -3082,7 +3083,7 @@ index 25d705d..06d1e44 100644
      }
  
      private void config_value_changed_cb(IBus.Config config,
-@@ -253,6 +525,13 @@ class Panel : IBus.PanelService {
+@@ -253,6 +526,13 @@ class Panel : IBus.PanelService {
              return;
          }
  
@@ -3096,7 +3097,7 @@ index 25d705d..06d1e44 100644
          if (section == "panel" && (name == "custom_font" ||
                                     name == "use_custom_font")) {
              set_custom_font();
-@@ -272,8 +551,7 @@ class Panel : IBus.PanelService {
+@@ -272,8 +552,7 @@ class Panel : IBus.PanelService {
                  event, primary_modifiers);
          if (pressed) {
              int i = revert ? m_engines.length - 1 : 1;
