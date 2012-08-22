@@ -1,18 +1,18 @@
-From 1cd16fa05c05e64bf5ee89c92a02fe4323e1de2b Mon Sep 17 00:00:00 2001
+From 22c52cc54228a64c7e26cc33de9a47d8b1e98add Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Thu, 24 May 2012 17:49:19 +0900
+Date: Wed, 15 Aug 2012 18:36:29 +0900
 Subject: [PATCH] Disabled to show non-used GUI.
 
 ---
- setup/main.py  |   60 ++++++++++++++++++++++++++++++++++++++++++++++++++------
- setup/setup.ui |   33 +++++++++++++++++--------------
- 2 files changed, 72 insertions(+), 21 deletions(-)
+ setup/main.py  |   63 ++++++++++++++++++++++++++++++++++++++++++++++++++------
+ setup/setup.ui |   38 ++++++++++++++++++----------------
+ 2 files changed, 77 insertions(+), 24 deletions(-)
 
 diff --git a/setup/main.py b/setup/main.py
-index 0e4c83d..fda20ea 100644
+index 0e4c83d..0e33d7b 100644
 --- a/setup/main.py
 +++ b/setup/main.py
-@@ -77,22 +77,30 @@ class Setup(object):
+@@ -77,22 +77,31 @@ class Setup(object):
          self.__init_ui()
  
      def __init_hotkey(self):
@@ -24,7 +24,8 @@ index 0e4c83d..fda20ea 100644
          }
 +        '''
 +        default_values = {
-+            'trigger_accel' : ('trigger', ['<Control>space']),
++            'trigger_accel' : ('next_engine', ['<Control>space']),
++            'trigger_accel_backward' : ('prev_engine', ['<Control><Shift>space']),
 +        }
  
          values = dict(self.__config.get_values("general/hotkey"))
@@ -49,7 +50,7 @@ index 0e4c83d..fda20ea 100644
  
      def __init_panel(self):
          values = dict(self.__config.get_values("panel"))
-@@ -445,6 +453,46 @@ class Setup(object):
+@@ -445,6 +454,48 @@ class Setup(object):
          entry.set_text(text)
          entry.set_tooltip_text(text)
  
@@ -61,6 +62,8 @@ index 0e4c83d..fda20ea 100644
 +        else:
 +            shortcuts = []
 +        orig_list =['<Control>space']
++        if name == 'trigger_accel_backward':
++            orig_list =['<Control><Shift>space']
 +        variant = self.__config.get_value(section, name)
 +        if variant != None:
 +            orig_list = variant.dup_strv()[0]
@@ -97,48 +100,27 @@ index 0e4c83d..fda20ea 100644
      def __item_started_column_toggled_cb(self, cell, path_str, model):
  
 diff --git a/setup/setup.ui b/setup/setup.ui
-index 2026172..c6f5f3a 100644
+index 2026172..af99cae 100644
 --- a/setup/setup.ui
 +++ b/setup/setup.ui
-@@ -106,7 +106,7 @@
-                                 <property name="row_spacing">6</property>
-                                 <child>
-                                   <object class="GtkLabel" id="label8">
--                                    <property name="visible">True</property>
-+                                    <property name="no_show_all">True</property>
-                                     <property name="can_focus">False</property>
-                                     <property name="tooltip_text" translatable="yes">The shortcut keys for switching to next input method in the list</property>
-                                     <property name="xalign">0</property>
-@@ -121,7 +121,7 @@
-                                 </child>
+@@ -122,7 +122,6 @@
                                  <child>
                                    <object class="GtkLabel" id="label9">
--                                    <property name="visible">True</property>
-+                                    <property name="no_show_all">True</property>
-                                     <property name="sensitive">False</property>
+                                     <property name="visible">True</property>
+-                                    <property name="sensitive">False</property>
                                      <property name="can_focus">False</property>
                                      <property name="tooltip_text" translatable="yes">The shortcut keys for switching to previous input method in the list</property>
-@@ -144,7 +144,7 @@
-                                       <object class="GtkEntry" id="entry_trigger">
-                                         <property name="visible">True</property>
-                                         <property name="can_focus">True</property>
--                                        <property name="editable">False</property>
-+                                        <!-- property name="editable">False</property -->
-                                       </object>
-                                       <packing>
-                                         <property name="expand">True</property>
-@@ -154,7 +154,9 @@
-                                     </child>
+                                     <property name="xalign">0</property>
+@@ -137,7 +136,7 @@
+                                 </child>
+                                 <child>
+                                   <object class="GtkHBox" id="hbox4">
+-                                    <property name="visible">True</property>
++                                    <property name="no_show_all">True</property>
+                                     <property name="can_focus">False</property>
+                                     <property name="spacing">6</property>
                                      <child>
-                                       <object class="GtkButton" id="button_trigger">
--                                        <property name="label" translatable="yes">...</property>
-+                                        <!-- property name="label" translatable="yes">...</property -->
-+                                        <property name="label">gtk-apply</property>
-+                                        <property name="use_stock">True</property>
-                                         <property name="use_action_appearance">False</property>
-                                         <property name="visible">True</property>
-                                         <property name="can_focus">True</property>
-@@ -172,11 +174,12 @@
+@@ -172,6 +171,7 @@
                                    <packing>
                                      <property name="left_attach">1</property>
                                      <property name="right_attach">2</property>
@@ -146,22 +128,61 @@ index 2026172..c6f5f3a 100644
                                    </packing>
                                  </child>
                                  <child>
-                                   <object class="GtkHBox" id="hbox5">
--                                    <property name="visible">True</property>
-+                                    <property name="no_show_all">True</property>
-                                     <property name="can_focus">False</property>
-                                     <property name="spacing">6</property>
+@@ -183,7 +183,7 @@
+                                       <object class="GtkEntry" id="entry_next_engine">
+                                         <property name="visible">True</property>
+                                         <property name="can_focus">True</property>
+-                                        <property name="editable">False</property>
++                                        <!-- property name="editable">False</property -->
+                                       </object>
+                                       <packing>
+                                         <property name="expand">True</property>
+@@ -193,7 +193,9 @@
+                                     </child>
                                      <child>
-@@ -217,7 +220,7 @@
+                                       <object class="GtkButton" id="button_next_engine">
+-                                        <property name="label" translatable="yes">...</property>
++                                        <!-- property name="label" translatable="yes">...</property -->
++                                        <property name="label">gtk-apply</property>
++                                        <property name="use_stock">True</property>
+                                         <property name="use_action_appearance">False</property>
+                                         <property name="visible">True</property>
+                                         <property name="can_focus">True</property>
+@@ -223,9 +225,8 @@
+                                     <child>
+                                       <object class="GtkEntry" id="entry_prev_engine">
+                                         <property name="visible">True</property>
+-                                        <property name="sensitive">False</property>
+                                         <property name="can_focus">True</property>
+-                                        <property name="editable">False</property>
++                                        <!-- property name="editable">False</property -->
+                                       </object>
+                                       <packing>
+                                         <property name="expand">True</property>
+@@ -235,10 +236,11 @@
+                                     </child>
+                                     <child>
+                                       <object class="GtkButton" id="button_prev_engine">
+-                                        <property name="label" translatable="yes">...</property>
++                                        <!-- property name="label" translatable="yes">...</property -->
++                                        <property name="label">gtk-apply</property>
++                                        <property name="use_stock">True</property>
+                                         <property name="use_action_appearance">False</property>
+                                         <property name="visible">True</property>
+-                                        <property name="sensitive">False</property>
+                                         <property name="can_focus">True</property>
+                                         <property name="receives_default">False</property>
+                                         <property name="use_action_appearance">False</property>
+@@ -260,7 +262,7 @@
                                  </child>
                                  <child>
-                                   <object class="GtkHBox" id="hbox6">
+                                   <object class="GtkLabel" id="label7">
 -                                    <property name="visible">True</property>
 +                                    <property name="no_show_all">True</property>
                                      <property name="can_focus">False</property>
-                                     <property name="spacing">6</property>
-                                     <child>
-@@ -273,7 +276,7 @@
+                                     <property name="tooltip_text" translatable="yes">The shortcut keys for turning input method on or off</property>
+                                     <property name="xalign">0</property>
+@@ -273,7 +275,7 @@
                                  </child>
                                  <child>
                                    <object class="GtkLabel" id="label18">
@@ -170,7 +191,7 @@ index 2026172..c6f5f3a 100644
                                      <property name="can_focus">False</property>
                                      <property name="xalign">0</property>
                                      <property name="label" translatable="yes">Enable:</property>
-@@ -287,7 +290,7 @@
+@@ -287,7 +289,7 @@
                                  </child>
                                  <child>
                                    <object class="GtkHBox" id="hbox2">
@@ -179,7 +200,7 @@ index 2026172..c6f5f3a 100644
                                      <property name="can_focus">False</property>
                                      <property name="spacing">6</property>
                                      <child>
-@@ -328,7 +331,7 @@
+@@ -328,7 +330,7 @@
                                  </child>
                                  <child>
                                    <object class="GtkLabel" id="label19">
@@ -188,7 +209,7 @@ index 2026172..c6f5f3a 100644
                                      <property name="can_focus">False</property>
                                      <property name="xalign">0</property>
                                      <property name="label" translatable="yes">Disable:</property>
-@@ -342,7 +345,7 @@
+@@ -342,7 +344,7 @@
                                  </child>
                                  <child>
                                    <object class="GtkHBox" id="hbox3">
@@ -197,7 +218,7 @@ index 2026172..c6f5f3a 100644
                                      <property name="can_focus">False</property>
                                      <property name="spacing">6</property>
                                      <child>
-@@ -452,7 +455,7 @@
+@@ -452,7 +454,7 @@
                                  </child>
                                  <child>
                                    <object class="GtkLabel" id="label10">
@@ -206,7 +227,7 @@ index 2026172..c6f5f3a 100644
                                      <property name="can_focus">False</property>
                                      <property name="tooltip_text" translatable="yes">Set the behavior of ibus how to show or hide language bar</property>
                                      <property name="xalign">0</property>
-@@ -481,7 +484,7 @@
+@@ -481,7 +483,7 @@
                                  </child>
                                  <child>
                                    <object class="GtkComboBox" id="combobox_panel_show">
@@ -215,7 +236,7 @@ index 2026172..c6f5f3a 100644
                                      <property name="can_focus">False</property>
                                      <property name="model">model_panel_show_mode</property>
                                      <child>
-@@ -521,7 +524,7 @@
+@@ -521,7 +523,7 @@
                                    <object class="GtkCheckButton" id="checkbutton_show_icon_on_systray">
                                      <property name="label" translatable="yes">Show icon on system tray</property>
                                      <property name="use_action_appearance">False</property>
@@ -224,7 +245,7 @@ index 2026172..c6f5f3a 100644
                                      <property name="can_focus">True</property>
                                      <property name="receives_default">False</property>
                                      <property name="tooltip_text" translatable="yes">Show icon on system tray</property>
-@@ -540,7 +543,7 @@
+@@ -540,7 +542,7 @@
                                    <object class="GtkCheckButton" id="checkbutton_show_im_name">
                                      <property name="label" translatable="yes">Show input method name on language bar</property>
                                      <property name="use_action_appearance">False</property>
@@ -233,7 +254,7 @@ index 2026172..c6f5f3a 100644
                                      <property name="can_focus">True</property>
                                      <property name="receives_default">False</property>
                                      <property name="tooltip_text" translatable="yes">Show input method's name on language bar when check the checkbox</property>
-@@ -1001,7 +1004,7 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
+@@ -1001,7 +1003,7 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
                      </child>
                      <child>
                        <object class="GtkFrame" id="frame5">

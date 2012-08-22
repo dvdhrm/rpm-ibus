@@ -1,6 +1,6 @@
-From 3eb162c984dc420b085547b0a590f079262ef97d Mon Sep 17 00:00:00 2001
+From 7a37c380e3aa0dc0111b0a238b0d38b3521acc00 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Tue, 17 Jul 2012 17:43:10 +0900
+Date: Wed, 15 Aug 2012 18:25:08 +0900
 Subject: [PATCH] Enable ibus-setup to show the frequently used languages
  only in IME list.
 
@@ -11,10 +11,10 @@ Subject: [PATCH] Enable ibus-setup to show the frequently used languages
  3 files changed, 300 insertions(+), 24 deletions(-)
 
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 0d127d5..1ea4277 100644
+index 4086f67..445d423 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
-@@ -340,6 +340,174 @@ se,si,sk,sy,sy(ku),th,tj,tr,ua,uz,vn
+@@ -332,6 +332,174 @@ se,si,sk,sy,sy(ku),th,tj,tr,ua,uz,vn
        </locale>
      </schema>
      <schema>

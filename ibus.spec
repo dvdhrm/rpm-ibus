@@ -14,7 +14,7 @@
 %endif
 
 %if (0%{?fedora} > 16 || 0%{?rhel} > 6)
-%define ibus_gjs_version 3.4.1.20120518
+%define ibus_gjs_version 3.4.1.20120815
 %define ibus_gjs_build_failure 1
 %else
 %define ibus_gjs_version 3.2.1.20111230
@@ -29,8 +29,8 @@
 %define gnome_icon_theme_legacy_version 2.91.6
 
 Name:       ibus
-Version:    1.4.99.20120712
-Release:    3%{?dist}
+Version:    1.4.99.20120822
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -38,10 +38,11 @@ URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
 Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/ibus-gjs-%{ibus_gjs_version}.tar.gz
-Patch0:     ibus-HEAD.patch
-Patch1:     ibus-541492-xkb.patch
-Patch2:     ibus-530711-preload-sys.patch
-Patch3:     ibus-xx-setup-frequent-lang.patch
+# Patch0:     ibus-HEAD.patch
+Patch1:     ibus-810211-no-switch-by-no-trigger.patch
+Patch2:     ibus-541492-xkb.patch
+Patch3:     ibus-530711-preload-sys.patch
+Patch4:     ibus-xx-setup-frequent-lang.patch
 
 # Workaround to disable preedit on gnome-shell until bug 658420 is fixed.
 # https://bugzilla.gnome.org/show_bug.cgi?id=658420
@@ -55,7 +56,6 @@ Patch95:    ibus-xx-f18-build.patch
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 
-BuildRequires:  cvs
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
 BuildRequires:  python
@@ -210,16 +210,17 @@ The ibus-devel-docs package contains developer documentation for ibus
 zcat %SOURCE2 | tar xf -
 %endif
 
-%patch0 -p1
+# %patch0 -p1
 %patch92 -p1 -b .g-s-preedit
 cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
+%patch1 -p1 -b .noswitch
 %if %with_xkbfile
-%patch1 -p1 -b .xkb
+%patch2 -p1 -b .xkb
 rm -f bindings/vala/ibus-1.0.vapi
 rm -f data/dconf/00-upstream-settings
 %endif
-%patch2 -p1 -b .preload-sys
-%patch3 -p1 -b .setup-frequent-lang
+%patch3 -p1 -b .preload-sys
+%patch4 -p1 -b .setup-frequent-lang
 
 %if 0%{?fedora} <= 16
 %patch93 -p1 -b .compat
@@ -472,6 +473,13 @@ dconf update
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Aug 22 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120822-1
+- Bumped to 1.4.99.20120822
+- Bumped to ibus-gjs 3.4.1.20120815
+  Fixed Bug 845956 - ibus backward trigger key is not customized
+  Fixed Bug 844580 - ibus-dconf does not load the system gvdb
+- Separated ibus-810211-no-switch-by-no-trigger.patch from ibus-HEAD.patch
+
 * Fri Jul 27 2012 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.4.99.20120712-3
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_18_Mass_Rebuild
 
