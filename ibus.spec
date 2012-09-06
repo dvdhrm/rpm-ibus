@@ -210,7 +210,7 @@ The ibus-devel-docs package contains developer documentation for ibus
 zcat %SOURCE2 | tar xf -
 %endif
 
-# %patch0 -p1
+# patch0 -p1
 %patch92 -p1 -b .g-s-preedit
 cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 %patch1 -p1 -b .noswitch
