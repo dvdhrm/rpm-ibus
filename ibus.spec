@@ -30,7 +30,7 @@
 
 Name:       ibus
 Version:    1.4.99.20120822
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -473,6 +473,12 @@ dconf update
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Sep 06 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120822-2
+- Updated ibus-530711-preload-sys.patch
+- Updated ibus-541492-xkb.patch
+- Updated ibus-xx-no-use.diff
+  Fixed Bug 854161 - not able to add keymap with ibus-setup
+
 * Wed Aug 22 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120822-1
 - Bumped to 1.4.99.20120822
 - Bumped to ibus-gjs 3.4.1.20120815

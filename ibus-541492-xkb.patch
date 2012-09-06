@@ -1,6 +1,6 @@
-From 2e159c7634a02c38729992f5016660585bec4d89 Mon Sep 17 00:00:00 2001
+From 127b639fe84cafcb65247654757fd6fde10c8e44 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 22 Aug 2012 19:50:06 +0900
+Date: Thu, 6 Sep 2012 12:47:09 +0900
 Subject: [PATCH] Add ibus-xkb and libgnomekbd.
 
 ---
@@ -1544,7 +1544,7 @@ index 58cac38..4b6f869 100644
  
  # make -C po update-gmo
 diff --git a/setup/main.py b/setup/main.py
-index 300f11b..f3fe1c5 100644
+index 300f11b..9bc16f0 100644
 --- a/setup/main.py
 +++ b/setup/main.py
 @@ -183,14 +183,22 @@ class Setup(object):
@@ -1554,7 +1554,7 @@ index 300f11b..f3fe1c5 100644
 +        value = self.__config.get_value("general", "load_xkb_layouts")
 +        load_layouts = []
 +        if value != None:
-+            load_layouts = value.dup_strv()[0]
++            load_layouts = value.dup_strv()
 +        engines = []
 +        for engine in self.__engines:
 +            if not engine.get_name().startswith('xkb:'):

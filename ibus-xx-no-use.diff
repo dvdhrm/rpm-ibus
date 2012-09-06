@@ -1,6 +1,6 @@
-From 22c52cc54228a64c7e26cc33de9a47d8b1e98add Mon Sep 17 00:00:00 2001
+From 7ba6b518fe414e2dc988acd9f7688ceca56d69f8 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 15 Aug 2012 18:36:29 +0900
+Date: Thu, 6 Sep 2012 13:05:56 +0900
 Subject: [PATCH] Disabled to show non-used GUI.
 
 ---
@@ -9,7 +9,7 @@ Subject: [PATCH] Disabled to show non-used GUI.
  2 files changed, 77 insertions(+), 24 deletions(-)
 
 diff --git a/setup/main.py b/setup/main.py
-index 0e4c83d..0e33d7b 100644
+index cf63643..d14796c 100644
 --- a/setup/main.py
 +++ b/setup/main.py
 @@ -77,22 +77,31 @@ class Setup(object):
@@ -66,7 +66,7 @@ index 0e4c83d..0e33d7b 100644
 +            orig_list =['<Control><Shift>space']
 +        variant = self.__config.get_value(section, name)
 +        if variant != None:
-+            orig_list = variant.dup_strv()[0]
++            orig_list = variant.dup_strv()
 +        orig_text = ';'.join(orig_list)
 +        if text == orig_text:
 +            return

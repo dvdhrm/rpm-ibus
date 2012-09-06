@@ -1,6 +1,6 @@
-From e035e26100e9495ab83a6c3739448c3b5349321c Mon Sep 17 00:00:00 2001
+From 87a84380b6e8da9f61671d96eca20bc700579ca6 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 15 Aug 2012 18:24:59 +0900
+Date: Thu, 6 Sep 2012 12:48:44 +0900
 Subject: [PATCH] Reload preload engines until users customize the list.
 
 The idea is, if users don't customize the preload_engines with ibus-setup,
@@ -60,7 +60,7 @@ index 07169ae..4086f67 100644
        <applyto>/desktop/ibus/general/preload_engines</applyto>
        <owner>ibus</owner>
 diff --git a/setup/main.py b/setup/main.py
-index f3fe1c5..b7833e3 100644
+index 9bc16f0..d62bdf2 100644
 --- a/setup/main.py
 +++ b/setup/main.py
 @@ -181,6 +181,20 @@ class Setup(object):
@@ -148,7 +148,7 @@ index f3fe1c5..b7833e3 100644
 +        if section == 'general' and name == 'preload_engines':
 +            value = []
 +            if variant != None:
-+                value = variant.dup_strv()[0]
++                value = variant.dup_strv()
 +            engines = self.__get_engine_descs_from_names(value)
 +            current_engines = self.__treeview.get_engines()
 +            engines_csv = str.join(',', map(lambda e: e.get_name(), engines))
@@ -228,10 +228,10 @@ index 737b3e2..8ce5a16 100644
   * @x: x coordinate.
   * @y: y coordinate.
 diff --git a/ui/gtk3/panel.vala b/ui/gtk3/panel.vala
-index 06d1e44..3464ba8 100644
+index 8cb5e8c..d7b925b 100644
 --- a/ui/gtk3/panel.vala
 +++ b/ui/gtk3/panel.vala
-@@ -298,6 +298,8 @@ class Panel : IBus.PanelService {
+@@ -299,6 +299,8 @@ class Panel : IBus.PanelService {
          if (m_config != null) {
              m_config.value_changed.connect(config_value_changed_cb);
              m_config.watch("general", "preload_engines");
@@ -240,7 +240,7 @@ index 06d1e44..3464ba8 100644
              m_config.watch("general", "engines_order");
              m_config.watch("general/hotkey", "trigger_accel");
              m_config.watch("general/hotkey", "trigger_accel_backward");
-@@ -359,7 +361,136 @@ class Panel : IBus.PanelService {
+@@ -360,7 +362,136 @@ class Panel : IBus.PanelService {
              init_gkbd();
          }
  
@@ -377,7 +377,7 @@ index 06d1e44..3464ba8 100644
      }
  
      private void update_xkb_engines() {
-@@ -520,6 +651,11 @@ class Panel : IBus.PanelService {
+@@ -521,6 +652,11 @@ class Panel : IBus.PanelService {
                                           string section,
                                           string name,
                                           Variant variant) {

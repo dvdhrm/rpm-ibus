@@ -1,6 +1,6 @@
-From 7a37c380e3aa0dc0111b0a238b0d38b3521acc00 Mon Sep 17 00:00:00 2001
+From 75fccb88c64fd28f20901608810da16cc57b4fc7 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 15 Aug 2012 18:25:08 +0900
+Date: Thu, 6 Sep 2012 12:50:14 +0900
 Subject: [PATCH] Enable ibus-setup to show the frequently used languages
  only in IME list.
 
@@ -411,7 +411,7 @@ index f80b164..578098c 100644
          return self.get_property("active-engine")
  
 diff --git a/setup/main.py b/setup/main.py
-index b7833e3..408e655 100644
+index d62bdf2..a69617d 100644
 --- a/setup/main.py
 +++ b/setup/main.py
 @@ -209,6 +209,7 @@ class Setup(object):
