@@ -29,8 +29,8 @@
 %define gnome_icon_theme_legacy_version 2.91.6
 
 Name:       ibus
-Version:    1.4.99.20120822
-Release:    2%{?dist}
+Version:    1.4.99.20120914
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -473,6 +473,9 @@ dconf update
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Sep 14 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120914-1
+- Bumped to 1.4.99.20120914
+
 * Thu Sep 06 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120822-2
 - Updated ibus-530711-preload-sys.patch
 - Updated ibus-541492-xkb.patch

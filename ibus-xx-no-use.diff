@@ -1,6 +1,6 @@
-From 7ba6b518fe414e2dc988acd9f7688ceca56d69f8 Mon Sep 17 00:00:00 2001
+From 59cf8aea1a9d6f687f58671e07f19b827cc9ff4a Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Thu, 6 Sep 2012 13:05:56 +0900
+Date: Fri, 14 Sep 2012 20:04:11 +0900
 Subject: [PATCH] Disabled to show non-used GUI.
 
 ---
@@ -9,10 +9,10 @@ Subject: [PATCH] Disabled to show non-used GUI.
  2 files changed, 77 insertions(+), 24 deletions(-)
 
 diff --git a/setup/main.py b/setup/main.py
-index cf63643..d14796c 100644
+index 37a8b0a..7b0b8d5 100644
 --- a/setup/main.py
 +++ b/setup/main.py
-@@ -77,22 +77,31 @@ class Setup(object):
+@@ -85,22 +85,31 @@ class Setup(object):
          self.__init_ui()
  
      def __init_hotkey(self):
@@ -50,7 +50,7 @@ index cf63643..d14796c 100644
  
      def __init_panel(self):
          values = dict(self.__config.get_values("panel"))
-@@ -445,6 +454,48 @@ class Setup(object):
+@@ -459,6 +468,48 @@ class Setup(object):
          entry.set_text(text)
          entry.set_tooltip_text(text)
  
@@ -66,7 +66,7 @@ index cf63643..d14796c 100644
 +            orig_list =['<Control><Shift>space']
 +        variant = self.__config.get_value(section, name)
 +        if variant != None:
-+            orig_list = variant.dup_strv()
++            orig_list = self.__variant_dup_strv(variant)
 +        orig_text = ';'.join(orig_list)
 +        if text == orig_text:
 +            return
