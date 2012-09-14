@@ -1,0 +1,15 @@
+--- ibus-1.4.99.20120914/bus/ibusimpl.c.orig	2012-09-14 21:11:37.627075831 +0900
++++ ibus-1.4.99.20120914/bus/ibusimpl.c	2012-09-14 21:12:41.632072691 +0900
+@@ -282,8 +282,10 @@ _dbus_name_owner_changed_cb (BusDBusImpl
+                 if (engine != NULL) {
+                     IBusPropList *prop_list =
+                         bus_engine_proxy_get_properties (engine);
+-                    bus_panel_proxy_register_properties (ibus->panel,
+-                                                         prop_list);
++                    if (prop_list) {
++                        bus_panel_proxy_register_properties (ibus->panel,
++                                                             prop_list);
++                    }
+                 }
+             }
+         }
