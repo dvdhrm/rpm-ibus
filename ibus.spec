@@ -29,8 +29,8 @@
 %define gnome_icon_theme_legacy_version 2.91.6
 
 Name:       ibus
-Version:    1.4.99.20120914
-Release:    2%{?dist}
+Version:    1.4.99.20121006
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -39,20 +39,19 @@ Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
 Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/ibus-gjs-%{ibus_gjs_version}.tar.gz
 # Patch0:     ibus-HEAD.patch
-Patch0:     ibus-xx-segv-reg-prop.patch
 Patch1:     ibus-810211-no-switch-by-no-trigger.patch
 Patch2:     ibus-541492-xkb.patch
 Patch3:     ibus-530711-preload-sys.patch
 Patch4:     ibus-xx-setup-frequent-lang.patch
 
+%if 0%{?fedora} <= 17
 # Workaround to disable preedit on gnome-shell until bug 658420 is fixed.
 # https://bugzilla.gnome.org/show_bug.cgi?id=658420
 Patch92:    ibus-xx-g-s-disable-preedit.patch
+%endif
 Patch93:    ibus-771115-property-compatible.patch
 # Hide no nused properties in f17.
 Patch94:    ibus-xx-no-use.diff
-# Workaround since f18 vala is old.
-Patch95:    ibus-xx-f18-build.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -212,9 +211,10 @@ zcat %SOURCE2 | tar xf -
 %endif
 
 # patch0 -p1
-%patch0 -p1
+%if 0%{?fedora} <= 17
 %patch92 -p1 -b .g-s-preedit
 cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
+%endif
 %patch1 -p1 -b .noswitch
 %if %with_xkbfile
 %patch2 -p1 -b .xkb
@@ -229,7 +229,6 @@ rm -f data/dconf/00-upstream-settings
 %endif
 
 %patch94 -p1 -b .no-used
-%patch95 -p1 -b .f18
 
 %build
 %if %with_xkbfile
@@ -475,6 +474,10 @@ dconf update
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Sat Oct 06 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20121006-1
+- Bumped to 1.4.99.20121006
+- Removed ibus-xx-segv-reg-prop.patch
+
 * Fri Sep 14 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20120914-2
 - Added ibus-xx-segv-reg-prop.patch to avoid segv
 

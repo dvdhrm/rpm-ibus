@@ -1,4 +1,4 @@
-From d3ae9bc16830c4cca27eba953e4576ded588e1f3 Mon Sep 17 00:00:00 2001
+From 2c4bbcc26f735d6c274483a79b4b27f730afa7b2 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
 Date: Fri, 14 Sep 2012 18:49:59 +0900
 Subject: [PATCH] Reload preload engines until users customize the list.
@@ -60,10 +60,10 @@ index 07169ae..4086f67 100644
        <applyto>/desktop/ibus/general/preload_engines</applyto>
        <owner>ibus</owner>
 diff --git a/setup/main.py b/setup/main.py
-index 141cdc2..0b6ce9c 100644
+index 2a19c49..000a03b 100644
 --- a/setup/main.py
 +++ b/setup/main.py
-@@ -189,6 +189,20 @@ class Setup(object):
+@@ -196,6 +196,20 @@ class Setup(object):
          self.__checkbutton_use_global_engine.connect("toggled",
                  self.__checkbutton_use_global_engine_toggled_cb)
  
@@ -84,7 +84,7 @@ index 141cdc2..0b6ce9c 100644
          # init engine page
          self.__engines = self.__bus.list_engines()
          value = self.__config.get_value("general", "load_xkb_layouts")
-@@ -250,6 +264,7 @@ class Setup(object):
+@@ -257,6 +271,7 @@ class Setup(object):
                  self.__checkbutton_auto_start_toggled_cb)
  
          self.__config = self.__bus.get_config()
@@ -92,7 +92,7 @@ index 141cdc2..0b6ce9c 100644
  
          self.__init_hotkey()
          self.__init_panel()
-@@ -264,8 +279,8 @@ class Setup(object):
+@@ -271,8 +286,8 @@ class Setup(object):
      def __combobox_notify_active_engine_cb(self, combobox, property):
          engine = self.__combobox.get_active_engine()
          button = self.__builder.get_object("button_engine_add")
@@ -103,7 +103,7 @@ index 141cdc2..0b6ce9c 100644
  
      def __get_engine_setup_exec_args(self, engine):
          args = []
-@@ -344,6 +359,34 @@ class Setup(object):
+@@ -351,6 +366,34 @@ class Setup(object):
              del self.__engine_setup_exec_list[name]
          self.__engine_setup_exec_list[name] = os.spawnl(os.P_NOWAIT, *args)
  
@@ -138,7 +138,7 @@ index 141cdc2..0b6ce9c 100644
      def __init_bus(self):
          self.__bus = IBus.Bus()
          if self.__bus.is_connected():
-@@ -554,8 +597,18 @@ class Setup(object):
+@@ -561,8 +604,18 @@ class Setup(object):
          value = GLib.Variant.new_boolean(value)
          self.__config.set_value("general", "use_global_engine", value)
  

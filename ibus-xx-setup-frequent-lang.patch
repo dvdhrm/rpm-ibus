@@ -1,4 +1,4 @@
-From 294c84451647426d687988b60aa0b2719c6f27cc Mon Sep 17 00:00:00 2001
+From 9fe1a6cf5d10d82c93bf2280a29ebf96e9813087 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
 Date: Fri, 14 Sep 2012 18:50:10 +0900
 Subject: [PATCH] Enable ibus-setup to show the frequently used languages
@@ -411,10 +411,10 @@ index f80b164..578098c 100644
          return self.get_property("active-engine")
  
 diff --git a/setup/main.py b/setup/main.py
-index 0b6ce9c..7e1f8e7 100644
+index 000a03b..ff1c0c6 100644
 --- a/setup/main.py
 +++ b/setup/main.py
-@@ -217,6 +217,7 @@ class Setup(object):
+@@ -224,6 +224,7 @@ class Setup(object):
                  engines.append(engine)
  
          self.__combobox = self.__builder.get_object("combobox_engines")
