@@ -1,11 +1,11 @@
-From 168b9a502b24a15e037d6f517165b8e068e4b5a1 Mon Sep 17 00:00:00 2001
+From 15a9eb2a8f9a278b5e357d7dd7ffebedd05d0c5e Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Sat, 6 Oct 2012 18:05:16 +0900
+Date: Tue, 9 Oct 2012 17:21:01 +0900
 Subject: [PATCH] Add ibus-xkb and libgnomekbd.
 
 ---
  bindings/vala/Gkbd-3.0.metadata |    1 +
- bindings/vala/Makefile.am       |   20 ++
+ bindings/vala/Makefile.am       |   23 ++
  bindings/vala/Xkl-1.0.metadata  |    3 +
  client/x11/gdk-private.c        |    3 +-
  configure.ac                    |   60 +++++
@@ -31,7 +31,7 @@ Subject: [PATCH] Add ibus-xkb and libgnomekbd.
  ui/gtk3/panel.vala              |  365 +++++++++++++++++++++++----
  ui/gtk3/switcher.vala           |   49 ++--
  ui/gtk3/xkblayout.vala          |  464 ++++++++++++++++++++++++++++++++++
- 27 files changed, 2559 insertions(+), 603 deletions(-)
+ 27 files changed, 2562 insertions(+), 603 deletions(-)
  create mode 100644 bindings/vala/Gkbd-3.0.metadata
  create mode 100644 bindings/vala/Xkl-1.0.metadata
  create mode 100644 engine/ibus-xkb/Makefile.am
@@ -52,7 +52,7 @@ index 0000000..661e6fd
 @@ -0,0 +1 @@
 +Configuration cheader_filename="libgnomekbd/gkbd-configuration.h"
 diff --git a/bindings/vala/Makefile.am b/bindings/vala/Makefile.am
-index abcc543..ed132e0 100644
+index abcc543..307a161 100644
 --- a/bindings/vala/Makefile.am
 +++ b/bindings/vala/Makefile.am
 @@ -27,12 +27,22 @@ dist_vapi_DATA = \
@@ -78,13 +78,14 @@ index abcc543..ed132e0 100644
  
  ibus-@IBUS_API_VERSION@.vapi: $(vapi_deps)
  	$(AM_V_GEN) $(VAPIGEN) --library ibus-@IBUS_API_VERSION@ \
-@@ -41,11 +51,21 @@ ibus-@IBUS_API_VERSION@.vapi: $(vapi_deps)
+@@ -41,13 +51,26 @@ ibus-@IBUS_API_VERSION@.vapi: $(vapi_deps)
  			$(top_srcdir)/src/IBus-@IBUS_API_VERSION@.gir \
  			$(srcdir)/IBus-1.0-custom.vala
  
 +if ENABLE_LIBGNOMEKBD
 +$(builddir)/gkbd.vapi:
-+	$(VAPIGEN) --metadatadir . --library gkbd \
++	$(AM_V_GEN) $(VAPIGEN) --library gkbd \
++	    --metadatadir $(srcdir) \
 +	    --pkg gtk+-3.0 --pkg glib-2.0 --pkg gmodule-2.0 \
 +	    /usr/share/gir-1.0/Gkbd-3.0.gir
 +	$(NULL)
@@ -99,7 +100,11 @@ index abcc543..ed132e0 100644
 +	Xkl-1.0.metadata \
  	$(NULL)
  
++CLEANFILES = gkbd.vapi
++
  MAINTAINERCLEANFILES = ibus-@IBUS_API_VERSION@.vapi
+ 
+ -include $(top_srcdir)/git.mk
 diff --git a/bindings/vala/Xkl-1.0.metadata b/bindings/vala/Xkl-1.0.metadata
 new file mode 100644
 index 0000000..4961d0c

@@ -30,7 +30,7 @@
 
 Name:       ibus
 Version:    1.4.99.20121006
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -38,7 +38,7 @@ URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
 Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/ibus-gjs-%{ibus_gjs_version}.tar.gz
-# Patch0:     ibus-HEAD.patch
+Patch0:     ibus-HEAD.patch
 Patch1:     ibus-810211-no-switch-by-no-trigger.patch
 Patch2:     ibus-541492-xkb.patch
 Patch3:     ibus-530711-preload-sys.patch
@@ -211,6 +211,7 @@ zcat %SOURCE2 | tar xf -
 %endif
 
 # patch0 -p1
+%patch0 -p1
 %if 0%{?fedora} <= 17
 %patch92 -p1 -b .g-s-preedit
 cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
@@ -474,6 +475,9 @@ dconf update
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Oct 11 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20121006-2
+- Updated ibus-HEAD.patch to fix typo in data/dconf/profile/ibus
+
 * Sat Oct 06 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20121006-1
 - Bumped to 1.4.99.20121006
 - Removed ibus-xx-segv-reg-prop.patch
