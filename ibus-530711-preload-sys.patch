@@ -1,6 +1,6 @@
-From 2c4bbcc26f735d6c274483a79b4b27f730afa7b2 Mon Sep 17 00:00:00 2001
+From a2558c5d403bc150fae7fb1e07f0b541a7f90e8a Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Fri, 14 Sep 2012 18:49:59 +0900
+Date: Wed, 14 Nov 2012 07:07:08 +0900
 Subject: [PATCH] Reload preload engines until users customize the list.
 
 The idea is, if users don't customize the preload_engines with ibus-setup,
@@ -17,15 +17,15 @@ on ibus-setup, ibus-setup sets 'preload_engine_mode' as
 IBUS_PRELOAD_ENGINE_MODE_USER and users can customize the value
 'preload_engines'.
 ---
- data/ibus.schemas.in |   24 +++++++++
- setup/main.py        |   61 ++++++++++++++++++++--
- setup/setup.ui       |   22 ++++++--
- src/ibustypes.h      |   10 ++++
- ui/gtk3/panel.vala   |  136 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ data/ibus.schemas.in |  24 +++++++++
+ setup/main.py        |  61 +++++++++++++++++++++--
+ setup/setup.ui       |  22 +++++++--
+ src/ibustypes.h      |  10 ++++
+ ui/gtk3/panel.vala   | 136 +++++++++++++++++++++++++++++++++++++++++++++++++++
  5 files changed, 246 insertions(+), 7 deletions(-)
 
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 07169ae..4086f67 100644
+index 1a0e2d2..64f6f33 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
 @@ -2,6 +2,30 @@
@@ -60,7 +60,7 @@ index 07169ae..4086f67 100644
        <applyto>/desktop/ibus/general/preload_engines</applyto>
        <owner>ibus</owner>
 diff --git a/setup/main.py b/setup/main.py
-index 2a19c49..000a03b 100644
+index c02229b..5da6340 100644
 --- a/setup/main.py
 +++ b/setup/main.py
 @@ -196,6 +196,20 @@ class Setup(object):
@@ -138,7 +138,7 @@ index 2a19c49..000a03b 100644
      def __init_bus(self):
          self.__bus = IBus.Bus()
          if self.__bus.is_connected():
-@@ -561,8 +604,18 @@ class Setup(object):
+@@ -562,8 +605,18 @@ class Setup(object):
          value = GLib.Variant.new_boolean(value)
          self.__config.set_value("general", "use_global_engine", value)
  
@@ -228,19 +228,19 @@ index 737b3e2..8ce5a16 100644
   * @x: x coordinate.
   * @y: y coordinate.
 diff --git a/ui/gtk3/panel.vala b/ui/gtk3/panel.vala
-index 8e6f756..01cc7aa 100644
+index 1aca443..1ec2579 100644
 --- a/ui/gtk3/panel.vala
 +++ b/ui/gtk3/panel.vala
-@@ -291,6 +291,8 @@ class Panel : IBus.PanelService {
+@@ -309,6 +309,8 @@ class Panel : IBus.PanelService {
          if (m_config != null) {
              m_config.value_changed.connect(config_value_changed_cb);
              m_config.watch("general", "preload_engines");
 +            m_config.watch("general", "preload_engines_inited");
 +            m_config.watch("general", "preload_engine_mode");
              m_config.watch("general", "engines_order");
+             m_config.watch("general", "switcher_delay_time");
              m_config.watch("general/hotkey", "trigger_accel");
-             m_config.watch("general/hotkey", "trigger_accel_backward");
-@@ -352,7 +354,136 @@ class Panel : IBus.PanelService {
+@@ -417,7 +419,136 @@ class Panel : IBus.PanelService {
              init_gkbd();
          }
  
@@ -377,7 +377,7 @@ index 8e6f756..01cc7aa 100644
      }
  
      private void update_xkb_engines() {
-@@ -513,6 +644,11 @@ class Panel : IBus.PanelService {
+@@ -580,6 +711,11 @@ class Panel : IBus.PanelService {
                                           string section,
                                           string name,
                                           Variant variant) {
@@ -390,5 +390,5 @@ index 8e6f756..01cc7aa 100644
              update_engines(variant, null);
              return;
 -- 
-1.7.10.4
+1.8.0
 

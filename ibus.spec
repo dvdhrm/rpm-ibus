@@ -7,19 +7,15 @@
 %define with_pygobject2 1
 %define with_pygobject3 1
 
-%ifarch ppc ppc64 s390 s390x
+%if (0%{?fedora} > 17 || 0%{?rhel} > 6)
+#ifarch ppc ppc64 s390 s390x
 %define with_gjs 0
 %else
 %define with_gjs 1
 %endif
 
-%if (0%{?fedora} > 16 || 0%{?rhel} > 6)
 %define ibus_gjs_version 3.4.1.20120815
 %define ibus_gjs_build_failure 1
-%else
-%define ibus_gjs_version 3.2.1.20111230
-%define ibus_gjs_build_failure 0
-%endif
 
 %define ibus_api_version 1.0
 
@@ -29,15 +25,17 @@
 %define gnome_icon_theme_legacy_version 2.91.6
 
 Name:       ibus
-Version:    1.4.99.20121006
-Release:    2%{?dist}
+Version:    1.4.99.20121109
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
 URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    xinput-ibus
+%if %with_gjs
 Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/ibus-gjs-%{ibus_gjs_version}.tar.gz
+%endif
 Patch0:     ibus-HEAD.patch
 Patch1:     ibus-810211-no-switch-by-no-trigger.patch
 Patch2:     ibus-541492-xkb.patch
@@ -49,7 +47,6 @@ Patch4:     ibus-xx-setup-frequent-lang.patch
 # https://bugzilla.gnome.org/show_bug.cgi?id=658420
 Patch92:    ibus-xx-g-s-disable-preedit.patch
 %endif
-Patch93:    ibus-771115-property-compatible.patch
 # Hide no nused properties in f17.
 Patch94:    ibus-xx-no-use.diff
 
@@ -104,7 +101,9 @@ Requires:   pyxdg
 Requires:   iso-codes
 Requires:   dbus-python >= %{dbus_python_version}
 Requires:   dbus-x11
+%if 0%{?fedora} <= 17
 Requires:   im-chooser
+%endif
 %if %with_dconf
 Requires:   dconf
 %else
@@ -114,7 +113,9 @@ Requires:   notify-python
 Requires:   libgnomekbd
 Requires:   librsvg2
 Requires:   gnome-icon-theme-legacy >= %{gnome_icon_theme_legacy_version}
+%if 0%{?fedora} <= 17
 Requires:   gnome-icon-theme-symbolic
+%endif
 
 Requires(post):  desktop-file-utils
 Requires(postun):  desktop-file-utils
@@ -163,7 +164,9 @@ Summary:    IBus im module for gtk3
 Group:      System Environment/Libraries
 Requires:   %{name} = %{version}-%{release}
 Requires:   %{name}-libs = %{version}-%{release}
+%if 0%{?fedora} <= 17
 Requires:   imsettings-gnome
+%endif
 Requires(post): glib2 >= %{glib_ver}
 
 %description gtk3
@@ -225,10 +228,6 @@ rm -f data/dconf/00-upstream-settings
 %patch3 -p1 -b .preload-sys
 %patch4 -p1 -b .setup-frequent-lang
 
-%if 0%{?fedora} <= 16
-%patch93 -p1 -b .compat
-%endif
-
 %patch94 -p1 -b .no-used
 
 %build
@@ -254,9 +253,12 @@ autoreconf -f -i
     --enable-gtk-doc \
     --with-no-snooper-apps='gnome-do,Do.*,firefox.*,.*chrome.*,.*chromium.*' \
     --enable-surrounding-text \
+%if (0%{?fedora} > 17 || 0%{?rhel} > 6)
+    --with-panel-icon-keyboard=legacy \
+%endif
 %if %with_xkbfile
     --with-xkb-preload-layouts=$XKB_PRELOAD_LAYOUTS \
-    --enable-xkb \
+    --with-xkb-command=ibus-xkb \
     --enable-libgnomekbd \
 %endif
 %if %with_dconf
@@ -272,7 +274,7 @@ autoreconf -f -i
 make -C ui/gtk3 maintainer-clean-generic
 %endif
 # make -C po update-gmo
-make USE_SYMBOL_ICON=TRUE %{?_smp_mflags}
+make %{?_smp_mflags}
 
 %if %with_gjs
 d=`basename %SOURCE2 .tar.gz`
@@ -475,6 +477,16 @@ dconf update
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Oct 11 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20121109-1
+- Bumped to 1.4.99.20121109
+- Removed im-chooser, imsettings-gnome, gnome-icon-theme-symbolic
+  dependencies in f18 because ibus gnome integration is done.
+  Use ibus-keyboard instead of input-keyboard-symbolic.
+- Disabled ibus-gjs build because of ibus gnome integration.
+
+* Thu Oct 11 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20121006-2
+- Updated ibus-HEAD.patch to fix typo in data/dconf/profile/ibus
+
 * Thu Oct 11 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20121006-2
 - Updated ibus-HEAD.patch to fix typo in data/dconf/profile/ibus
 
