@@ -42,7 +42,7 @@ Patch2:     ibus-541492-xkb.patch
 Patch3:     ibus-530711-preload-sys.patch
 Patch4:     ibus-xx-setup-frequent-lang.patch
 
-%if 0%{?fedora} <= 17
+%if (0%{?fedora} <= 17 && 0%{?rhel} < 7)
 # Workaround to disable preedit on gnome-shell until bug 658420 is fixed.
 # https://bugzilla.gnome.org/show_bug.cgi?id=658420
 Patch92:    ibus-xx-g-s-disable-preedit.patch
@@ -101,7 +101,7 @@ Requires:   pyxdg
 Requires:   iso-codes
 Requires:   dbus-python >= %{dbus_python_version}
 Requires:   dbus-x11
-%if 0%{?fedora} <= 17
+%if (0%{?fedora} <= 17 && 0%{?rhel} < 7)
 Requires:   im-chooser
 %endif
 %if %with_dconf
@@ -113,7 +113,7 @@ Requires:   notify-python
 Requires:   libgnomekbd
 Requires:   librsvg2
 Requires:   gnome-icon-theme-legacy >= %{gnome_icon_theme_legacy_version}
-%if 0%{?fedora} <= 17
+%if (0%{?fedora} <= 17 && 0%{?rhel} < 7)
 Requires:   gnome-icon-theme-symbolic
 %endif
 
@@ -164,7 +164,7 @@ Summary:    IBus im module for gtk3
 Group:      System Environment/Libraries
 Requires:   %{name} = %{version}-%{release}
 Requires:   %{name}-libs = %{version}-%{release}
-%if 0%{?fedora} <= 17
+%if (0%{?fedora} <= 17 && 0%{?rhel} < 7)
 Requires:   imsettings-gnome
 %endif
 Requires(post): glib2 >= %{glib_ver}
@@ -215,7 +215,7 @@ zcat %SOURCE2 | tar xf -
 
 # patch0 -p1
 %patch0 -p1
-%if 0%{?fedora} <= 17
+%if (0%{?fedora} <= 17 && 0%{?rhel} < 7)
 %patch92 -p1 -b .g-s-preedit
 cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 %endif
