@@ -26,7 +26,7 @@
 
 Name:       ibus
 Version:    1.4.99.20121109
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -115,6 +115,9 @@ Requires:   librsvg2
 Requires:   gnome-icon-theme-legacy >= %{gnome_icon_theme_legacy_version}
 %if (0%{?fedora} <= 17 && 0%{?rhel} < 7)
 Requires:   gnome-icon-theme-symbolic
+%endif
+%if (0%{?fedora} > 17 || 0%{?rhel} > 6)
+Obsoletes:  ibus-gnome3 < %{version}-%{release}
 %endif
 
 Requires(post):  desktop-file-utils
@@ -477,6 +480,9 @@ dconf update
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Oct 11 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20121109-2
+- Obsoleted ibus-gnome3
+
 * Thu Oct 11 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20121109-1
 - Bumped to 1.4.99.20121109
 - Removed im-chooser, imsettings-gnome, gnome-icon-theme-symbolic
