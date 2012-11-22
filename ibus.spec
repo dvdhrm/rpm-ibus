@@ -3,7 +3,6 @@
 %{!?gtk3_binary_version: %define gtk3_binary_version %(pkg-config  --variable=gtk_binary_version gtk+-3.0)}
 
 %define with_xkbfile 1
-%define with_dconf 1
 %define with_pygobject2 1
 %define with_pygobject3 1
 
@@ -62,12 +61,10 @@ BuildRequires:  dbus-glib-devel
 BuildRequires:  dbus-python-devel >= %{dbus_python_version}
 BuildRequires:  desktop-file-utils
 BuildRequires:  gtk-doc
-%if %with_dconf
 BuildRequires:  dconf-devel
 BuildRequires:  dbus-x11
 BuildRequires:  vala
 BuildRequires:  vala-tools
-%endif
 # for AM_GCONF_SOURCE_2 in configure.ac
 BuildRequires:  GConf2-devel
 %if %with_pygobject3
@@ -104,11 +101,7 @@ Requires:   dbus-x11
 %if (0%{?fedora} <= 17 && 0%{?rhel} < 7)
 Requires:   im-chooser
 %endif
-%if %with_dconf
 Requires:   dconf
-%else
-Requires:   GConf2
-%endif
 Requires:   notify-python
 Requires:   libgnomekbd
 Requires:   librsvg2
@@ -122,14 +115,8 @@ Obsoletes:  ibus-gnome3 < %{version}-%{release}
 
 Requires(post):  desktop-file-utils
 Requires(postun):  desktop-file-utils
-%if %with_dconf
 Requires(postun):  dconf
 Requires(posttrans): dconf
-%endif
-
-Requires(pre): GConf2
-Requires(post): GConf2
-Requires(preun): GConf2
 
 Requires(post):  %{_sbindir}/alternatives
 Requires(postun):  %{_sbindir}/alternatives
@@ -235,17 +222,6 @@ rm -f data/dconf/00-upstream-settings
 
 %build
 %if %with_xkbfile
-XKB_PRELOAD_LAYOUTS=\
-"us,us(chr),us(dvorak),ad,al,am,ara,az,ba,bd,be,bg,br,bt,by,"\
-"de,dk,ca,ch,cn(tib),cz,ee,epo,es,et,fi,fo,fr,"\
-"gb,ge,ge(dsb),ge(ru),ge(os),gh,gh(akan),gh(ewe),gh(fula),gh(ga),gh(hausa),"\
-"gn,gr,hu,hr,ie,ie(CloGaelach),il,"\
-"in,"\
-"in(tel),in(bolnagri),iq,iq(ku),ir,ir(ku),is,it,jp,"\
-"kg,kh,kz,la,latam,lk,lk(tam_unicode),lt,lv,ma,ma(tifinagh),mal,mao,"\
-"me,mk,mm,mt,mv,ng,ng(hausa),ng,ng(igbo),ng(yoruba),nl,no,no(smi),np,"\
-"pk,pl,pl(csb),pt,ro,rs,ru,ru(cv),ru(kom),ru(sah),ru(tt),ru(xal),"\
-"se,si,sk,sy,sy(ku),th,tj,tr,ua,uz,vn"
 autoreconf -f -i
 %endif
 %configure \
@@ -260,14 +236,11 @@ autoreconf -f -i
     --with-panel-icon-keyboard=legacy \
 %endif
 %if %with_xkbfile
-    --with-xkb-preload-layouts=$XKB_PRELOAD_LAYOUTS \
     --with-xkb-command=ibus-xkb \
     --enable-libgnomekbd \
 %endif
-%if %with_dconf
     --enable-dconf \
     --disable-gconf \
-%endif
 %if %with_pygobject2
     --enable-python-library \
 %endif
@@ -291,8 +264,7 @@ cd ..
 %endif
 
 %install
-rm -rf $RPM_BUILD_ROOT
-make DESTDIR=$RPM_BUILD_ROOT install
+make install DESTDIR=$RPM_BUILD_ROOT INSTALL='install -p'
 rm -f $RPM_BUILD_ROOT%{_libdir}/libibus-%{ibus_api_version}.la
 rm -f $RPM_BUILD_ROOT%{_libdir}/gtk-2.0/%{gtk2_binary_version}/immodules/im-ibus.la
 rm -f $RPM_BUILD_ROOT%{_libdir}/gtk-3.0/%{gtk3_binary_version}/immodules/im-ibus.la
@@ -331,35 +303,11 @@ cd ..
 # FIXME: no version number
 %find_lang %{name}10
 
-%clean
-rm -rf $RPM_BUILD_ROOT
-
 %post
 # recreate icon cache
 touch --no-create %{_datadir}/icons/hicolor &>/dev/null || :
 
 %{_sbindir}/alternatives --install %{_sysconfdir}/X11/xinit/xinputrc xinputrc %{_xinputconf} 83 || :
-
-%if !%with_dconf
-export GCONF_CONFIG_SOURCE=`gconftool-2 --get-default-source`
-gconftool-2 --makefile-install-rule %{_sysconfdir}/gconf/schemas/ibus.schemas > /dev/null 2>&1 || :
-%endif
-
-%pre
-%if !%with_dconf
-if [ "$1" -gt 1 ]; then
-    export GCONF_CONFIG_SOURCE=`gconftool-2 --get-default-source`
-    gconftool-2 --makefile-uninstall-rule %{_sysconfdir}/gconf/schemas/ibus.schemas > /dev/null 2>&1 || :
-fi
-%endif
-
-%preun
-%if !%with_dconf
-if [ "$1" -eq 0 ]; then
-    export GCONF_CONFIG_SOURCE=`gconftool-2 --get-default-source`
-    gconftool-2 --makefile-uninstall-rule %{_sysconfdir}/gconf/schemas/ibus.schemas > /dev/null 2>&1 || :
-fi
-%endif
 
 %postun
 if [ "$1" -eq 0 ]; then
@@ -371,22 +319,18 @@ if [ "$1" -eq 0 ]; then
   # if alternative was set to manual, reset to auto
   [ -L %{_sysconfdir}/alternatives/xinputrc -a "`readlink %{_sysconfdir}/alternatives/xinputrc`" = "%{_xinputconf}" ] && %{_sbindir}/alternatives --auto xinputrc || :
 
-%if %with_dconf
   glib-compile-schemas %{_datadir}/glib-2.0/schemas &>/dev/null || :
   # 'dconf update' sometimes does not update the db...
   dconf update
   if [ -f %{_sysconfdir}/dconf/db/ibus ] ; then
       rm -f %{_sysconfdir}/dconf/db/ibus
   fi
-%endif
 fi
 
 %posttrans
 gtk-update-icon-cache %{_datadir}/icons/hicolor &>/dev/null || :
-%if %with_dconf
 glib-compile-schemas %{_datadir}/glib-2.0/schemas &>/dev/null || :
 dconf update
-%endif
 
 %post libs -p /sbin/ldconfig
 
@@ -406,7 +350,6 @@ dconf update
 
 # FIXME: no version number
 %files -f %{name}10.lang
-%defattr(-,root,root,-)
 %doc AUTHORS COPYING README
 %if %with_pygobject2
 %dir %{python_sitelib}/ibus
@@ -421,53 +364,40 @@ dconf update
 %endif
 %{_datadir}/applications/*
 %{_datadir}/icons/hicolor/*/apps/*
-%if %with_dconf
 %{_datadir}/GConf/gsettings/*
 %{_datadir}/glib-2.0/schemas/*.xml
 %{_libexecdir}/ibus-engine-simple
 %{_libexecdir}/ibus-dconf
-%else
-%{_libexecdir}/ibus-gconf
-%endif
 %{_libexecdir}/ibus-ui-gtk3
 %{_libexecdir}/ibus-x11
 # {_sysconfdir}/xdg/autostart/ibus.desktop
 %{_sysconfdir}/bash_completion.d/ibus.bash
-%if %with_dconf
 %{_sysconfdir}/dconf/db/ibus.d
 %{_sysconfdir}/dconf/profile/ibus
-%else
-%{_sysconfdir}/gconf/schemas/ibus.schemas
-%endif
 %config %{_xinputconf}
 %if %with_xkbfile
 %{_libexecdir}/ibus-xkb
 %endif
 
 %files libs
-%defattr(-,root,root,-)
 %{_libdir}/libibus-%{ibus_api_version}.so.*
 %if %with_pygobject3
 %{_libdir}/girepository-1.0/IBus-1.0.typelib
 %endif
 
 %files gtk2
-%defattr(-,root,root,-)
 %{_libdir}/gtk-2.0/%{gtk2_binary_version}/immodules/im-ibus.so
 
 %files gtk3
-%defattr(-,root,root,-)
 %{_libdir}/gtk-3.0/%{gtk3_binary_version}/immodules/im-ibus.so
 
 %if %with_gjs
 %files gnome3
-%defattr(-,root,root,-)
 %{_datadir}/gnome-shell/js/ui/status/ibus
 %{_datadir}/gnome-shell/extensions/ibus-indicator@example.com
 %endif
 
 %files devel
-%defattr(-,root,root,-)
 %{_libdir}/lib*.so
 %{_libdir}/pkgconfig/*
 %{_includedir}/*
@@ -476,7 +406,6 @@ dconf update
 %{_datadir}/vala/vapi/ibus-1.0.deps
 
 %files devel-docs
-%defattr(-,root,root,-)
 %{_datadir}/gtk-doc/html/*
 
 %changelog
