@@ -34,10 +34,15 @@ Source1:    %{name}-xinput
 %if %with_gjs
 Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/%{name}-gjs-%{ibus_gjs_version}.tar.gz
 %endif
+# Upstreamed patches.
 Patch0:     %{name}-HEAD.patch
+# https://bugzilla.redhat.com/show_bug.cgi?id=810211
 Patch1:     %{name}-810211-no-switch-by-no-trigger.patch
+# https://bugzilla.redhat.com/show_bug.cgi?id=541492
 Patch2:     %{name}-541492-xkb.patch
+# https://bugzilla.redhat.com/show_bug.cgi?id=530711
 Patch3:     %{name}-530711-preload-sys.patch
+# Hide minor input method engines on ibus-setup by locale
 Patch4:     %{name}-xx-setup-frequent-lang.patch
 
 %if (0%{?fedora} <= 17 && 0%{?rhel} < 7)
