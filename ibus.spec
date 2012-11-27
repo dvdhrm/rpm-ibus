@@ -24,7 +24,7 @@
 
 Name:       ibus
 Version:    1.4.99.20121109
-Release:    3%{?dist}
+Release:    4%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -419,6 +419,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Tue Nov 27 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20121109-4
+- Added comment lines for patches.
+
 * Tue Nov 27 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20121109-3
 - Fixed misc issues.
 
