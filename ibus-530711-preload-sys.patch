@@ -1,6 +1,6 @@
-From a2558c5d403bc150fae7fb1e07f0b541a7f90e8a Mon Sep 17 00:00:00 2001
+From 456ea33621814aa08ca62e31f7cb1e770ebb3670 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 14 Nov 2012 07:07:08 +0900
+Date: Tue, 27 Nov 2012 15:53:27 +0900
 Subject: [PATCH] Reload preload engines until users customize the list.
 
 The idea is, if users don't customize the preload_engines with ibus-setup,

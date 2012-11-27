@@ -1,6 +1,6 @@
-From c53acc91c40753ec845a4a73035769d4e205be7c Mon Sep 17 00:00:00 2001
+From 8ca5d79b3f919621df691f8acbec58b206b15aa2 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 14 Nov 2012 07:06:58 +0900
+Date: Tue, 27 Nov 2012 15:53:14 +0900
 Subject: [PATCH] Add ibus-xkb and libgnomekbd.
 
 ---
@@ -23,14 +23,14 @@ Subject: [PATCH] Add ibus-xkb and libgnomekbd.
  src/ibus.h                      |   1 +
  src/ibusxkbxml.c                | 466 +++++++++++++++++++++++++++++++
  src/ibusxkbxml.h                | 187 +++++++++++++
- ui/gtk3/Makefile.am             |  39 +++
+ ui/gtk3/Makefile.am             |  37 +++
  ui/gtk3/gkbdlayout.vala.false   |  63 +++++
  ui/gtk3/gkbdlayout.vala.true    | 108 +++++++
  ui/gtk3/keybindingmanager.vala  |  14 +-
  ui/gtk3/panel.vala              | 353 ++++++++++++++++++++---
  ui/gtk3/switcher.vala           |  49 ++--
  ui/gtk3/xkblayout.vala          | 464 ++++++++++++++++++++++++++++++
- 26 files changed, 2628 insertions(+), 667 deletions(-)
+ 26 files changed, 2626 insertions(+), 667 deletions(-)
  create mode 100644 bindings/vala/Gkbd-3.0.metadata
  create mode 100644 bindings/vala/Xkl-1.0.metadata
  create mode 100644 engine/ibus-xkb/Makefile.am
@@ -2512,31 +2512,29 @@ index 0000000..6f5b7bd
 +G_END_DECLS
 +#endif
 diff --git a/ui/gtk3/Makefile.am b/ui/gtk3/Makefile.am
-index 5473027..cbd746c 100644
+index 5473027..6cb02a1 100644
 --- a/ui/gtk3/Makefile.am
 +++ b/ui/gtk3/Makefile.am
-@@ -47,6 +47,9 @@ USE_SYMBOL_ICON = FALSE
+@@ -47,6 +47,8 @@ USE_SYMBOL_ICON = FALSE
  # force include config.h before gi18n.h.
  AM_CPPFLAGS = -include $(CONFIG_HEADER)
  
-+HAVE_IBUS_XKB_C = $(strip $(subst false, FALSE, $(subst true, TRUE, $(HAVE_IBUS_XKB))))
 +HAVE_IBUS_GKBD_C = $(strip $(subst false, FALSE, $(subst true, TRUE, $(HAVE_IBUS_GKBD))))
 +
  AM_CFLAGS = \
  	@GLIB2_CFLAGS@ \
  	@GIO2_CFLAGS@ \
-@@ -58,6 +61,10 @@ AM_CFLAGS = \
+@@ -58,6 +60,9 @@ AM_CFLAGS = \
  	-DBINDIR=\"$(bindir)\" \
  	-DIBUS_DISABLE_DEPRECATED \
  	-DSWITCHER_USE_SYMBOL_ICON=$(USE_SYMBOL_ICON) \
-+	-DHAVE_IBUS_XKB=$(HAVE_IBUS_XKB_C) \
 +	-DHAVE_IBUS_GKBD=$(HAVE_IBUS_GKBD_C) \
 +	-DIBUS_XKB_COMMAND=\"$(libexecdir)/ibus-xkb\" \
 +	-DXKB_LAYOUTS_MAX_LENGTH=4 \
  	-Wno-unused-variable \
  	-Wno-unused-but-set-variable \
  	-Wno-unused-function \
-@@ -91,6 +98,7 @@ ibus_ui_gtk3_SOURCES = \
+@@ -91,6 +96,7 @@ ibus_ui_gtk3_SOURCES = \
  	application.vala \
  	candidatearea.vala \
  	candidatepanel.vala \
@@ -2544,7 +2542,7 @@ index 5473027..cbd746c 100644
  	handle.vala \
  	iconwidget.vala \
  	keybindingmanager.vala \
-@@ -99,17 +107,48 @@ ibus_ui_gtk3_SOURCES = \
+@@ -99,17 +105,48 @@ ibus_ui_gtk3_SOURCES = \
  	property.vala \
  	separator.vala \
  	switcher.vala \

@@ -1,6 +1,6 @@
-From cdfad7a4f7026c6db0e570b4d9b2c14d1c7ca2b2 Mon Sep 17 00:00:00 2001
+From d3ce0467bb7825cc97da9646254bc09f58119fda Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 14 Nov 2012 07:07:17 +0900
+Date: Tue, 27 Nov 2012 15:53:34 +0900
 Subject: [PATCH] Enable ibus-setup to show the frequently used languages
  only in IME list.
 
