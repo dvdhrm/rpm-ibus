@@ -30,23 +30,23 @@ License:    LGPLv2+
 Group:      System Environment/Libraries
 URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
-Source1:    xinput-ibus
+Source1:    %{name}-xinput
 %if %with_gjs
-Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/ibus-gjs-%{ibus_gjs_version}.tar.gz
+Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/%{name}-gjs-%{ibus_gjs_version}.tar.gz
 %endif
-Patch0:     ibus-HEAD.patch
-Patch1:     ibus-810211-no-switch-by-no-trigger.patch
-Patch2:     ibus-541492-xkb.patch
-Patch3:     ibus-530711-preload-sys.patch
-Patch4:     ibus-xx-setup-frequent-lang.patch
+Patch0:     %{name}-HEAD.patch
+Patch1:     %{name}-810211-no-switch-by-no-trigger.patch
+Patch2:     %{name}-541492-xkb.patch
+Patch3:     %{name}-530711-preload-sys.patch
+Patch4:     %{name}-xx-setup-frequent-lang.patch
 
 %if (0%{?fedora} <= 17 && 0%{?rhel} < 7)
 # Workaround to disable preedit on gnome-shell until bug 658420 is fixed.
 # https://bugzilla.gnome.org/show_bug.cgi?id=658420
-Patch92:    ibus-xx-g-s-disable-preedit.patch
+Patch92:    %{name}-xx-g-s-disable-preedit.patch
 %endif
 # Hide no nused properties in f17.
-Patch94:    ibus-xx-no-use.diff
+Patch94:    %{name}-xx-no-use.diff
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
