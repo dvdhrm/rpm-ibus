@@ -1,9 +1,8 @@
-%{!?gtk2_binary_version: %global gtk2_binary_version %(pkg-config  --variable=gtk_binary_version gtk+-2.0)}
-%{!?gtk3_binary_version: %global gtk3_binary_version %(pkg-config  --variable=gtk_binary_version gtk+-3.0)}
-
 %global with_xkbfile 1
 %global with_pygobject2 1
 %global with_pygobject3 1
+
+%global with_pkg_config %(pkg-config --version >/dev/null 2>&1 && echo -n "1" || echo -n "0")
 
 %if (0%{?fedora} > 17 || 0%{?rhel} > 6)
 #ifarch ppc ppc64 s390 s390x
@@ -17,14 +16,23 @@
 
 %global ibus_api_version 1.0
 
+%if %with_pkg_config
+%{!?gtk2_binary_version: %global gtk2_binary_version %(pkg-config  --variable=gtk_binary_version gtk+-2.0)}
+%{!?gtk3_binary_version: %global gtk3_binary_version %(pkg-config  --variable=gtk_binary_version gtk+-3.0)}
 %global glib_ver %([ -a %{_libdir}/pkgconfig/glib-2.0.pc ] && pkg-config --modversion glib-2.0 | cut -d. -f 1,2 || echo -n "999")
+%else
+%{!?gtk2_binary_version: %global gtk2_binary_version ?.?.?}
+%{!?gtk3_binary_version: %global gtk3_binary_version ?.?.?}
+%global glib_ver 0
+%endif
+
 %global dbus_python_version 0.83.0
 # FIXME: It's better to use the new icon names
 %global gnome_icon_theme_legacy_version 2.91.6
 
 Name:       ibus
 Version:    1.4.99.20121109
-Release:    4%{?dist}
+Release:    5%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -419,6 +427,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Nov 30 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20121109-5
+- Updated spec file to work witout pkgconfig.
+
 * Tue Nov 27 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20121109-4
 - Added comment lines for patches.
 

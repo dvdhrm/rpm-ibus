@@ -265,3 +265,59 @@ index 25db578..d064ad6 100644
 -- 
 1.8.0
 
+From ae98b5a58846e1326550027dc8d2a773ed8a24c5 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Fri, 30 Nov 2012 11:43:43 +0900
+Subject: [PATCH] Fix xmllint errors.
+
+Review URL: https://codereview.appspot.com/6842115
+---
+ conf/dconf/dconf.xml.in.in     | 2 +-
+ conf/gconf/gconf.xml.in.in     | 2 +-
+ conf/memconf/memconf.xml.in.in | 2 +-
+ ui/gtk3/gtkpanel.xml.in.in     | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/conf/dconf/dconf.xml.in.in b/conf/dconf/dconf.xml.in.in
+index 0367008..ceb2b0c 100644
+--- a/conf/dconf/dconf.xml.in.in
++++ b/conf/dconf/dconf.xml.in.in
+@@ -1,4 +1,4 @@
+-<?xml version="1.0" encoding="utf-8"?>
++<?xml version=\"1.0\" encoding=\"utf-8\"?>
+ <!-- filename: dconf.xml -->
+ <component>
+ 	<name>org.freedesktop.IBus.Config</name>
+diff --git a/conf/gconf/gconf.xml.in.in b/conf/gconf/gconf.xml.in.in
+index 0644d7e..d82179f 100644
+--- a/conf/gconf/gconf.xml.in.in
++++ b/conf/gconf/gconf.xml.in.in
+@@ -1,4 +1,4 @@
+-<?xml version="1.0" encoding="utf-8"?>
++<?xml version=\"1.0\" encoding=\"utf-8\"?>
+ <!-- filename: pinyin.xml -->
+ <component>
+ 	<name>org.freedesktop.IBus.Config</name>
+diff --git a/conf/memconf/memconf.xml.in.in b/conf/memconf/memconf.xml.in.in
+index b60dbf2..939e40a 100644
+--- a/conf/memconf/memconf.xml.in.in
++++ b/conf/memconf/memconf.xml.in.in
+@@ -1,4 +1,4 @@
+-<?xml version="1.0" encoding="utf-8"?>
++<?xml version=\"1.0\" encoding=\"utf-8\"?>
+ <component>
+ 	<name>org.freedesktop.IBus.Config</name>
+ 	<description>On-memory Config Component</description>
+diff --git a/ui/gtk3/gtkpanel.xml.in.in b/ui/gtk3/gtkpanel.xml.in.in
+index c480bcd..1d2cf73 100644
+--- a/ui/gtk3/gtkpanel.xml.in.in
++++ b/ui/gtk3/gtkpanel.xml.in.in
+@@ -1,4 +1,4 @@
+-<?xml version="1.0" encoding="utf-8"?>
++<?xml version=\"1.0\" encoding=\"utf-8\"?>
+ <!-- filename: gtkpanel.xml -->
+ <component>
+ 	<name>org.freedesktop.IBus.Panel</name>
+-- 
+1.8.0
+
