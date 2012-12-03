@@ -12,7 +12,6 @@
 %endif
 
 %global ibus_gjs_version 3.4.1.20120815
-%global ibus_gjs_build_failure 1
 
 %global ibus_api_version 1.0
 
@@ -88,11 +87,12 @@ BuildRequires:  iso-codes-devel
 BuildRequires:  libxkbfile-devel
 BuildRequires:  libgnomekbd-devel
 %endif
+%if %with_gjs
 # for ibus-gjs-xx.tar.gz
 BuildRequires:  gjs
-%if ! %ibus_gjs_build_failure
 BuildRequires:  gnome-shell
 %endif
+BuildRequires:  diffstat
 
 Requires:   %{name}-libs = %{version}-%{release}
 Requires:   %{name}-gtk2 = %{version}-%{release}
@@ -202,6 +202,9 @@ docs for ibus.
 Summary:    Developer documents for ibus
 Group:      Development/Libraries
 Requires:   %{name} = %{version}-%{release}
+%if (0%{?fedora} >= 19 || 0%{?rhel} >= 7)
+BuildArch:  noarch
+%endif
 
 %description devel-docs
 The ibus-devel-docs package contains developer documentation for ibus
@@ -213,22 +216,43 @@ The ibus-devel-docs package contains developer documentation for ibus
 zcat %SOURCE2 | tar xf -
 %endif
 
-# patch0 -p1
+# Update timestamps on the files touched by a patch, to avoid non-equal
+# .pyc/.pyo files across the multilib peers within a build, where "Level"
+# is the patch prefix option (e.g. -p1)
+UpdateTimestamps() {
+  Level=$1
+  PatchFile=$2
+  # Locate the affected files:
+  for f in $(diffstat $Level -l $PatchFile); do
+    # Set the files to have the same timestamp as that of the patch:
+    touch -r $PatchFile $f
+  done
+}
+
+# %%patch0 -p1
+# UpdateTimestamps -p1 %%{PATCH0}
 %patch0 -p1
+UpdateTimestamps -p1 %{PATCH0}
 %if (0%{?fedora} <= 17 && 0%{?rhel} < 7)
 %patch92 -p1 -b .g-s-preedit
+UpdateTimestamps -p1 %{PATCH92}
 cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 %endif
 %patch1 -p1 -b .noswitch
+UpdateTimestamps -p1 %{PATCH1}
 %if %with_xkbfile
 %patch2 -p1 -b .xkb
+UpdateTimestamps -p1 %{PATCH2}
 rm -f bindings/vala/ibus-1.0.vapi
 rm -f data/dconf/00-upstream-settings
 %endif
 %patch3 -p1 -b .preload-sys
+UpdateTimestamps -p1 %{PATCH3}
 %patch4 -p1 -b .setup-frequent-lang
+UpdateTimestamps -p1 %{PATCH4}
 
 %patch94 -p1 -b .no-used
+UpdateTimestamps -p1 %{PATCH94}
 
 %build
 %if %with_xkbfile
