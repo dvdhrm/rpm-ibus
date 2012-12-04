@@ -31,7 +31,7 @@
 
 Name:       ibus
 Version:    1.4.99.20121109
-Release:    5%{?dist}
+Release:    6%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -216,6 +216,7 @@ The ibus-devel-docs package contains developer documentation for ibus
 zcat %SOURCE2 | tar xf -
 %endif
 
+# home [dot] corp [dot] redhat [dot] com/wiki/rpmdiff-multilib
 # Update timestamps on the files touched by a patch, to avoid non-equal
 # .pyc/.pyo files across the multilib peers within a build, where "Level"
 # is the patch prefix option (e.g. -p1)
@@ -285,6 +286,11 @@ make -C ui/gtk3 maintainer-clean-generic
 %endif
 # make -C po update-gmo
 make %{?_smp_mflags}
+
+# home [dot] corp [dot] redhat [dot] com/wiki/rpmdiff-multilib
+if test -f ibus/_config.py -a -f ibus/_config.py.in ; then
+  touch -r ibus/_config.py.in ibus/_config.py
+fi
 
 %if %with_gjs
 d=`basename %SOURCE2 .tar.gz`
@@ -451,6 +457,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Nov 30 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20121109-6
+- Set time stamp of ibus/_config.py
+
 * Fri Nov 30 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20121109-5
 - Updated spec file to work witout pkgconfig.
 
