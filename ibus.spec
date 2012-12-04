@@ -287,11 +287,6 @@ make -C ui/gtk3 maintainer-clean-generic
 # make -C po update-gmo
 make %{?_smp_mflags}
 
-# home [dot] corp [dot] redhat [dot] com/wiki/rpmdiff-multilib
-if test -f ibus/_config.py -a -f ibus/_config.py.in ; then
-  touch -r ibus/_config.py.in ibus/_config.py
-fi
-
 %if %with_gjs
 d=`basename %SOURCE2 .tar.gz`
 cd $d
@@ -331,6 +326,23 @@ sed -i -e 's|Comment\[ja\]=IBus |& |' \
 desktop-file-install --delete-original          \
   --dir $RPM_BUILD_ROOT%{_datadir}/applications \
   $RPM_BUILD_ROOT%{_datadir}/applications/*
+
+# home [dot] corp [dot] redhat [dot] com/wiki/rpmdiff-multilib
+if test -f ibus/_config.py.in -a -f ibus/_config.py ; then
+  touch -r ibus/_config.py.in ibus/_config.py
+  if test -f $RPM_BUILD_ROOT%{python2_sitelib}/ibus/_config.py ; then
+    touch -r ibus/_config.py.in \
+        $RPM_BUILD_ROOT%{python2_sitelib}/ibus/_config.py
+  fi
+  if test -f $RPM_BUILD_ROOT%{python2_sitelib}/ibus/_config.pyc ; then
+    touch -r ibus/_config.py.in \
+        $RPM_BUILD_ROOT%{python2_sitelib}/ibus/_config.pyc
+  fi
+  if test -f $RPM_BUILD_ROOT%{python2_sitelib}/ibus/_config.pyo ; then
+    touch -r ibus/_config.py.in \
+        $RPM_BUILD_ROOT%{python2_sitelib}/ibus/_config.pyo
+  fi
+fi
 
 %if %with_gjs
 # https://bugzilla.redhat.com/show_bug.cgi?id=657165
