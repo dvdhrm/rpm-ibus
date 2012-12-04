@@ -31,7 +31,7 @@
 
 Name:       ibus
 Version:    1.4.99.20121109
-Release:    6%{?dist}
+Release:    7%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -328,19 +328,13 @@ desktop-file-install --delete-original          \
   $RPM_BUILD_ROOT%{_datadir}/applications/*
 
 # home [dot] corp [dot] redhat [dot] com/wiki/rpmdiff-multilib
-if test -f ibus/_config.py.in -a -f ibus/_config.py ; then
-  touch -r ibus/_config.py.in ibus/_config.py
-  if test -f $RPM_BUILD_ROOT%{python2_sitelib}/ibus/_config.py ; then
-    touch -r ibus/_config.py.in \
-        $RPM_BUILD_ROOT%{python2_sitelib}/ibus/_config.py
-  fi
-  if test -f $RPM_BUILD_ROOT%{python2_sitelib}/ibus/_config.pyc ; then
-    touch -r ibus/_config.py.in \
-        $RPM_BUILD_ROOT%{python2_sitelib}/ibus/_config.pyc
-  fi
-  if test -f $RPM_BUILD_ROOT%{python2_sitelib}/ibus/_config.pyo ; then
-    touch -r ibus/_config.py.in \
-        $RPM_BUILD_ROOT%{python2_sitelib}/ibus/_config.pyo
+if test -f ibus/_config.py.in -a \
+    -f $RPM_BUILD_ROOT%{python2_sitelib}/ibus/_config.py ; then
+  touch -r ibus/_config.py.in \
+      $RPM_BUILD_ROOT%{python2_sitelib}/ibus/_config.py
+  if test -f ./py-compile ; then
+    sh ./py-compile --destdir $RPM_BUILD_ROOT \
+        --basedir %{python2_sitelib}/ibus _config.py
   fi
 fi
 
@@ -469,6 +463,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Nov 30 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20121109-7
+- Set time stamp of ibus/_config.py
+
 * Fri Nov 30 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20121109-6
 - Set time stamp of ibus/_config.py
 
