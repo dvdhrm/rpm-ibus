@@ -1,6 +1,6 @@
-From 8ca5d79b3f919621df691f8acbec58b206b15aa2 Mon Sep 17 00:00:00 2001
+From 965f09a94744b6374656247ff091eb91b5bad0b2 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Tue, 27 Nov 2012 15:53:14 +0900
+Date: Mon, 10 Dec 2012 16:24:34 +0900
 Subject: [PATCH] Add ibus-xkb and libgnomekbd.
 
 ---
@@ -11,7 +11,7 @@ Subject: [PATCH] Add ibus-xkb and libgnomekbd.
  data/ibus.schemas.in            |  94 +++++++
  engine/Makefile.am              |   6 +
  engine/ibus-xkb/Makefile.am     |  61 ++++
- engine/ibus-xkb/ibus-xkb-main.c | 177 ++++++++++++
+ engine/ibus-xkb/ibus-xkb-main.c | 173 ++++++++++++
  engine/ibus-xkb/xkblib.c        | 327 ++++++++++++++++++++++
  engine/ibus-xkb/xkblib.h        |  41 +++
  engine/main.vala                |  86 ++++++
@@ -26,11 +26,9 @@ Subject: [PATCH] Add ibus-xkb and libgnomekbd.
  ui/gtk3/Makefile.am             |  37 +++
  ui/gtk3/gkbdlayout.vala.false   |  63 +++++
  ui/gtk3/gkbdlayout.vala.true    | 108 +++++++
- ui/gtk3/keybindingmanager.vala  |  14 +-
- ui/gtk3/panel.vala              | 353 ++++++++++++++++++++---
- ui/gtk3/switcher.vala           |  49 ++--
- ui/gtk3/xkblayout.vala          | 464 ++++++++++++++++++++++++++++++
- 26 files changed, 2626 insertions(+), 667 deletions(-)
+ ui/gtk3/panel.vala              | 362 ++++++++++++++++++++++--
+ ui/gtk3/xkblayout.vala          | 465 ++++++++++++++++++++++++++++++
+ 24 files changed, 2597 insertions(+), 639 deletions(-)
  create mode 100644 bindings/vala/Gkbd-3.0.metadata
  create mode 100644 bindings/vala/Xkl-1.0.metadata
  create mode 100644 engine/ibus-xkb/Makefile.am
@@ -404,10 +402,10 @@ index 0000000..4a32e87
 +-include $(top_srcdir)/git.mk
 diff --git a/engine/ibus-xkb/ibus-xkb-main.c b/engine/ibus-xkb/ibus-xkb-main.c
 new file mode 100644
-index 0000000..3878b5f
+index 0000000..3dfd987
 --- /dev/null
 +++ b/engine/ibus-xkb/ibus-xkb-main.c
-@@ -0,0 +1,177 @@
+@@ -0,0 +1,173 @@
 +/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
 +/* vim:set et sts=4: */
 +/* bus - The Input Bus
@@ -547,10 +545,6 @@ index 0000000..3878b5f
 +    ibus_xkb_init (xdisplay);
 +
 +    if (layout) {
-+        if (variant == NULL) {
-+            variant = ibus_xkb_get_current_variant ();
-+        }
-+
 +        if (option == NULL) {
 +            option = ibus_xkb_get_current_option ();
 +        }
@@ -2774,69 +2768,8 @@ index 0000000..2b78c69
 +    }
 +    */
 +}
-diff --git a/ui/gtk3/keybindingmanager.vala b/ui/gtk3/keybindingmanager.vala
-index 12d731d..0f6b7c9 100644
---- a/ui/gtk3/keybindingmanager.vala
-+++ b/ui/gtk3/keybindingmanager.vala
-@@ -41,15 +41,18 @@ public class KeybindingManager : GLib.Object {
-     private class Keybinding {
-         public Keybinding(uint keysym,
-                           Gdk.ModifierType modifiers,
--                          KeybindingHandlerFunc handler) {
-+                          KeybindingHandlerFunc handler,
-+                          bool reverse) {
-             this.keysym = keysym;
-             this.modifiers = modifiers;
-             this.handler = handler;
-+            this.reverse = reverse;
-         }
- 
-         public uint keysym { get; set; }
-         public Gdk.ModifierType modifiers { get; set; }
-         public unowned KeybindingHandlerFunc handler { get; set; }
-+        public bool reverse { get; set; }
-     }
- 
-     /**
-@@ -57,7 +60,7 @@ public class KeybindingManager : GLib.Object {
-      *
-      * @param event passing on gdk event
-      */
--    public delegate void KeybindingHandlerFunc(Gdk.Event event);
-+    public delegate void KeybindingHandlerFunc(Gdk.Event event, bool reverse);
- 
- 
-     private  KeybindingManager() {
-@@ -73,7 +76,8 @@ public class KeybindingManager : GLib.Object {
-      */
-     public bool bind(uint keysym,
-                      Gdk.ModifierType modifiers,
--                     KeybindingHandlerFunc handler) {
-+                     KeybindingHandlerFunc handler,
-+                     bool reverse) {
-         unowned X.Display display = Gdk.x11_get_default_xdisplay();
- 
-         int keycode = display.keysym_to_keycode(keysym);
-@@ -84,7 +88,7 @@ public class KeybindingManager : GLib.Object {
-         grab_keycode (Gdk.Display.get_default(), keysym, modifiers);
- 
-         // store binding
--        Keybinding binding = new Keybinding(keysym, modifiers, handler);
-+        Keybinding binding = new Keybinding(keysym, modifiers, handler, reverse);
-         m_bindings.append(binding);
- 
-         return true;
-@@ -199,7 +203,7 @@ public class KeybindingManager : GLib.Object {
-                     if (event.key.keyval != binding.keysym ||
-                         modifiers != binding.modifiers)
-                         continue;
--                    binding.handler(event);
-+                    binding.handler(event, binding.reverse);
-                     return;
-                 }
-             }
 diff --git a/ui/gtk3/panel.vala b/ui/gtk3/panel.vala
-index c159693..1aca443 100644
+index c159693..63b0cde 100644
 --- a/ui/gtk3/panel.vala
 +++ b/ui/gtk3/panel.vala
 @@ -21,6 +21,20 @@
@@ -2880,37 +2813,40 @@ index c159693..1aca443 100644
  
      public Panel(IBus.Bus bus) {
          GLib.assert(bus.is_connected());
-@@ -60,7 +81,6 @@ class Panel : IBus.PanelService {
+@@ -60,7 +81,8 @@ class Panel : IBus.PanelService {
          m_candidate_panel.page_down.connect((w) => this.page_down());
  
          m_switcher = new Switcher();
 -        bind_switch_shortcut();
++        // The initial shortcut is "<Control>space"
++        bind_switch_shortcut(null);
  
          if (m_switcher_delay_time >= 0) {
              m_switcher.set_popup_delay_time((uint) m_switcher_delay_time);
-@@ -76,64 +96,129 @@ class Panel : IBus.PanelService {
+@@ -76,64 +98,132 @@ class Panel : IBus.PanelService {
  
      ~Panel() {
          unbind_switch_shortcut();
--    }
- 
--    private void bind_switch_shortcut() {
--        var keybinding_manager = KeybindingManager.get_instance();
++
 +        if (HAVE_IBUS_GKBD && m_gkbdlayout != null) {
 +            m_gkbdlayout.changed.disconnect(gkbdlayout_changed_cb);
 +            m_gkbdlayout.stop_listen();
 +            m_gkbdlayout = null;
 +        }
- 
--        var accelerator = ACCELERATOR_SWITCH_IME_FOREWARD;
-+        m_xkblayout = null;
-+    }
 +
++        m_xkblayout = null;
+     }
+ 
+-    private void bind_switch_shortcut() {
+-        var keybinding_manager = KeybindingManager.get_instance();
 +    private void keybinding_manager_bind(KeybindingManager keybinding_manager,
-+                                         string? accelerator,
-+                                         bool reverse) {
++                                         string?           accelerator) {
 +        uint switch_keysym = 0;
 +        Gdk.ModifierType switch_modifiers = 0;
++        Gdk.ModifierType reverse_modifier = Gdk.ModifierType.SHIFT_MASK;
++        Keybinding keybinding;
+ 
+-        var accelerator = ACCELERATOR_SWITCH_IME_FOREWARD;
          Gtk.accelerator_parse(accelerator,
 -                out m_switch_keysym, out m_switch_modifiers);
 +                out switch_keysym, out switch_modifiers);
@@ -2950,75 +2886,73 @@ index c159693..1aca443 100644
          }
  
 -        keybinding_manager.bind(m_switch_keysym, m_switch_modifiers,
--                (e) => handle_engine_switch(e, false));
-+        Keybinding keybinding = new Keybinding(switch_keysym,
-+                                               switch_modifiers,
-+                                               reverse);
++        keybinding = new Keybinding(switch_keysym,
++                                    switch_modifiers,
++                                    false);
 +        m_keybindings.append(keybinding);
- 
--        // accelerator already has Shift mask
--        if ((m_switch_modifiers & Gdk.ModifierType.SHIFT_MASK) != 0)
--            return;
++
 +        keybinding_manager.bind(switch_keysym, switch_modifiers,
-+                (e, _reverse) => handle_engine_switch(e, _reverse),
-+                reverse);
+                 (e) => handle_engine_switch(e, false));
+ 
+         // accelerator already has Shift mask
+-        if ((m_switch_modifiers & Gdk.ModifierType.SHIFT_MASK) != 0)
++        if ((switch_modifiers & reverse_modifier) != 0) {
+             return;
++        }
+ 
+-        keybinding_manager.bind(m_switch_keysym,
+-                m_switch_modifiers | Gdk.ModifierType.SHIFT_MASK,
++        switch_modifiers |= reverse_modifier;
++        keybinding = new Keybinding(switch_keysym,
++                                    switch_modifiers,
++                                    true);
++        m_keybindings.append(keybinding);
++
++        keybinding_manager.bind(switch_keysym, switch_modifiers,
+                 (e) => handle_engine_switch(e, true));
++
 +    }
 +
 +    // ToDo: Customize the input method with ibus-setup
-+    private void bind_switch_shortcut() {
++    private void bind_switch_shortcut(Variant ?variant) {
 +        string locale = GLib.Intl.setlocale(GLib.LocaleCategory.ALL,
 +                                            null);
 +        if (locale == null) {
 +            locale = "C";
 +        }
 +
-+        string[] ACCELERATOR_IME_HOTKEYS = {};
-+        ACCELERATOR_IME_HOTKEYS += ACCELERATOR_SWITCH_IME_FOREWARD;
++        string[] accelerators = {};
++        Variant var_trigger = variant;
 +
-+        if (m_config != null) {
-+            GLib.Variant variant = m_config.get_value("general/hotkey",
-+                                                      "trigger_accel");
-+            if (variant != null) {
-+                ACCELERATOR_IME_HOTKEYS = variant.dup_strv();
-+            }
++        if (var_trigger == null && m_config != null) {
++            var_trigger = m_config.get_value("general/hotkey",
++                                             "trigger_accel");
 +        }
 +
-+        if (ACCELERATOR_IME_HOTKEYS.length == 1 &&
-+            ACCELERATOR_IME_HOTKEYS[0] == ACCELERATOR_SWITCH_IME_FOREWARD) {
++        if (var_trigger != null) {
++            accelerators = var_trigger.dup_strv();
++        } else {
++            accelerators += ACCELERATOR_SWITCH_IME_FOREWARD;
++        }
++
++        if (accelerators.length == 1 &&
++            accelerators[0] == ACCELERATOR_SWITCH_IME_FOREWARD) {
 +            // FIXME: When us keyboard is used, Zenkaku_Hankaku does not work.
 +            /*
 +            if (locale[0:2] == "ja") {
-+                ACCELERATOR_IME_HOTKEYS += "Zenkaku_Hankaku";
++                accelerators += "Zenkaku_Hankaku";
 +            }
 +            */
 +            if (locale[0:2] == "ko") {
-+                ACCELERATOR_IME_HOTKEYS += "Hangul";
-+                ACCELERATOR_IME_HOTKEYS += "Alt_R";
++                accelerators += "Hangul";
++                accelerators += "Alt_R";
 +            }
 +        }
 +
 +        var keybinding_manager = KeybindingManager.get_instance();
 +
-+        foreach (var accelerator in ACCELERATOR_IME_HOTKEYS) {
-+            keybinding_manager_bind(keybinding_manager, accelerator, false);
-+        }
-+
-+        ACCELERATOR_IME_HOTKEYS = {};
-+        ACCELERATOR_IME_HOTKEYS += ACCELERATOR_SWITCH_IME_BACKWARD;
-+
-+        if (m_config != null) {
-+            GLib.Variant variant = m_config.get_value("general/hotkey",
-+                                                      "trigger_accel_backward");
-+            if (variant != null) {
-+                ACCELERATOR_IME_HOTKEYS = variant.dup_strv();
-+            }
-+        }
- 
--        keybinding_manager.bind(m_switch_keysym,
--                m_switch_modifiers | Gdk.ModifierType.SHIFT_MASK,
--                (e) => handle_engine_switch(e, true));
-+        foreach (var accelerator in ACCELERATOR_IME_HOTKEYS) {
-+            keybinding_manager_bind(keybinding_manager, accelerator, true);
++        foreach (var accelerator in accelerators) {
++            keybinding_manager_bind(keybinding_manager, accelerator);
 +        }
      }
  
@@ -3028,44 +2962,40 @@ index c159693..1aca443 100644
 -        if (m_switch_keysym == 0 && m_switch_modifiers == 0)
 -            return;
 +        unowned GLib.List<Keybinding> keybindings = m_keybindings;
++
++        while (keybindings != null) {
++            Keybinding keybinding = keybindings.data;
  
 -        keybinding_manager.unbind(m_switch_keysym, m_switch_modifiers);
 -        keybinding_manager.unbind(m_switch_keysym,
 -                m_switch_modifiers | Gdk.ModifierType.SHIFT_MASK);
-+        while (keybindings != null) {
-+            Keybinding keybinding = keybindings.data;
++            keybinding_manager.unbind(keybinding.keysym,
++                                      keybinding.modifiers);
++            keybindings = keybindings.next;
++        }
  
 -        m_switch_keysym = 0;
 -        m_switch_modifiers = 0;
-+            keybinding_manager.unbind(keybinding.keysym,
-+                                      keybinding.modifiers);
-+
-+            // Need to get keybindings.next before GList.remove is called.
-+            keybindings = keybindings.next;
-+            m_keybindings.remove(keybinding);
-+        }
++        m_keybindings = null;
      }
  
      private void set_custom_font() {
-@@ -220,13 +305,17 @@ class Panel : IBus.PanelService {
-         }
- 
-         m_config = config;
-+        bind_switch_shortcut();
-         if (m_config != null) {
-             m_config.value_changed.connect(config_value_changed_cb);
+@@ -225,10 +315,14 @@ class Panel : IBus.PanelService {
              m_config.watch("general", "preload_engines");
              m_config.watch("general", "engines_order");
              m_config.watch("general", "switcher_delay_time");
 +            m_config.watch("general/hotkey", "trigger_accel");
-+            m_config.watch("general/hotkey", "trigger_accel_backward");
              m_config.watch("panel", "custom_font");
              m_config.watch("panel", "use_custom_font");
 +            init_engines_order();
              update_engines(m_config.get_value("general", "preload_engines"),
                             m_config.get_value("general", "engines_order"));
++            unbind_switch_shortcut();
++            bind_switch_shortcut(null);
              set_switcher_delay_time(null);
-@@ -282,6 +371,194 @@ class Panel : IBus.PanelService {
+         } else {
+             update_engines(null, null);
+@@ -282,6 +376,200 @@ class Panel : IBus.PanelService {
          }
      }
  
@@ -3110,8 +3040,11 @@ index c159693..1aca443 100644
 +        }
 +
 +        m_xkblayout = new XKBLayout(m_config);
++        string session = Environment.get_variable("DESKTOP_SESSION");
 +
-+        if (HAVE_IBUS_GKBD) {
++        if (HAVE_IBUS_GKBD &&
++            session != null && session.length >= 5 &&
++            session[0:5] == "gnome") {
 +            init_gkbd();
 +        }
 +
@@ -3203,7 +3136,10 @@ index c159693..1aca443 100644
 +    }
 +
 +    private void set_xkb_group_layout(string layout) {
-+        int[] retval = m_xkblayout.set_layout(layout);
++        int[] retval = m_xkblayout.set_layout(layout,
++                                              "default",
++                                              "default",
++                                              true);
 +        if (retval[0] >= 0) {
 +            /* If an XKB keymap is added into the XKB group,
 +             * this._gkbdlayout.lock_group will be called after
@@ -3246,7 +3182,7 @@ index c159693..1aca443 100644
 +            init_engines_order();
 +        }
 +
-+        if (HAVE_IBUS_GKBD) {
++        if (HAVE_IBUS_GKBD && m_gkbdlayout != null) {
 +            if (set_gkbd_layout(layout)) {
 +                return;
 +            }
@@ -3260,7 +3196,7 @@ index c159693..1aca443 100644
      private void switch_engine(int i, bool force = false) {
          GLib.assert(i >= 0 && i < m_engines.length);
  
-@@ -296,7 +573,7 @@ class Panel : IBus.PanelService {
+@@ -296,7 +584,7 @@ class Panel : IBus.PanelService {
              return;
          }
          // set xkb layout
@@ -3269,133 +3205,58 @@ index c159693..1aca443 100644
      }
  
      private void config_value_changed_cb(IBus.Config config,
-@@ -308,6 +585,13 @@ class Panel : IBus.PanelService {
+@@ -308,6 +596,12 @@ class Panel : IBus.PanelService {
              return;
          }
  
-+        if (section == "general/hotkey" &&
-+            name.length >= 13 && name[0:13] == "trigger_accel") {
++        if (section == "general/hotkey" && name == "trigger_accel") {
 +            unbind_switch_shortcut();
-+            bind_switch_shortcut();
++            bind_switch_shortcut(variant);
 +            return;
 +        }
 +
          if (section == "panel" && (name == "custom_font" ||
                                     name == "use_custom_font")) {
              set_custom_font();
-@@ -331,8 +615,7 @@ class Panel : IBus.PanelService {
+@@ -316,6 +610,7 @@ class Panel : IBus.PanelService {
+ 
+         if (section == "general" && name == "switcher_delay_time") {
+             set_switcher_delay_time(variant);
++            return;
+         }
+     }
+ 
+@@ -324,15 +619,22 @@ class Panel : IBus.PanelService {
+         if (m_engines.length <= 1)
+             return;
+ 
++        uint keyval = event.key.keyval;
++        uint modifiers = KeybindingManager.MODIFIER_FILTER & event.key.state;
++
+         uint primary_modifiers =
+             KeybindingManager.get_primary_modifier(event.key.state);
+ 
+         bool pressed = KeybindingManager.primary_modifier_still_pressed(
                  event, primary_modifiers);
++
++        if (revert) {
++            modifiers &= ~Gdk.ModifierType.SHIFT_MASK;
++        }
++
          if (pressed && m_switcher_delay_time >= 0) {
              int i = revert ? m_engines.length - 1 : 1;
 -            i = m_switcher.run(m_switch_keysym, m_switch_modifiers, event,
 -                    m_engines, i);
-+            i = m_switcher.run(m_keybindings, event, m_engines, i);
++            i = m_switcher.run(keyval, modifiers, event, m_engines, i);
              if (i < 0) {
                  debug("switch cancelled");
              } else {
-diff --git a/ui/gtk3/switcher.vala b/ui/gtk3/switcher.vala
-index c5286b1..8836cb2 100644
---- a/ui/gtk3/switcher.vala
-+++ b/ui/gtk3/switcher.vala
-@@ -63,13 +63,26 @@ class Switcher : Gtk.Window {
-         public string longname { get; set; }
-     }
- 
-+    private class Keybinding {
-+        public Keybinding(uint keysym,
-+                          Gdk.ModifierType modifiers,
-+                          bool reverse) {
-+            this.keysym = keysym;
-+            this.modifiers = modifiers;
-+            this.reverse = reverse;
-+        }
-+
-+        public uint keysym { get; set; }
-+        public Gdk.ModifierType modifiers { get; set; }
-+        public bool reverse { get; set; }
-+    }
-+
-     private Gtk.Box m_box;
-     private Gtk.Label m_label;
-     private IBusEngineButton[] m_buttons = {};
-     private IBus.EngineDesc[] m_engines;
-     private uint m_selected_engine;
--    private uint m_keyval;
--    private uint m_modifiers;
-+    private unowned GLib.List<Keybinding> m_keybindings;
-     private Gdk.ModifierType m_primary_modifier;
-     private GLib.MainLoop m_loop;
-     private int m_result;
-@@ -109,19 +122,17 @@ class Switcher : Gtk.Window {
-         grab_focus();
-     }
- 
--    public int run(uint keyval,
--                   uint state,
-+    public int run(GLib.List keybindings,
-                    Gdk.Event event,
-                    IBus.EngineDesc[] engines,
-                    int index) {
-         assert (m_loop == null);
-         assert (index < engines.length);
- 
--        m_keyval = keyval;
--        m_modifiers = state;
-+        m_keybindings = (GLib.List<Keybinding>) keybindings;
-         m_primary_modifier =
-             KeybindingManager.get_primary_modifier(
--                state & KeybindingManager.MODIFIER_FILTER);
-+                event.key.state & KeybindingManager.MODIFIER_FILTER);
- 
-         update_engines(engines);
-         /* Let gtk recalculate the window size. */
-@@ -328,27 +339,29 @@ class Switcher : Gtk.Window {
-     public override bool key_press_event(Gdk.EventKey e) {
-         bool retval = true;
-         Gdk.EventKey *pe = &e;
-+        uint modifiers = KeybindingManager.MODIFIER_FILTER & pe->state;
- 
-         if (m_popup_delay_time > 0) {
-             restore_window_position("pressed");
-         }
- 
--        do {
--            uint modifiers = KeybindingManager.MODIFIER_FILTER & pe->state;
-+        for (unowned GLib.List<Keybinding> keybindings = m_keybindings;
-+             keybindings != null;
-+             keybindings = keybindings.next) {
-+            Keybinding keybinding = keybindings.data;
- 
--            if ((modifiers != m_modifiers) &&
--                (modifiers != (m_modifiers | Gdk.ModifierType.SHIFT_MASK))) {
--                break;
--            }
--
--            if (pe->keyval == m_keyval) {
--                if (modifiers == m_modifiers)
-+            if (pe->keyval == keybinding.keysym &&
-+                modifiers == (uint) keybinding.modifiers) {
-+                if (!keybinding.reverse) {
-                     next_engine();
--                else // modififers == m_modifiers | SHIFT_MASK
-+                } else {
-                     previous_engine();
--                break;
-+                }
-+                return true;
-             }
-+        }
- 
-+        do {
-             switch (pe->keyval) {
-                 case 0x08fb: /* leftarrow */
-                 case 0xff51: /* Left */
 diff --git a/ui/gtk3/xkblayout.vala b/ui/gtk3/xkblayout.vala
 new file mode 100644
-index 0000000..33e9d9d
+index 0000000..2092a60
 --- /dev/null
 +++ b/ui/gtk3/xkblayout.vala
-@@ -0,0 +1,464 @@
+@@ -0,0 +1,465 @@
 +/* vim:set et sts=4 sw=4:
 + *
 + * ibus - The Input Bus
@@ -3646,7 +3507,8 @@ index 0000000..33e9d9d
 +
 +    public int[] set_layout(string _layout="default",
 +                            string _variant="default",
-+                            string _option="default") {
++                            string _option="default",
++                            bool   use_group_layout=false) {
 +        assert (_layout != null);
 +
 +        int xkb_group_id = 0;
@@ -3709,7 +3571,7 @@ index 0000000..33e9d9d
 +            layout = m_default_layout;
 +            variant = m_default_variant;
 +        } else {
-+            if (HAVE_IBUS_GKBD) {
++            if (use_group_layout) {
 +                if (variant == "default") {
 +                    variant = "";
 +                }

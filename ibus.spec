@@ -11,6 +11,12 @@
 %global with_gjs 1
 %endif
 
+%if (0%{?fedora} > 17 || 0%{?rhel} > 6)
+%global with_gkbd 0
+%else
+%global with_gkbd 1
+%endif
+
 %global ibus_gjs_version 3.4.1.20120815
 
 %global ibus_api_version 1.0
@@ -31,7 +37,7 @@
 
 Name:       ibus
 Version:    1.4.99.20121109
-Release:    7%{?dist}
+Release:    8%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -39,7 +45,12 @@ URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:    %{name}-xinput
 %if %with_gjs
+# ibus-gjs
 Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/%{name}-gjs-%{ibus_gjs_version}.tar.gz
+%endif
+%if (0%{?fedora} < 19 && 0%{?rhel} < 7)
+# Upstreamed translations.
+Source3:    http://fujiwara.fedorapeople.org/ibus/po/%{name}-po-1.4.99.20121207.tar.gz
 %endif
 # Upstreamed patches.
 Patch0:     %{name}-HEAD.patch
@@ -85,6 +96,8 @@ BuildRequires:  intltool
 BuildRequires:  iso-codes-devel
 %if %with_xkbfile
 BuildRequires:  libxkbfile-devel
+%endif
+%if %with_gkbd
 BuildRequires:  libgnomekbd-devel
 %endif
 %if %with_gjs
@@ -115,7 +128,9 @@ Requires:   im-chooser
 %endif
 Requires:   dconf
 Requires:   notify-python
+%if %with_gkbd
 Requires:   libgnomekbd
+%endif
 Requires:   librsvg2
 Requires:   gnome-icon-theme-legacy >= %{gnome_icon_theme_legacy_version}
 %if (0%{?fedora} <= 17 && 0%{?rhel} < 7)
@@ -213,7 +228,10 @@ The ibus-devel-docs package contains developer documentation for ibus
 %prep
 %setup -q
 %if %with_gjs
-zcat %SOURCE2 | tar xf -
+gzip -dc %SOURCE2 | tar xf -
+%endif
+%if (0%{?fedora} < 19 && 0%{?rhel} < 7)
+gzip -dc %SOURCE3 | tar xf -
 %endif
 
 # home [dot] corp [dot] redhat [dot] com/wiki/rpmdiff-multilib
@@ -272,6 +290,8 @@ autoreconf -f -i
 %endif
 %if %with_xkbfile
     --with-xkb-command=ibus-xkb \
+%endif
+%if %with_gkbd
     --enable-libgnomekbd \
 %endif
     --enable-dconf \
@@ -463,6 +483,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Dec 07 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20121109-8
+- Resolves #869584 - Removed libgnomekbd dependency in f18.
+
 * Fri Nov 30 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20121109-7
 - Set time stamp of ibus/_config.py
 

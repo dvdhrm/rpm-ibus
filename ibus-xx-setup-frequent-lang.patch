@@ -1,4 +1,4 @@
-From d3ce0467bb7825cc97da9646254bc09f58119fda Mon Sep 17 00:00:00 2001
+From 58d4c946db3396897f36f71d33e939dfbbf0ebed Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
 Date: Tue, 27 Nov 2012 15:53:34 +0900
 Subject: [PATCH] Enable ibus-setup to show the frequently used languages

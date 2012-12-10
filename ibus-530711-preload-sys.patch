@@ -1,4 +1,4 @@
-From 456ea33621814aa08ca62e31f7cb1e770ebb3670 Mon Sep 17 00:00:00 2001
+From dfe858f7ba476aa878c5d60a7480a03def558463 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
 Date: Tue, 27 Nov 2012 15:53:27 +0900
 Subject: [PATCH] Reload preload engines until users customize the list.
@@ -228,10 +228,10 @@ index 737b3e2..8ce5a16 100644
   * @x: x coordinate.
   * @y: y coordinate.
 diff --git a/ui/gtk3/panel.vala b/ui/gtk3/panel.vala
-index 1aca443..1ec2579 100644
+index 63b0cde..c4c8f2c 100644
 --- a/ui/gtk3/panel.vala
 +++ b/ui/gtk3/panel.vala
-@@ -309,6 +309,8 @@ class Panel : IBus.PanelService {
+@@ -313,6 +313,8 @@ class Panel : IBus.PanelService {
          if (m_config != null) {
              m_config.value_changed.connect(config_value_changed_cb);
              m_config.watch("general", "preload_engines");
@@ -240,7 +240,7 @@ index 1aca443..1ec2579 100644
              m_config.watch("general", "engines_order");
              m_config.watch("general", "switcher_delay_time");
              m_config.watch("general/hotkey", "trigger_accel");
-@@ -417,7 +419,136 @@ class Panel : IBus.PanelService {
+@@ -425,7 +427,136 @@ class Panel : IBus.PanelService {
              init_gkbd();
          }
  
@@ -377,7 +377,7 @@ index 1aca443..1ec2579 100644
      }
  
      private void update_xkb_engines() {
-@@ -580,6 +711,11 @@ class Panel : IBus.PanelService {
+@@ -591,6 +722,11 @@ class Panel : IBus.PanelService {
                                           string section,
                                           string name,
                                           Variant variant) {
