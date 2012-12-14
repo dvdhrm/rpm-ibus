@@ -37,7 +37,7 @@
 
 Name:       ibus
 Version:    1.4.99.20121109
-Release:    8%{?dist}
+Release:    9%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -483,6 +483,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Dec 14 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20121109-9
+- Updated ibus-xx-no-use.diff not to use variant.dup_strv()
+
 * Fri Dec 07 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20121109-8
 - Resolves #869584 - Removed libgnomekbd dependency in f18.
 
