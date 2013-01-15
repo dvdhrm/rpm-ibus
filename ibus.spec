@@ -129,6 +129,8 @@ Requires:   notify-python
 Requires:   libgnomekbd
 %endif
 Requires:   librsvg2
+# for setxkbmap
+Requires:   xorg-x11-xkb-utils
 %if (0%{?fedora} <= 17 && 0%{?rhel} < 7)
 Requires:   gnome-icon-theme-symbolic
 %endif
