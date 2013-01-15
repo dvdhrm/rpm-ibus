@@ -1,6 +1,6 @@
-From 58d4c946db3396897f36f71d33e939dfbbf0ebed Mon Sep 17 00:00:00 2001
+From 7c4c048bd5aceb15d44042c72ff931d0c05d440f Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Tue, 27 Nov 2012 15:53:34 +0900
+Date: Fri, 11 Jan 2013 23:04:53 +0900
 Subject: [PATCH] Enable ibus-setup to show the frequently used languages
  only in IME list.
 
@@ -11,10 +11,10 @@ Subject: [PATCH] Enable ibus-setup to show the frequently used languages
  3 files changed, 300 insertions(+), 24 deletions(-)
 
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 64f6f33..23739af 100644
+index 7833959..72bcc72 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
-@@ -348,6 +348,174 @@ se,si,sk,sy,sy(ku),th,tj,tr,ua,uz,vn
+@@ -325,6 +325,174 @@ se,si,sk,sy,sy(ku),th,tj,tr,ua,uz,vn
        </locale>
      </schema>
      <schema>
@@ -190,7 +190,7 @@ index 64f6f33..23739af 100644
        <applyto>/desktop/ibus/panel/custom_font</applyto>
        <owner>ibus</owner>
 diff --git a/setup/enginecombobox.py b/setup/enginecombobox.py
-index f80b164..578098c 100644
+index 0f8a6ae..9828ee6 100644
 --- a/setup/enginecombobox.py
 +++ b/setup/enginecombobox.py
 @@ -45,6 +45,9 @@ class EngineComboBox(Gtk.ComboBox):
@@ -362,7 +362,7 @@ index f80b164..578098c 100644
          else:
              renderer.set_property("visible", True)
              renderer.set_property("sensitive", True)
-@@ -124,7 +215,8 @@ class EngineComboBox(Gtk.ComboBox):
+@@ -119,7 +210,8 @@ class EngineComboBox(Gtk.ComboBox):
              renderer.set_property("pixbuf", pixbuf)
  
      def __name_cell_data_cb(self, celllayout, renderer, model, iter, data):
@@ -372,7 +372,7 @@ index f80b164..578098c 100644
  
          if isinstance (engine, str) or isinstance (engine, unicode):
              renderer.set_property("sensitive", False)
-@@ -132,8 +224,15 @@ class EngineComboBox(Gtk.ComboBox):
+@@ -127,8 +219,15 @@ class EngineComboBox(Gtk.ComboBox):
              renderer.set_property("weight", Pango.Weight.NORMAL)
          elif isinstance(engine, int):
              renderer.set_property("sensitive", True)
@@ -390,7 +390,7 @@ index f80b164..578098c 100644
          else:
              renderer.set_property("sensitive", True)
              renderer.set_property("text", engine.get_longname())
-@@ -149,10 +248,18 @@ class EngineComboBox(Gtk.ComboBox):
+@@ -144,10 +243,18 @@ class EngineComboBox(Gtk.ComboBox):
              if i == 0 or i == -1:
                  return None
              iter = self.get_active_iter()
@@ -411,17 +411,17 @@ index f80b164..578098c 100644
          return self.get_property("active-engine")
  
 diff --git a/setup/main.py b/setup/main.py
-index 5da6340..d6fa3ef 100644
+index aae6bb9..ded85c0 100644
 --- a/setup/main.py
 +++ b/setup/main.py
-@@ -224,6 +224,7 @@ class Setup(object):
-                 engines.append(engine)
- 
+@@ -207,6 +207,7 @@ class Setup(object):
+         # init engine page
+         self.__engines = self.__bus.list_engines()
          self.__combobox = self.__builder.get_object("combobox_engines")
 +        self.__combobox.set_config(self.__config)
-         self.__combobox.set_engines(engines)
+         self.__combobox.set_engines(self.__engines)
  
-         engine_names = values.get("preload_engines", [])
+         tmp_dict = {}
 -- 
 1.8.0
 

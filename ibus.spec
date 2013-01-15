@@ -17,7 +17,7 @@
 %global with_gkbd 1
 %endif
 
-%global ibus_gjs_version 3.4.1.20120815
+%global ibus_gjs_version 3.4.1.20130115
 
 %global ibus_api_version 1.0
 
@@ -32,12 +32,10 @@
 %endif
 
 %global dbus_python_version 0.83.0
-# FIXME: It's better to use the new icon names
-%global gnome_icon_theme_legacy_version 2.91.6
 
 Name:       ibus
-Version:    1.4.99.20121109
-Release:    9%{?dist}
+Version:    1.5.1
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -47,10 +45,6 @@ Source1:    %{name}-xinput
 %if %with_gjs
 # ibus-gjs
 Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/%{name}-gjs-%{ibus_gjs_version}.tar.gz
-%endif
-%if (0%{?fedora} < 19 && 0%{?rhel} < 7)
-# Upstreamed translations.
-Source3:    http://fujiwara.fedorapeople.org/ibus/po/%{name}-po-1.4.99.20121207.tar.gz
 %endif
 # Upstreamed patches.
 Patch0:     %{name}-HEAD.patch
@@ -68,8 +62,10 @@ Patch4:     %{name}-xx-setup-frequent-lang.patch
 # https://bugzilla.gnome.org/show_bug.cgi?id=658420
 Patch92:    %{name}-xx-g-s-disable-preedit.patch
 %endif
-# Hide no nused properties in f17.
-Patch94:    %{name}-xx-no-use.diff
+%if (0%{?fedora} < 18 && 0%{?rhel} < 7)
+# The patch enables to build on fedora 17.
+Patch93:    %{name}-xx-f17.patch
+%endif
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -91,6 +87,7 @@ BuildRequires:  vala-tools
 BuildRequires:  GConf2-devel
 %if %with_pygobject3
 BuildRequires:  gobject-introspection-devel
+BuildRequires:  pygobject3-devel
 %endif
 BuildRequires:  intltool
 BuildRequires:  iso-codes-devel
@@ -132,7 +129,6 @@ Requires:   notify-python
 Requires:   libgnomekbd
 %endif
 Requires:   librsvg2
-Requires:   gnome-icon-theme-legacy >= %{gnome_icon_theme_legacy_version}
 %if (0%{?fedora} <= 17 && 0%{?rhel} < 7)
 Requires:   gnome-icon-theme-symbolic
 %endif
@@ -230,9 +226,6 @@ The ibus-devel-docs package contains developer documentation for ibus
 %if %with_gjs
 gzip -dc %SOURCE2 | tar xf -
 %endif
-%if (0%{?fedora} < 19 && 0%{?rhel} < 7)
-gzip -dc %SOURCE3 | tar xf -
-%endif
 
 # home [dot] corp [dot] redhat [dot] com/wiki/rpmdiff-multilib
 # Update timestamps on the files touched by a patch, to avoid non-equal
@@ -270,8 +263,10 @@ UpdateTimestamps -p1 %{PATCH3}
 %patch4 -p1 -b .setup-frequent-lang
 UpdateTimestamps -p1 %{PATCH4}
 
-%patch94 -p1 -b .no-used
-UpdateTimestamps -p1 %{PATCH94}
+%if (0%{?fedora} < 18 && 0%{?rhel} < 7)
+%patch93 -p1 -b .f17
+UpdateTimestamps -p1 %{PATCH93}
+%endif
 
 %build
 %if %with_xkbfile
@@ -285,17 +280,12 @@ autoreconf -f -i
     --enable-gtk-doc \
     --with-no-snooper-apps='gnome-do,Do.*,firefox.*,.*chrome.*,.*chromium.*' \
     --enable-surrounding-text \
-%if (0%{?fedora} > 17 || 0%{?rhel} > 6)
-    --with-panel-icon-keyboard=legacy \
-%endif
-%if %with_xkbfile
-    --with-xkb-command=ibus-xkb \
+%if (0%{?fedora} <= 17 && 0%{?rhel} < 7)
+    --with-panel-icon-keyboard=yes \
 %endif
 %if %with_gkbd
     --enable-libgnomekbd \
 %endif
-    --enable-dconf \
-    --disable-gconf \
 %if %with_pygobject2
     --enable-python-library \
 %endif
@@ -448,10 +438,8 @@ fi
 %{_sysconfdir}/bash_completion.d/ibus.bash
 %{_sysconfdir}/dconf/db/ibus.d
 %{_sysconfdir}/dconf/profile/ibus
+%python2_sitearch/gi/overrides/IBus.py*
 %config %{_xinputconf}
-%if %with_xkbfile
-%{_libexecdir}/ibus-xkb
-%endif
 
 %files libs
 %{_libdir}/libibus-%{ibus_api_version}.so.*
@@ -483,6 +471,11 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Tue Jan 08 2013 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.1-1
+- Bumped to 1.5.1
+- Bumped to ibus-gjs 3.4.1.20130115 for f17
+- Removed ibus-xx-no-use.diff
+
 * Fri Dec 14 2012 Takao Fujiwara <tfujiwar@redhat.com> - 1.4.99.20121109-9
 - Updated ibus-xx-no-use.diff not to use variant.dup_strv()
 

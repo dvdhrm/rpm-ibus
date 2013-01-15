@@ -1,6 +1,6 @@
-From dfe858f7ba476aa878c5d60a7480a03def558463 Mon Sep 17 00:00:00 2001
+From f209d4c3430df3707c432ddfcfc184b791bb50fd Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Tue, 27 Nov 2012 15:53:27 +0900
+Date: Fri, 11 Jan 2013 23:03:19 +0900
 Subject: [PATCH] Reload preload engines until users customize the list.
 
 The idea is, if users don't customize the preload_engines with ibus-setup,
@@ -25,7 +25,7 @@ IBUS_PRELOAD_ENGINE_MODE_USER and users can customize the value
  5 files changed, 246 insertions(+), 7 deletions(-)
 
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 1a0e2d2..64f6f33 100644
+index 70bf9ca..7833959 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
 @@ -2,6 +2,30 @@
@@ -60,10 +60,10 @@ index 1a0e2d2..64f6f33 100644
        <applyto>/desktop/ibus/general/preload_engines</applyto>
        <owner>ibus</owner>
 diff --git a/setup/main.py b/setup/main.py
-index c02229b..5da6340 100644
+index 707faa4..aae6bb9 100644
 --- a/setup/main.py
 +++ b/setup/main.py
-@@ -196,6 +196,20 @@ class Setup(object):
+@@ -190,6 +190,20 @@ class Setup(object):
          self.__checkbutton_use_global_engine.connect("toggled",
                  self.__checkbutton_use_global_engine_toggled_cb)
  
@@ -83,8 +83,8 @@ index c02229b..5da6340 100644
 +
          # init engine page
          self.__engines = self.__bus.list_engines()
-         value = self.__config.get_value("general", "load_xkb_layouts")
-@@ -257,6 +271,7 @@ class Setup(object):
+         self.__combobox = self.__builder.get_object("combobox_engines")
+@@ -243,6 +257,7 @@ class Setup(object):
                  self.__checkbutton_auto_start_toggled_cb)
  
          self.__config = self.__bus.get_config()
@@ -92,7 +92,7 @@ index c02229b..5da6340 100644
  
          self.__init_hotkey()
          self.__init_panel()
-@@ -271,8 +286,8 @@ class Setup(object):
+@@ -251,8 +266,8 @@ class Setup(object):
      def __combobox_notify_active_engine_cb(self, combobox, property):
          engine = self.__combobox.get_active_engine()
          button = self.__builder.get_object("button_engine_add")
@@ -103,7 +103,7 @@ index c02229b..5da6340 100644
  
      def __get_engine_setup_exec_args(self, engine):
          args = []
-@@ -351,6 +366,34 @@ class Setup(object):
+@@ -324,6 +339,34 @@ class Setup(object):
              del self.__engine_setup_exec_list[name]
          self.__engine_setup_exec_list[name] = os.spawnl(os.P_NOWAIT, *args)
  
@@ -138,7 +138,7 @@ index c02229b..5da6340 100644
      def __init_bus(self):
          self.__bus = IBus.Bus()
          if self.__bus.is_connected():
-@@ -562,8 +605,18 @@ class Setup(object):
+@@ -538,8 +581,18 @@ class Setup(object):
          value = GLib.Variant.new_boolean(value)
          self.__config.set_value("general", "use_global_engine", value)
  
@@ -148,7 +148,7 @@ index c02229b..5da6340 100644
 +        if section == 'general' and name == 'preload_engines':
 +            value = []
 +            if variant != None:
-+                value = self.__variant_dup_strv(variant)
++                value = variant.unpack()
 +            engines = self.__get_engine_descs_from_names(value)
 +            current_engines = self.__treeview.get_engines()
 +            engines_csv = str.join(',', map(lambda e: e.get_name(), engines))
@@ -160,10 +160,10 @@ index c02229b..5da6340 100644
      def __config_reloaded_cb(self, bus):
          pass
 diff --git a/setup/setup.ui b/setup/setup.ui
-index 8121d62..2026172 100644
+index e56e917..b3165aa 100644
 --- a/setup/setup.ui
 +++ b/setup/setup.ui
-@@ -653,7 +653,23 @@
+@@ -669,7 +669,23 @@
                      <property name="visible">True</property>
                      <property name="can_focus">False</property>
                      <child>
@@ -188,7 +188,7 @@ index 8121d62..2026172 100644
                          <property name="visible">True</property>
                          <property name="can_focus">False</property>
                          <child>
-@@ -842,7 +858,7 @@
+@@ -858,7 +874,7 @@
                        <packing>
                          <property name="expand">True</property>
                          <property name="fill">True</property>
@@ -197,7 +197,7 @@ index 8121d62..2026172 100644
                        </packing>
                      </child>
                      <child>
-@@ -889,7 +905,7 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
+@@ -905,7 +921,7 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
                        <packing>
                          <property name="expand">False</property>
                          <property name="fill">True</property>
@@ -228,10 +228,10 @@ index 737b3e2..8ce5a16 100644
   * @x: x coordinate.
   * @y: y coordinate.
 diff --git a/ui/gtk3/panel.vala b/ui/gtk3/panel.vala
-index 63b0cde..c4c8f2c 100644
+index 55b63ce..4717431 100644
 --- a/ui/gtk3/panel.vala
 +++ b/ui/gtk3/panel.vala
-@@ -313,6 +313,8 @@ class Panel : IBus.PanelService {
+@@ -291,6 +291,8 @@ class Panel : IBus.PanelService {
          if (m_config != null) {
              m_config.value_changed.connect(config_value_changed_cb);
              m_config.watch("general", "preload_engines");
@@ -239,8 +239,8 @@ index 63b0cde..c4c8f2c 100644
 +            m_config.watch("general", "preload_engine_mode");
              m_config.watch("general", "engines_order");
              m_config.watch("general", "switcher_delay_time");
-             m_config.watch("general/hotkey", "trigger_accel");
-@@ -425,7 +427,136 @@ class Panel : IBus.PanelService {
+             m_config.watch("general/hotkey", "triggers");
+@@ -358,7 +360,136 @@ class Panel : IBus.PanelService {
              init_gkbd();
          }
  
@@ -377,7 +377,7 @@ index 63b0cde..c4c8f2c 100644
      }
  
      private void update_xkb_engines() {
-@@ -591,6 +722,11 @@ class Panel : IBus.PanelService {
+@@ -573,6 +704,11 @@ class Panel : IBus.PanelService {
                                           string section,
                                           string name,
                                           Variant variant) {

@@ -12,10 +12,10 @@ diff --git a/client/gtk2/ibusimcontext.c b/client/gtk2/ibusimcontext.c
 index 584b92d..c4c61d3 100644
 --- a/client/gtk2/ibusimcontext.c
 +++ b/client/gtk2/ibusimcontext.c
-@@ -584,6 +584,14 @@ ibus_im_context_init (GObject *obj)
- #else
-     ibusimcontext->caps = IBUS_CAP_PREEDIT_TEXT | IBUS_CAP_FOCUS;
- #endif
+@@ -645,6 +645,15 @@ ibus_im_context_init (GObject *obj)
+ 
+     ibusimcontext->events_queue = g_queue_new ();
+ 
 +    if (!g_getenv ("IBUS_GNOME_SHELL_ENABLE_PREEDIT_TEXT")) {
 +        const gchar * prgname = g_get_prgname ();
 +        if (g_strcmp0 (prgname, "gnome-shell") == 0) {
@@ -24,9 +24,10 @@ index 584b92d..c4c61d3 100644
 +            }
 +        }
 +    }
- 
- 
++
      // Create slave im context
+     ibusimcontext->slave = gtk_im_context_simple_new ();
+     gtk_im_context_simple_add_table (GTK_IM_CONTEXT_SIMPLE (ibusimcontext->slave),
 -- 
 1.7.10.4
 
