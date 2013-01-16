@@ -66,6 +66,8 @@ Patch92:    %{name}-xx-g-s-disable-preedit.patch
 # The patch enables to build on fedora 17.
 Patch93:    %{name}-xx-f17.patch
 %endif
+# Fix the build failure in f17 and f19 vala.
+Patch94:    %{name}-xx-vapi-build-failure.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
@@ -269,6 +271,8 @@ UpdateTimestamps -p1 %{PATCH4}
 %patch93 -p1 -b .f17
 UpdateTimestamps -p1 %{PATCH93}
 %endif
+%patch94 -p1 -b .vapi
+UpdateTimestamps -p1 %{PATCH94}
 
 %build
 %if %with_xkbfile
