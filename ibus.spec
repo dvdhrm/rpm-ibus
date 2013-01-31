@@ -35,7 +35,7 @@
 
 Name:       ibus
 Version:    1.5.1
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -477,6 +477,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Jan 31 2013 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.1-2
+- Updated ibus-530711-preload-sys.patch. Fixes #904799
+
 * Tue Jan 08 2013 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.1-1
 - Bumped to 1.5.1
 - Bumped to ibus-gjs 3.4.1.20130115 for f17
