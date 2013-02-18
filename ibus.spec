@@ -35,7 +35,7 @@
 
 Name:       ibus
 Version:    1.5.1
-Release:    2%{?dist}
+Release:    3%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -252,8 +252,8 @@ UpdateTimestamps -p1 %{PATCH0}
 %if (0%{?fedora} <= 17 && 0%{?rhel} < 7)
 %patch92 -p1 -b .g-s-preedit
 UpdateTimestamps -p1 %{PATCH92}
-cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 %endif
+cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 %patch1 -p1 -b .noswitch
 UpdateTimestamps -p1 %{PATCH1}
 %if %with_xkbfile
@@ -477,6 +477,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon Feb 18 2013 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.1-3
+- Copied gtk2 module to gtk3 one.
+
 * Thu Jan 31 2013 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.1-2
 - Updated ibus-530711-preload-sys.patch. Fixes #904799
 
@@ -858,7 +861,7 @@ fi
 - Fix bug 531857 - applet order should correspond with preferences order
 - Fix bug 532856 - should not list already added input-methods in Add selector
 
-* Wed Dec 15 2009 Peng Huang <phuang@redhat.com> - 1.2.0.20091215-1
+* Tue Dec 15 2009 Peng Huang <phuang@redhat.com> - 1.2.0.20091215-1
 - Update to 1.2.0.20091215
 
 * Thu Dec 10 2009 Peng Huang <phuang@redhat.com> - 1.2.0.20091204-2
@@ -881,7 +884,7 @@ fi
 - Update to 1.2.0.20091014
 - Change ICON in ibus.conf 
 
-* Mon Sep 27 2009 Peng Huang <phuang@redhat.com> - 1.2.0.20090927-1
+* Sun Sep 27 2009 Peng Huang <phuang@redhat.com> - 1.2.0.20090927-1
 - Update to 1.2.0.20090927
 
 * Tue Sep 15 2009 Peng Huang <phuang@redhat.com> - 1.2.0.20090915-1
@@ -1062,7 +1065,7 @@ fi
 - drop the superfluous ibus-0.1 engine obsoletes
 - move glib2 requires to gtk package
 
-* Tue Feb 25 2009 Peng Huang <phuang@redhat.com> - 1.1.0.20090225-1
+* Wed Feb 25 2009 Peng Huang <phuang@redhat.com> - 1.1.0.20090225-1
 - Update to ibus-1.1.0.20090225.
 - Fix problems in %%post and %%postun scripts.
 - Hide ibus & ibus preferences menu items.
@@ -1169,7 +1172,7 @@ fi
 * Fri Aug 15 2008 Peng Huang <phuang@redhat.com> - 0.1.1.20080815-1
 - Update to 0.1.1.20080815.
 
-* Thu Aug 12 2008 Peng Huang <phuang@redhat.com> - 0.1.1.20080812-1
+* Tue Aug 12 2008 Peng Huang <phuang@redhat.com> - 0.1.1.20080812-1
 - Update to 0.1.1.20080812.
 
 * Mon Aug 11 2008 Peng Huang <phuang@redhat.com> - 0.1.0.20080810-2
