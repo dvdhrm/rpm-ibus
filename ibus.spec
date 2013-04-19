@@ -1,4 +1,4 @@
-%global with_xkbfile 1
+%global with_preload_xkb_engine 1
 %global with_pygobject2 1
 %global with_pygobject3 1
 
@@ -34,8 +34,8 @@
 %global dbus_python_version 0.83.0
 
 Name:       ibus
-Version:    1.5.1
-Release:    3%{?dist}
+Version:    1.5.2
+Release:    1%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -45,6 +45,9 @@ Source1:    %{name}-xinput
 %if %with_gjs
 # ibus-gjs
 Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/%{name}-gjs-%{ibus_gjs_version}.tar.gz
+Source3:    https://raw.github.com/ibus/ibus/master/debian/ibus.1
+Source4:    https://raw.github.com/ibus/ibus/master/debian/ibus-daemon.1
+Source5:    https://raw.github.com/ibus/ibus/master/debian/ibus-setup.1
 %endif
 # Upstreamed patches.
 Patch0:     %{name}-HEAD.patch
@@ -56,6 +59,8 @@ Patch2:     %{name}-541492-xkb.patch
 Patch3:     %{name}-530711-preload-sys.patch
 # Hide minor input method engines on ibus-setup by locale
 Patch4:     %{name}-xx-setup-frequent-lang.patch
+# https://bugzilla.redhat.com/show_bug.cgi?id=947318
+Patch5:     %{name}-947318-reconnect-gtk-client.patch
 
 %if (0%{?fedora} <= 17 && 0%{?rhel} < 7)
 # Workaround to disable preedit on gnome-shell until bug 658420 is fixed.
@@ -66,15 +71,12 @@ Patch92:    %{name}-xx-g-s-disable-preedit.patch
 # The patch enables to build on fedora 17.
 Patch93:    %{name}-xx-f17.patch
 %endif
-# Fix the build failure in f17 and f19 vala.
-Patch94:    %{name}-xx-vapi-build-failure.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
-BuildRequires:  python2-devel
 BuildRequires:  gtk2-devel
 BuildRequires:  gtk3-devel
 BuildRequires:  dbus-glib-devel
@@ -84,18 +86,12 @@ BuildRequires:  gtk-doc
 BuildRequires:  dconf-devel
 BuildRequires:  dbus-x11
 BuildRequires:  vala
+BuildRequires:  vala-devel
 BuildRequires:  vala-tools
 # for AM_GCONF_SOURCE_2 in configure.ac
 BuildRequires:  GConf2-devel
-%if %with_pygobject3
-BuildRequires:  gobject-introspection-devel
-BuildRequires:  pygobject3-devel
-%endif
 BuildRequires:  intltool
 BuildRequires:  iso-codes-devel
-%if %with_xkbfile
-BuildRequires:  libxkbfile-devel
-%endif
 %if %with_gkbd
 BuildRequires:  libgnomekbd-devel
 %endif
@@ -104,21 +100,13 @@ BuildRequires:  libgnomekbd-devel
 BuildRequires:  gjs
 BuildRequires:  gnome-shell
 %endif
-BuildRequires:  diffstat
 
-Requires:   %{name}-libs = %{version}-%{release}
-Requires:   %{name}-gtk2 = %{version}-%{release}
-%if (0%{?fedora} > 14 || 0%{?rhel} > 6)
-Requires:   %{name}-gtk3 = %{version}-%{release}
-%endif
+Requires:   %{name}-libs   = %{version}-%{release}
+Requires:   %{name}-gtk2   = %{version}-%{release}
+Requires:   %{name}-gtk3   = %{version}-%{release}
+Requires:   %{name}-setup  = %{version}-%{release}
+Requires:   %{name}-pygtk2 = %{version}-%{release}
 
-%if %with_pygobject2
-Requires:   pygtk2
-%endif
-%if %with_pygobject3
-Requires:   pygobject3
-%endif
-Requires:   pyxdg
 Requires:   iso-codes
 Requires:   dbus-python >= %{dbus_python_version}
 Requires:   dbus-x11
@@ -187,6 +175,35 @@ Requires(post): glib2 >= %{glib_ver}
 %description gtk3
 This package contains ibus im module for gtk3
 
+%if %with_pygobject3
+%package setup
+Summary:        IBus setup utility
+Group:          System Environment/Libraries
+Requires:       %{name} = %{version}-%{release}
+Requires:       pygobject3
+BuildRequires:  gobject-introspection-devel
+BuildRequires:  pygobject3-devel
+BuildArch:      noarch
+
+%description setup
+This is a setup utility for IBus.
+%endif
+
+%if %with_pygobject2
+%package pygtk2
+Summary:        IBus pygtk2 library
+Group:          System Environment/Libraries
+Requires:       %{name} = %{version}-%{release}
+Requires:       pygtk2
+Requires:       pyxdg
+BuildRequires:  python2-devel
+BuildArch:      noarch
+
+%description pygtk2
+This is a pygtk2 library for IBus. Now major IBUs engines use pygobject3
+and this package will be deprecated.
+%endif
+
 %if %with_gjs
 %package gnome3
 Summary:    IBus gnome-shell-extension for GNOME3
@@ -231,51 +248,27 @@ The ibus-devel-docs package contains developer documentation for ibus
 gzip -dc %SOURCE2 | tar xf -
 %endif
 
-# home [dot] corp [dot] redhat [dot] com/wiki/rpmdiff-multilib
-# Update timestamps on the files touched by a patch, to avoid non-equal
-# .pyc/.pyo files across the multilib peers within a build, where "Level"
-# is the patch prefix option (e.g. -p1)
-UpdateTimestamps() {
-  Level=$1
-  PatchFile=$2
-  # Locate the affected files:
-  for f in $(diffstat $Level -l $PatchFile); do
-    # Set the files to have the same timestamp as that of the patch:
-    touch -r $PatchFile $f
-  done
-}
-
 # %%patch0 -p1
-# UpdateTimestamps -p1 %%{PATCH0}
-%patch0 -p1
-UpdateTimestamps -p1 %{PATCH0}
 %if (0%{?fedora} <= 17 && 0%{?rhel} < 7)
 %patch92 -p1 -b .g-s-preedit
-UpdateTimestamps -p1 %{PATCH92}
 %endif
+%patch5 -p1 -b .reconnect
 cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 %patch1 -p1 -b .noswitch
-UpdateTimestamps -p1 %{PATCH1}
-%if %with_xkbfile
-%patch2 -p1 -b .xkb
-UpdateTimestamps -p1 %{PATCH2}
+%if %with_preload_xkb_engine
+%patch2 -p1 -b .preload-xkb
 rm -f bindings/vala/ibus-1.0.vapi
 rm -f data/dconf/00-upstream-settings
 %endif
 %patch3 -p1 -b .preload-sys
-UpdateTimestamps -p1 %{PATCH3}
 %patch4 -p1 -b .setup-frequent-lang
-UpdateTimestamps -p1 %{PATCH4}
 
 %if (0%{?fedora} < 18 && 0%{?rhel} < 7)
 %patch93 -p1 -b .f17
-UpdateTimestamps -p1 %{PATCH93}
 %endif
-%patch94 -p1 -b .vapi
-UpdateTimestamps -p1 %{PATCH94}
 
 %build
-%if %with_xkbfile
+%if %with_preload_xkb_engine
 autoreconf -f -i
 %endif
 %configure \
@@ -297,7 +290,7 @@ autoreconf -f -i
 %endif
     --enable-introspection
 
-%if %with_xkbfile
+%if %with_preload_xkb_engine
 make -C ui/gtk3 maintainer-clean-generic
 %endif
 # make -C po update-gmo
@@ -353,6 +346,14 @@ if test -f ibus/_config.py.in -a \
         --basedir %{python2_sitelib}/ibus _config.py
   fi
 fi
+
+for S in %{SOURCE3} %{SOURCE4} %{SOURCE5}
+do
+  cp $S .
+  MP=`basename $S` 
+  gzip $MP
+  install -pm 644 -D ${MP}.gz $RPM_BUILD_ROOT%{_datadir}/man/man1/${MP}.gz
+done
 
 %if %with_gjs
 # https://bugzilla.redhat.com/show_bug.cgi?id=657165
@@ -421,27 +422,24 @@ fi
 # FIXME: no version number
 %files -f %{name}10.lang
 %doc AUTHORS COPYING README
-%if %with_pygobject2
-%dir %{python2_sitelib}/ibus
-%{python2_sitelib}/ibus/*
-%endif
 %dir %{_datadir}/ibus/
 %{_bindir}/ibus
 %{_bindir}/ibus-daemon
-%{_bindir}/ibus-setup
-%if %with_pygobject3
-%{_datadir}/ibus/*
-%endif
 %{_datadir}/applications/*
-%{_datadir}/icons/hicolor/*/apps/*
+%{_datadir}/bash-completion/completions/ibus.bash
 %{_datadir}/GConf/gsettings/*
 %{_datadir}/glib-2.0/schemas/*.xml
+%{_datadir}/ibus/component
+%{_datadir}/ibus/engine
+%{_datadir}/ibus/keymaps
+%{_datadir}/icons/hicolor/*/apps/*
+%{_datadir}/man/man1/ibus.1.gz
+%{_datadir}/man/man1/ibus-daemon.1.gz
 %{_libexecdir}/ibus-engine-simple
 %{_libexecdir}/ibus-dconf
 %{_libexecdir}/ibus-ui-gtk3
 %{_libexecdir}/ibus-x11
 # {_sysconfdir}/xdg/autostart/ibus.desktop
-%{_sysconfdir}/bash_completion.d/ibus.bash
 %{_sysconfdir}/dconf/db/ibus.d
 %{_sysconfdir}/dconf/profile/ibus
 %python2_sitearch/gi/overrides/IBus.py*
@@ -449,15 +447,26 @@ fi
 
 %files libs
 %{_libdir}/libibus-%{ibus_api_version}.so.*
-%if %with_pygobject3
 %{_libdir}/girepository-1.0/IBus-1.0.typelib
-%endif
 
 %files gtk2
 %{_libdir}/gtk-2.0/%{gtk2_binary_version}/immodules/im-ibus.so
 
 %files gtk3
 %{_libdir}/gtk-3.0/%{gtk3_binary_version}/immodules/im-ibus.so
+
+%if %with_pygobject3
+%files setup
+%{_bindir}/ibus-setup
+%{_datadir}/ibus/setup
+%{_datadir}/man/man1/ibus-setup.1.gz
+%endif
+
+%if %with_pygobject2
+%files pygtk2
+%dir %{python2_sitelib}/ibus
+%{python2_sitelib}/ibus/*
+%endif
 
 %if %with_gjs
 %files gnome3
@@ -477,6 +486,11 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Apr 18 2013 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.2-1
+- Bumped to 1.5.2
+- Created noarch packages for python files due to .pyc and .pyo.
+- Added man pages.
+
 * Mon Feb 18 2013 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.1-3
 - Copied gtk2 module to gtk3 one.
 
