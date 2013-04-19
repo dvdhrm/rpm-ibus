@@ -45,10 +45,10 @@ Source1:    %{name}-xinput
 %if %with_gjs
 # ibus-gjs
 Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/%{name}-gjs-%{ibus_gjs_version}.tar.gz
+%endif
 Source3:    https://raw.github.com/ibus/ibus/master/debian/ibus.1
 Source4:    https://raw.github.com/ibus/ibus/master/debian/ibus-daemon.1
 Source5:    https://raw.github.com/ibus/ibus/master/debian/ibus-setup.1
-%endif
 # Upstreamed patches.
 Patch0:     %{name}-HEAD.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=810211
