@@ -17,6 +17,12 @@
 %global with_gkbd 1
 %endif
 
+%if (0%{?fedora} > 18 || 0%{?rhel} > 6)
+%global with_python_pkg 1
+%else
+%global with_python_pkg 0
+%endif
+
 %global ibus_gjs_version 3.4.1.20130115
 
 %global ibus_api_version 1.0
@@ -35,7 +41,7 @@
 
 Name:       ibus
 Version:    1.5.2
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -85,6 +91,7 @@ BuildRequires:  desktop-file-utils
 BuildRequires:  gtk-doc
 BuildRequires:  dconf-devel
 BuildRequires:  dbus-x11
+BuildRequires:  python2-devel
 BuildRequires:  vala
 BuildRequires:  vala-devel
 BuildRequires:  vala-tools
@@ -104,8 +111,10 @@ BuildRequires:  gnome-shell
 Requires:   %{name}-libs   = %{version}-%{release}
 Requires:   %{name}-gtk2   = %{version}-%{release}
 Requires:   %{name}-gtk3   = %{version}-%{release}
+%if %with_python_pkg
 Requires:   %{name}-setup  = %{version}-%{release}
 Requires:   %{name}-pygtk2 = %{version}-%{release}
+%endif
 
 Requires:   iso-codes
 Requires:   dbus-python >= %{dbus_python_version}
@@ -127,6 +136,17 @@ Requires:   gnome-icon-theme-symbolic
 %if (0%{?fedora} > 17 || 0%{?rhel} > 6)
 # The feature in ibus-gnome3 is provided by gnome-shell.
 Obsoletes:  ibus-gnome3 < %{version}-%{release}
+%endif
+%if ! %with_python_pkg
+%if %with_pygobject3
+Requires:       pygobject3
+BuildRequires:  gobject-introspection-devel
+BuildRequires:  pygobject3-devel
+%endif
+%if %with_pygobject2
+Requires:       pygtk2
+Requires:       pyxdg
+%endif
 %endif
 
 Requires(post):  desktop-file-utils
@@ -175,6 +195,7 @@ Requires(post): glib2 >= %{glib_ver}
 %description gtk3
 This package contains ibus im module for gtk3
 
+%if %with_python_pkg
 %if %with_pygobject3
 %package setup
 Summary:        IBus setup utility
@@ -196,12 +217,12 @@ Group:          System Environment/Libraries
 Requires:       %{name} = %{version}-%{release}
 Requires:       pygtk2
 Requires:       pyxdg
-BuildRequires:  python2-devel
 BuildArch:      noarch
 
 %description pygtk2
 This is a pygtk2 library for IBus. Now major IBUs engines use pygobject3
 and this package will be deprecated.
+%endif
 %endif
 
 %if %with_gjs
@@ -444,6 +465,17 @@ fi
 %{_sysconfdir}/dconf/profile/ibus
 %python2_sitearch/gi/overrides/IBus.py*
 %config %{_xinputconf}
+%if ! %with_python_pkg
+%if %with_pygobject3
+%{_bindir}/ibus-setup
+%{_datadir}/ibus/setup
+%{_datadir}/man/man1/ibus-setup.1.gz
+%endif
+%if %with_pygobject2
+%dir %{python2_sitelib}/ibus
+%{python2_sitelib}/ibus/*
+%endif
+%endif
 
 %files libs
 %{_libdir}/libibus-%{ibus_api_version}.so.*
@@ -455,6 +487,7 @@ fi
 %files gtk3
 %{_libdir}/gtk-3.0/%{gtk3_binary_version}/immodules/im-ibus.so
 
+%if %with_python_pkg
 %if %with_pygobject3
 %files setup
 %{_bindir}/ibus-setup
@@ -466,6 +499,7 @@ fi
 %files pygtk2
 %dir %{python2_sitelib}/ibus
 %{python2_sitelib}/ibus/*
+%endif
 %endif
 
 %if %with_gjs
@@ -486,6 +520,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Sun Apr 21 2013 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.2-2
+- Separate python files in f19 or later.
+
 * Thu Apr 18 2013 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.2-1
 - Bumped to 1.5.2
 - Created noarch packages for python files due to .pyc and .pyo.
