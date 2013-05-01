@@ -1,4 +1,4 @@
-From 918f22efe0898a6dc87da4d94dadf413e7840e43 Mon Sep 17 00:00:00 2001
+From 985443696823678f86d2340e2404f7d120fe5688 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
 Date: Thu, 31 Jan 2013 17:31:55 +0900
 Subject: [PATCH] Enable ibus-setup to show the frequently used languages
@@ -11,7 +11,7 @@ Subject: [PATCH] Enable ibus-setup to show the frequently used languages
  3 files changed, 300 insertions(+), 24 deletions(-)
 
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 136c192..bd566ca 100644
+index 184de80..c02ecde 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
 @@ -325,6 +325,174 @@ se,si,sk,sy,sy(ku),th,tj,tr,ua,uz,vn
@@ -411,7 +411,7 @@ index 0f8a6ae..9828ee6 100644
          return self.get_property("active-engine")
  
 diff --git a/setup/main.py b/setup/main.py
-index 4826037..42fcb33 100644
+index ba78eeb..b219771 100644
 --- a/setup/main.py
 +++ b/setup/main.py
 @@ -207,6 +207,7 @@ class Setup(object):

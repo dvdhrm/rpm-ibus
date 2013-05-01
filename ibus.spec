@@ -41,7 +41,7 @@
 
 Name:       ibus
 Version:    1.5.2
-Release:    2%{?dist}
+Release:    3%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -65,8 +65,6 @@ Patch2:     %{name}-541492-xkb.patch
 Patch3:     %{name}-530711-preload-sys.patch
 # Hide minor input method engines on ibus-setup by locale
 Patch4:     %{name}-xx-setup-frequent-lang.patch
-# https://bugzilla.redhat.com/show_bug.cgi?id=947318
-Patch5:     %{name}-947318-reconnect-gtk-client.patch
 
 %if (0%{?fedora} <= 17 && 0%{?rhel} < 7)
 # Workaround to disable preedit on gnome-shell until bug 658420 is fixed.
@@ -270,10 +268,10 @@ gzip -dc %SOURCE2 | tar xf -
 %endif
 
 # %%patch0 -p1
+%patch0 -p1
 %if (0%{?fedora} <= 17 && 0%{?rhel} < 7)
 %patch92 -p1 -b .g-s-preedit
 %endif
-%patch5 -p1 -b .reconnect
 cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 %patch1 -p1 -b .noswitch
 %if %with_preload_xkb_engine
@@ -520,6 +518,10 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed May 01 2013 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.2-3
+- Updated ibus-HEAD.patch for upstream.
+- Deleted ibus-947318-reconnect-gtk-client.patch
+
 * Sun Apr 21 2013 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.2-2
 - Separate python files in f19 or later.
 

@@ -1,6 +1,6 @@
-From 3130e980aafbb1ec025a7ca68559fb83e801cba3 Mon Sep 17 00:00:00 2001
+From f14ffe9913736019f556e507c1521ef2dee96392 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Fri, 19 Apr 2013 09:46:33 +0900
+Date: Wed, 1 May 2013 14:28:31 +0900
 Subject: [PATCH] Add libgnomekbd and load preload engines.
 
 ---
@@ -39,7 +39,7 @@ index 0000000..661e6fd
 @@ -0,0 +1 @@
 +Configuration cheader_filename="libgnomekbd/gkbd-configuration.h"
 diff --git a/bindings/vala/Makefile.am b/bindings/vala/Makefile.am
-index aba3454..3f93fba 100644
+index be45e41..44b3e61 100644
 --- a/bindings/vala/Makefile.am
 +++ b/bindings/vala/Makefile.am
 @@ -28,8 +28,6 @@ vapi_deps = \
@@ -160,7 +160,7 @@ index 3036792..06b6e0c 100644
  ])
  
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 54ccb4c..704ba60 100644
+index 9263adc..fccab62 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
 @@ -42,6 +42,52 @@
@@ -1251,7 +1251,7 @@ index 0000000..2b78c69
 +    */
 +}
 diff --git a/ui/gtk3/panel.vala b/ui/gtk3/panel.vala
-index 0d7a5b2..10eaa0c 100644
+index 0c793f4..4469963 100644
 --- a/ui/gtk3/panel.vala
 +++ b/ui/gtk3/panel.vala
 @@ -49,6 +49,13 @@ class Panel : IBus.PanelService {
@@ -1265,7 +1265,7 @@ index 0d7a5b2..10eaa0c 100644
 +    private int m_fallback_lock_id = -1;
 +    private bool m_changed_xkb_option = false;
 +    private GLib.Timer m_changed_layout_timer;
-     private const string ACCELERATOR_SWITCH_IME_FOREWARD = "<Control>space";
+     private const string ACCELERATOR_SWITCH_IME_FOREWARD = "<Super>space";
  
      private GLib.List<Keybinding> m_keybindings = new GLib.List<Keybinding>();
 @@ -91,6 +98,14 @@ class Panel : IBus.PanelService {
@@ -1283,7 +1283,7 @@ index 0d7a5b2..10eaa0c 100644
      }
  
      private void keybinding_manager_bind(KeybindingManager keybinding_manager,
-@@ -299,6 +314,7 @@ class Panel : IBus.PanelService {
+@@ -316,6 +331,7 @@ class Panel : IBus.PanelService {
              m_config.watch("general/hotkey", "triggers");
              m_config.watch("panel", "custom_font");
              m_config.watch("panel", "use_custom_font");
@@ -1291,7 +1291,7 @@ index 0d7a5b2..10eaa0c 100644
              // Update m_use_system_keyboard_layout before update_engines()
              // is called.
              set_use_system_keyboard_layout(null);
-@@ -314,6 +330,204 @@ class Panel : IBus.PanelService {
+@@ -332,6 +348,204 @@ class Panel : IBus.PanelService {
          set_custom_font();
      }
  
@@ -1496,7 +1496,7 @@ index 0d7a5b2..10eaa0c 100644
      private void exec_setxkbmap(IBus.EngineDesc engine) {
          string layout = engine.get_layout();
          string variant = engine.get_layout_variant();
-@@ -374,7 +588,7 @@ class Panel : IBus.PanelService {
+@@ -392,7 +606,7 @@ class Panel : IBus.PanelService {
          }
          // set xkb layout
          if (!m_use_system_keyboard_layout) {
