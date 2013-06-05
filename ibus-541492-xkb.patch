@@ -1,6 +1,6 @@
-From f14ffe9913736019f556e507c1521ef2dee96392 Mon Sep 17 00:00:00 2001
+From 69171c9c9446a60da1979c88478055c9df35136f Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 1 May 2013 14:28:31 +0900
+Date: Wed, 5 Jun 2013 11:48:54 +0900
 Subject: [PATCH] Add libgnomekbd and load preload engines.
 
 ---
@@ -51,7 +51,7 @@ index be45e41..44b3e61 100644
  VAPIGEN_VAPIS = ibus-1.0.vapi
  
  ibus_1_0_vapi_DEPS = gio-2.0
-@@ -39,15 +37,30 @@ ibus_1_0_vapi_FILES = \
+@@ -39,18 +37,33 @@ ibus_1_0_vapi_FILES = \
  	$(srcdir)/IBus-1.0-custom.vala \
  	$(NULL)
  
@@ -71,7 +71,10 @@ index be45e41..44b3e61 100644
 -vapi_DATA = $(VAPIGEN_VAPIS) $(VAPIGEN_VAPIS:.vapi=.deps)
 +vapi_DATA = ibus-1.0.vapi ibus-1.0.deps
  
+ MAINTAINERCLEANFILES = $(VAPIGEN_VAPIS)
+ 
  EXTRA_DIST = \
+ 	$(VAPIGEN_VAPIS) \
 +	Gkbd-3.0.metadata \
 +	gkbd.deps \
  	IBus-1.0.metadata \
@@ -102,7 +105,7 @@ index 0000000..172632c
 +glib-2.0
 +gmodule-2.0
 diff --git a/configure.ac b/configure.ac
-index 3036792..06b6e0c 100644
+index 781bbf5..f576f46 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -237,6 +237,45 @@ else
@@ -151,19 +154,19 @@ index 3036792..06b6e0c 100644
  # GObject introspection
  GOBJECT_INTROSPECTION_CHECK([0.6.8])
  
-@@ -574,6 +613,7 @@ Build options:
-   No snooper regexes        "$NO_SNOOPER_APPS"
+@@ -590,6 +629,7 @@ Build options:
    Panel icon                "$IBUS_ICON_KEYBOARD"
    Enable surrounding-text   $enable_surrounding_text
+   Enable libnotify          $enable_libnotify
 +  Build libgnomebkd         $enable_libgnomekbd
    Run test cases            $enable_tests
  ])
  
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 9263adc..fccab62 100644
+index 9cfe83b..d0b3db8 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
-@@ -42,6 +42,52 @@
+@@ -56,6 +56,52 @@
        </locale>
      </schema>
      <schema>
@@ -216,7 +219,7 @@ index 9263adc..fccab62 100644
        <key>/schemas/desktop/ibus/general/hotkey/trigger</key>
        <applyto>/desktop/ibus/general/hotkey/trigger</applyto>
        <owner>ibus</owner>
-@@ -66,6 +112,19 @@
+@@ -80,6 +126,19 @@
        </locale>
      </schema>
      <schema>
@@ -320,16 +323,16 @@ index ef811a4..f82a162 100644
  #include <ibusobservedpath.h>
 diff --git a/src/ibusxkbxml.c b/src/ibusxkbxml.c
 new file mode 100644
-index 0000000..4792664
+index 0000000..f815e5d
 --- /dev/null
 +++ b/src/ibusxkbxml.c
 @@ -0,0 +1,466 @@
 +/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
 +/* vim:set et sts=4: */
 +/* bus - The Input Bus
-+ * Copyright (C) 2012 Takao Fujiwara <takao.fujiwara1@gmail.com>
-+ * Copyright (C) 2012 Peng Huang <shawn.p.huang@gmail.com>
-+ * Copyright (C) 2012 Red Hat, Inc.
++ * Copyright (C) 2013 Takao Fujiwara <takao.fujiwara1@gmail.com>
++ * Copyright (C) 2013 Peng Huang <shawn.p.huang@gmail.com>
++ * Copyright (C) 2013 Red Hat, Inc.
 + *
 + * This library is free software; you can redistribute it and/or
 + * modify it under the terms of the GNU Lesser General Public
@@ -792,16 +795,16 @@ index 0000000..4792664
 +#undef TABLE_LOOKUP_STRING_FUNC
 diff --git a/src/ibusxkbxml.h b/src/ibusxkbxml.h
 new file mode 100644
-index 0000000..6f5b7bd
+index 0000000..5aa486d
 --- /dev/null
 +++ b/src/ibusxkbxml.h
 @@ -0,0 +1,187 @@
 +/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
 +/* vim:set et sts=4: */
 +/* bus - The Input Bus
-+ * Copyright (C) 2012 Takao Fujiwara <takao.fujiwara1@gmail.com>
-+ * Copyright (C) 2012 Peng Huang <shawn.p.huang@gmail.com>
-+ * Copyright (C) 2012 Red Hat, Inc.
++ * Copyright (C) 2013 Takao Fujiwara <takao.fujiwara1@gmail.com>
++ * Copyright (C) 2013 Peng Huang <shawn.p.huang@gmail.com>
++ * Copyright (C) 2013 Red Hat, Inc.
 + *
 + * This library is free software; you can redistribute it and/or
 + * modify it under the terms of the GNU Lesser General Public
@@ -984,7 +987,7 @@ index 0000000..6f5b7bd
 +G_END_DECLS
 +#endif
 diff --git a/ui/gtk3/Makefile.am b/ui/gtk3/Makefile.am
-index 43454bc..6b7e70a 100644
+index 2038814..aa79eee 100644
 --- a/ui/gtk3/Makefile.am
 +++ b/ui/gtk3/Makefile.am
 @@ -45,6 +45,8 @@ USE_SYMBOL_ICON = FALSE
@@ -1005,9 +1008,9 @@ index 43454bc..6b7e70a 100644
  	-Wno-unused-variable \
  	-Wno-unused-but-set-variable \
  	-Wno-unused-function \
-@@ -83,12 +87,40 @@ AM_VALAFLAGS = \
- 	--pkg=xi \
+@@ -98,12 +102,40 @@ AM_VALAFLAGS += \
  	$(NULL)
+ endif
  
 +if ENABLE_LIBGNOMEKBD
 +AM_CFLAGS += \
@@ -1046,7 +1049,7 @@ index 43454bc..6b7e70a 100644
  	handle.vala \
  	iconwidget.vala \
  	keybindingmanager.vala \
-@@ -97,6 +129,7 @@ ibus_ui_gtk3_SOURCES = \
+@@ -112,6 +144,7 @@ ibus_ui_gtk3_SOURCES = \
  	property.vala \
  	separator.vala \
  	switcher.vala \
@@ -1054,7 +1057,7 @@ index 43454bc..6b7e70a 100644
  	$(NULL)
  
  ibus_ui_gtk3_LDADD = \
-@@ -105,9 +138,12 @@ ibus_ui_gtk3_LDADD = \
+@@ -120,9 +153,12 @@ ibus_ui_gtk3_LDADD = \
  
  CLEANFILES = \
  	gtkpanel.xml \
@@ -1069,7 +1072,7 @@ index 43454bc..6b7e70a 100644
  
 diff --git a/ui/gtk3/gkbdlayout.vala.false b/ui/gtk3/gkbdlayout.vala.false
 new file mode 100644
-index 0000000..a387de9
+index 0000000..506aff2
 --- /dev/null
 +++ b/ui/gtk3/gkbdlayout.vala.false
 @@ -0,0 +1,63 @@
@@ -1077,9 +1080,9 @@ index 0000000..a387de9
 + *
 + * ibus - The Input Bus
 + *
-+ * Copyright 2012 Red Hat, Inc.
-+ * Copyright(c) 2012 Peng Huang <shawn.p.huang@gmail.com>
-+ * Copyright(c) 2012 Takao Fujiwara <tfujiwar@redhat.com>
++ * Copyright(c) 2013 Red Hat, Inc.
++ * Copyright(c) 2013 Peng Huang <shawn.p.huang@gmail.com>
++ * Copyright(c) 2013 Takao Fujiwara <tfujiwar@redhat.com>
 + *
 + * This library is free software; you can redistribute it and/or
 + * modify it under the terms of the GNU Lesser General Public
@@ -1138,7 +1141,7 @@ index 0000000..a387de9
 +}
 diff --git a/ui/gtk3/gkbdlayout.vala.true b/ui/gtk3/gkbdlayout.vala.true
 new file mode 100644
-index 0000000..2b78c69
+index 0000000..a6e0f8d
 --- /dev/null
 +++ b/ui/gtk3/gkbdlayout.vala.true
 @@ -0,0 +1,108 @@
@@ -1146,9 +1149,9 @@ index 0000000..2b78c69
 + *
 + * ibus - The Input Bus
 + *
-+ * Copyright 2012 Red Hat, Inc.
-+ * Copyright(c) 2012 Peng Huang <shawn.p.huang@gmail.com>
-+ * Copyright(c) 2012 Takao Fujiwara <tfujiwar@redhat.com>
++ * Copyright(c) 2013 Red Hat, Inc.
++ * Copyright(c) 2013 Peng Huang <shawn.p.huang@gmail.com>
++ * Copyright(c) 2013 Takao Fujiwara <tfujiwar@redhat.com>
 + *
 + * This library is free software; you can redistribute it and/or
 + * modify it under the terms of the GNU Lesser General Public
@@ -1251,7 +1254,7 @@ index 0000000..2b78c69
 +    */
 +}
 diff --git a/ui/gtk3/panel.vala b/ui/gtk3/panel.vala
-index 0c793f4..4469963 100644
+index 39aca08..fb012c3 100644
 --- a/ui/gtk3/panel.vala
 +++ b/ui/gtk3/panel.vala
 @@ -49,6 +49,13 @@ class Panel : IBus.PanelService {
@@ -1283,7 +1286,7 @@ index 0c793f4..4469963 100644
      }
  
      private void keybinding_manager_bind(KeybindingManager keybinding_manager,
-@@ -316,6 +331,7 @@ class Panel : IBus.PanelService {
+@@ -405,6 +420,7 @@ class Panel : IBus.PanelService {
              m_config.watch("general/hotkey", "triggers");
              m_config.watch("panel", "custom_font");
              m_config.watch("panel", "use_custom_font");
@@ -1291,8 +1294,8 @@ index 0c793f4..4469963 100644
              // Update m_use_system_keyboard_layout before update_engines()
              // is called.
              set_use_system_keyboard_layout(null);
-@@ -332,6 +348,204 @@ class Panel : IBus.PanelService {
-         set_custom_font();
+@@ -422,6 +438,204 @@ class Panel : IBus.PanelService {
+         }
      }
  
 +    private void gkbdlayout_changed_cb() {
@@ -1496,18 +1499,18 @@ index 0c793f4..4469963 100644
      private void exec_setxkbmap(IBus.EngineDesc engine) {
          string layout = engine.get_layout();
          string variant = engine.get_layout_variant();
-@@ -392,7 +606,7 @@ class Panel : IBus.PanelService {
+@@ -482,7 +696,7 @@ class Panel : IBus.PanelService {
          }
          // set xkb layout
          if (!m_use_system_keyboard_layout) {
 -            exec_setxkbmap(engine);
-+           set_layout(engine);
++            set_layout(engine);
          }
      }
  
 diff --git a/ui/gtk3/xkblayout.vala b/ui/gtk3/xkblayout.vala
 new file mode 100644
-index 0000000..165a905
+index 0000000..b4b54ff
 --- /dev/null
 +++ b/ui/gtk3/xkblayout.vala
 @@ -0,0 +1,431 @@
@@ -1515,9 +1518,9 @@ index 0000000..165a905
 + *
 + * ibus - The Input Bus
 + *
-+ * Copyright 2012 Red Hat, Inc.
-+ * Copyright(c) 2012 Peng Huang <shawn.p.huang@gmail.com>
-+ * Copyright(c) 2012 Takao Fujiwara <tfujiwar@redhat.com>
++ * Copyright(c) 2013 Red Hat, Inc.
++ * Copyright(c) 2013 Peng Huang <shawn.p.huang@gmail.com>
++ * Copyright(c) 2013 Takao Fujiwara <tfujiwar@redhat.com>
 + *
 + * This library is free software; you can redistribute it and/or
 + * modify it under the terms of the GNU Lesser General Public

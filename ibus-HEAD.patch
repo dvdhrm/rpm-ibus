@@ -1,3 +1,80 @@
+From 0b612dfb8ab52a61896b9079acd2d76a360f8666 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Mon, 22 Apr 2013 20:16:31 +0900
+Subject: [PATCH] Fix make dist errors.
+
+Review URL: https://codereview.appspot.com/8850043
+---
+ bindings/pygobject/Makefile.am | 6 +++++-
+ bindings/vala/Makefile.am      | 2 ++
+ 2 files changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/bindings/pygobject/Makefile.am b/bindings/pygobject/Makefile.am
+index 3980bc6..6360397 100644
+--- a/bindings/pygobject/Makefile.am
++++ b/bindings/pygobject/Makefile.am
+@@ -27,7 +27,11 @@ overrides_PYTHON =				\
+ 	gi/overrides/IBus.py			\
+ 	$(NULL)
+ 
+-TESTS = test-override-ibus.py
++TESTS =
++
++if ENABLE_TESTS
++TESTS += test-override-ibus.py
++endif
+ 
+ TESTS_ENVIRONMENT = \
+ 	PYTHONPATH=$(top_srcdir)/tests:$${PYTHONPATH:+:$$PYTHONPATH} \
+diff --git a/bindings/vala/Makefile.am b/bindings/vala/Makefile.am
+index aba3454..381ef31 100644
+--- a/bindings/vala/Makefile.am
++++ b/bindings/vala/Makefile.am
+@@ -50,4 +50,6 @@ EXTRA_DIST = \
+ 	xi.vapi \
+ 	$(NULL)
+ 
++DIST_SOURCES = $(VAPIGEN_VAPIS)
++
+ -include $(top_srcdir)/git.mk
+-- 
+1.8.0
+
+From 4e175e3337337f2c261088d4576ea63a144cee3a Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Wed, 24 Apr 2013 13:44:35 +0900
+Subject: [PATCH] Use EXTRA_DIST instead of DIST_SOURCES.
+
+Review URL: https://codereview.appspot.com/8698047
+---
+ bindings/vala/Makefile.am | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/bindings/vala/Makefile.am b/bindings/vala/Makefile.am
+index 381ef31..be45e41 100644
+--- a/bindings/vala/Makefile.am
++++ b/bindings/vala/Makefile.am
+@@ -42,7 +42,10 @@ ibus_1_0_vapi_FILES = \
+ vapidir = $(datadir)/vala/vapi
+ vapi_DATA = $(VAPIGEN_VAPIS) $(VAPIGEN_VAPIS:.vapi=.deps)
+ 
++MAINTAINERCLEANFILES = $(VAPIGEN_VAPIS)
++
+ EXTRA_DIST = \
++	$(VAPIGEN_VAPIS) \
+ 	IBus-1.0.metadata \
+ 	IBus-1.0-custom.vala \
+ 	ibus-1.0.deps \
+@@ -50,6 +53,4 @@ EXTRA_DIST = \
+ 	xi.vapi \
+ 	$(NULL)
+ 
+-DIST_SOURCES = $(VAPIGEN_VAPIS)
+-
+ -include $(top_srcdir)/git.mk
+-- 
+1.8.0
+
 From 667b7f0b96e5a7e1190e606a9c680bcbda8c2a88 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
 Date: Tue, 30 Apr 2013 21:46:02 +0900
@@ -554,14 +631,60 @@ index 0d7a5b2..8090a42 100644
 -- 
 1.8.0
 
-From 4b7b5202bbe89c097233e4252b157052c6e5e846 Mon Sep 17 00:00:00 2001
+From 927e9f58da9b4a9898403c8e339109e2ad2fa966 Mon Sep 17 00:00:00 2001
+From: Daiki Ueno <ueno@unixuser.org>
+Date: Mon, 13 May 2013 11:47:29 +0900
+Subject: [PATCH] Check GtkIMContext:input-purpose to disable IM on lock
+ screen
+
+Recent GtkIMContext has "input-purpose" property, which can be used to check if the target widget is a password entry, in a more reliable way.
+
+BUG=none
+R=Shawn.P.Huang@gmail.com
+
+Review URL: https://codereview.appspot.com/7064059
+---
+ client/gtk2/ibusimcontext.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/client/gtk2/ibusimcontext.c b/client/gtk2/ibusimcontext.c
+index 49598b4..3694dd4 100644
+--- a/client/gtk2/ibusimcontext.c
++++ b/client/gtk2/ibusimcontext.c
+@@ -803,6 +803,18 @@ ibus_im_context_focus_in (GtkIMContext *context)
+         return;
+ 
+     /* don't set focus on password entry */
++#if GTK_CHECK_VERSION (3, 6, 0)
++    {
++        GtkInputPurpose purpose;
++
++        g_object_get (G_OBJECT (context),
++                      "input-purpose", &purpose,
++                      NULL);
++
++        if (purpose == GTK_INPUT_PURPOSE_PASSWORD)
++            return;
++    }
++#endif
+     if (ibusimcontext->client_window != NULL) {
+         GtkWidget *widget;
+ 
+-- 
+1.8.0
+
+From f3d80dc026853c1024cdf6bda31b1496939cb095 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 1 May 2013 12:31:57 +0900
+Date: Mon, 13 May 2013 16:36:19 +0900
 Subject: [PATCH] Defalut triggers key is changed to <Super>space.
 
 We have been used <Control>space as the default triggers key.
 GNOME3 and Windows7 applied <Super>space as the default trigger key
 and IBus follows it for the consistent key between desktops.
+
+BUG=RH#953404
+
+Review URL: https://codereview.appspot.com/9081043
 ---
  data/ibus.schemas.in | 2 +-
  setup/main.py        | 2 +-
@@ -616,6 +739,586 @@ index 8090a42..0c793f4 100644
          bind_switch_shortcut(null);
  
          if (m_switcher_delay_time >= 0) {
+-- 
+1.8.0
+
+From 3c96d67404da274c34631ad821da736cf55a2b62 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Wed, 15 May 2013 12:03:54 +0900
+Subject: [PATCH] Add man files of /usr/bin files.
+
+Review URL: https://codereview.appspot.com/9413043
+---
+ bus/Makefile.am       | 21 ++++++++++++--
+ bus/ibus-daemon.1.in  | 77 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ setup/Makefile.am     | 18 ++++++++++--
+ setup/ibus-setup.1.in | 33 ++++++++++++++++++++++
+ tools/Makefile.am     | 21 ++++++++++++--
+ tools/ibus.1.in       | 58 ++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 222 insertions(+), 6 deletions(-)
+ create mode 100644 bus/ibus-daemon.1.in
+ create mode 100644 setup/ibus-setup.1.in
+ create mode 100644 tools/ibus.1.in
+
+diff --git a/bus/Makefile.am b/bus/Makefile.am
+index 7024b8f..f06b70c 100644
+--- a/bus/Makefile.am
++++ b/bus/Makefile.am
+@@ -2,8 +2,8 @@
+ #
+ # ibus - The Input Bus
+ #
+-# Copyright (c) 2007-2010 Peng Huang <shawn.p.huang@gmail.com>
+-# Copyright (c) 2007-2010 Red Hat, Inc.
++# Copyright (c) 2007-2013 Peng Huang <shawn.p.huang@gmail.com>
++# Copyright (c) 2007-2013 Red Hat, Inc.
+ #
+ # This library is free software; you can redistribute it and/or
+ # modify it under the terms of the GNU Lesser General Public
+@@ -162,6 +162,7 @@ test_stress_LDADD = \
+ 
+ EXTRA_DIST =                \
+ 	$(desktop_in_files)     \
++	$(man_one_in_files)     \
+ 	marshalers.list         \
+ 	$(NULL)
+ 
+@@ -169,6 +170,11 @@ DISTCLEANFILES =            \
+ 	$(desktop_DATA)         \
+ 	$(NULL)
+ 
++CLEANFILES = \
++	$(man_one_DATA)            \
++	$(man_one_files)        \
++	$(NULL)
++
+ $(libibus):
+ 	$(MAKE) -C $(top_builddir)/src
+ 
+@@ -182,4 +188,15 @@ desktop_in_files = ibus.desktop.in
+ desktop_DATA = $(desktop_in_files:.desktop.in=.desktop)
+ @INTLTOOL_DESKTOP_RULE@
+ 
++man_one_in_files = ibus-daemon.1.in
++man_one_files = $(man_one_in_files:.1.in=.1)
++man_one_DATA =$(man_one_files:.1=.1.gz) 
++man_onedir = $(datadir)/man/man1
++%.1: %.1.in
++	$(AM_V_GEN) sed \
++		-e 's|@VERSION[@]|$(VERSION)|g' $< > $@.tmp && \
++		mv $@.tmp $@
++%.1.gz: %.1
++	$(AM_V_GEN) gzip -c $< > $@.tmp && mv $@.tmp $@
++
+ -include $(top_srcdir)/git.mk
+diff --git a/bus/ibus-daemon.1.in b/bus/ibus-daemon.1.in
+new file mode 100644
+index 0000000..74e7431
+--- /dev/null
++++ b/bus/ibus-daemon.1.in
+@@ -0,0 +1,77 @@
++.\" This file is distributed under the same license as the ibus
++.\" package.
++.\" Copyright (C) Takao Fujiwara <takao.fujiwara1@gmail.com>, 2013.
++.\" Copyright (c) Peng Huang <shawn.p.huang@gmail.com>, 2013.
++.\"
++.TH IBUS-DAEMON "1" "April 2010" "@VERSION@" "User Commands"
++.SH NAME
++.B ibus\-daemon
++\- daemon program for ibus
++
++.SH SYNOPSIS
++.B ibus\-daemon
++[\fIOPTION\fR]...
++
++.SH DESCRIPTION
++
++.PP
++IBus is an Intelligent Input Bus. It is a new input framework for Linux
++OS. It provides full featured and user friendly input method user
++interface.  It also may help developers to develop input method easily.
++
++.PP
++.B ibus\-daemon
++is a daemon program for ibus and it is also a start up program for users
++to activate ibus daemon, engines and panel.
++
++.SS "Help Options:"
++.TP
++\fB\-h\fR, \fB\-\-help\fR
++Show help options
++
++.SS "Application Options:"
++.TP
++\fB\-d\fR, \fB\-\-daemonize\fR
++run ibus as background process.
++.TP
++\fB\-s\fR, \fB\-\-single\fR
++do not execute panel and config module.
++.TP
++\fB\-x\fR, \fB\-\-xim\fR
++execute ibus XIM server.
++.TP
++\fB\-n\fR, \fB\-\-desktop\fR=\fIname\fR
++specify the name of desktop session. [default=gnome]
++.TP
++\fB\-p\fR, \fB\-\-panel\fR=\fIcmdline\fR
++specify the cmdline of panel program.
++.TP
++\fB\-c\fR, \fB\-\-config\fR=\fIcmdline\fR
++specify the cmdline of config program.
++.TP
++\fB\-a\fR, \fB\-\-address\fR=\fIaddress\fR
++specify the address of ibus daemon.
++.TP
++\fB\-r\fR, \fB\-\-replace\fR
++if there is an old ibus\-daemon is running, it will be replaced.
++.TP
++\fB\-t\fR, \fB\-\-re\-scan\fR
++force to re\-scan components, and re\-create registry cache.
++.TP
++\fB\-o\fR, \fB\-\-timeout\fR=\fItimeout\fR [default is 2000]
++dbus reply timeout in milliseconds.
++.TP
++\fB\-j\fR, \fB\-\-monitor\-timeout\fR=\fItimeout\fR [default is 0]
++timeout of poll changes of engines in seconds. 0 to disable it.
++.TP
++\fB\-m\fR, \fB\-\-mem\-profile\fR
++enable memory profile, send SIGUSR2 to print out the memory profile.
++.TP
++\fB\-v\fR, \fB\-\-verbose\fR
++verbose.
++
++.SH BUGS
++If you find a bug, please report it at http://code.google.com/p/ibus/issues/list
++
++.SH "SEE ALSO"
++.BR ibus (1)
+diff --git a/setup/Makefile.am b/setup/Makefile.am
+index 9618d7f..5274f19 100644
+--- a/setup/Makefile.am
++++ b/setup/Makefile.am
+@@ -2,8 +2,8 @@
+ #
+ # ibus - The Input Bus
+ #
+-# Copyright (c) 2007-2010 Peng Huang <shawn.p.huang@gmail.com>
+-# Copyright (c) 2007-2010 Red Hat, Inc.
++# Copyright (c) 2007-2013 Peng Huang <shawn.p.huang@gmail.com>
++# Copyright (c) 2007-2013 Red Hat, Inc.
+ #
+ # This library is free software; you can redistribute it and/or
+ # modify it under the terms of the GNU Lesser General Public
+@@ -42,12 +42,26 @@ desktop_DATA = $(desktop_in_files:.desktop.in=.desktop)
+ desktopdir = $(datadir)/applications
+ @INTLTOOL_DESKTOP_RULE@
+ 
++man_one_in_files = ibus-setup.1.in
++man_one_files = $(man_one_in_files:.1.in=.1)
++man_one_DATA =$(man_one_files:.1=.1.gz) 
++man_onedir = $(datadir)/man/man1
++%.1: %.1.in
++	$(AM_V_GEN) sed \
++		-e 's|@VERSION[@]|$(VERSION)|g' $< > $@.tmp && \
++		mv $@.tmp $@
++%.1.gz: %.1
++	$(AM_V_GEN) gzip -c $< > $@.tmp && mv $@.tmp $@
++
+ CLEANFILES = \
++	$(man_one_DATA) \
++	$(man_one_files) \
+ 	*.pyc \
+ 	ibus-setup \
+ 	$(NULL)
+ 
+ EXTRA_DIST = \
++	$(man_one_in_files) \
+ 	ibus-setup.in \
+ 	setup.ui \
+ 	ibus-setup.desktop.in \
+diff --git a/setup/ibus-setup.1.in b/setup/ibus-setup.1.in
+new file mode 100644
+index 0000000..3daafe4
+--- /dev/null
++++ b/setup/ibus-setup.1.in
+@@ -0,0 +1,33 @@
++.\" This file is distributed under the same license as the ibus
++.\" package.
++.\" Copyright (C) LI Daobing <lidaobing@gmail.com>, 2008.
++.\" Copyright (C) Takao Fujiwara <takao.fujiwara1@gmail.com>, 2013.
++.\" Copyright (c) Peng Huang <shawn.p.huang@gmail.com>, 2013.
++.\"
++.TH "IBUS-SETUP" 1 "November 2008" "@VERSION@" "User Commands"
++.SH NAME
++.B ibus-setup
++\- configuration program for ibus
++
++.SH "SYNOPSIS"
++.B ibus-setup
++
++.SH "DESCRIPTION"
++
++.PP
++IBus is an Intelligent Input Bus. It is a new input framework for Linux
++OS. It provides full featured and user friendly input method user
++interface.  It also may help developers to develop input method easily.  
++
++.PP
++.B ibus-setup
++is the configuration program for IBus.
++
++.PP
++Homepage: http://code.google.com/p/ibus/
++
++.SH BUGS
++If you find a bug, please report it at http://code.google.com/p/ibus/issues/list
++
++.SH "SEE ALSO"
++.BR ibus (1)
+diff --git a/tools/Makefile.am b/tools/Makefile.am
+index 5aa1099..65d1877 100644
+--- a/tools/Makefile.am
++++ b/tools/Makefile.am
+@@ -2,8 +2,8 @@
+ #
+ # ibus - The Input Bus
+ #
+-# Copyright (c) 2007-2010 Peng Huang <shawn.p.huang@gmail.com>
+-# Copyright (c) 2007-2010 Red Hat, Inc.
++# Copyright (c) 2007-2013 Peng Huang <shawn.p.huang@gmail.com>
++# Copyright (c) 2007-2013 Red Hat, Inc.
+ #
+ # This library is free software; you can redistribute it and/or
+ # modify it under the terms of the GNU Lesser General Public
+@@ -75,8 +75,25 @@ bash_completion_DATA= \
+ 	$(NULL)
+ bash_completiondir=@datadir@/bash-completion/completions
+ 
++man_one_in_files = ibus.1.in
++man_one_files = $(man_one_in_files:.1.in=.1)
++man_one_DATA =$(man_one_files:.1=.1.gz) 
++man_onedir = $(datadir)/man/man1
++%.1: %.1.in
++	$(AM_V_GEN) sed \
++		-e 's|@VERSION[@]|$(VERSION)|g' $< > $@.tmp && \
++		mv $@.tmp $@
++%.1.gz: %.1
++	$(AM_V_GEN) gzip -c $< > $@.tmp && mv $@.tmp $@
++
+ EXTRA_DIST = \
++	$(man_one_in_files) \
+ 	ibus.bash \
+ 	$(NULL)
+ 
++CLEANFILES = \
++	$(man_one_DATA) \
++	$(man_one_files) \
++	$(NULL)
++
+ -include $(top_srcdir)/git.mk
+diff --git a/tools/ibus.1.in b/tools/ibus.1.in
+new file mode 100644
+index 0000000..05bf63d
+--- /dev/null
++++ b/tools/ibus.1.in
+@@ -0,0 +1,58 @@
++.\" This file is distributed under the same license as the ibus
++.\" package.
++.\" Copyright (C) Takao Fujiwara <takao.fujiwara1@gmail.com>, 2013.
++.\" Copyright (c) Peng Huang <shawn.p.huang@gmail.com>, 2013.
++.\"
++.TH "IBUS" 1 "May 2013" "@VERSION@" "User Commands"
++.SH NAME
++.B ibus
++\- command line utility for ibus
++
++.SH "SYNOPSIS"
++.B ibus
++\fICOMMAND\fR [\fIOPTION\fR]...
++
++.SH "DESCRIPTION"
++
++.PP
++IBus is an Intelligent Input Bus. It is a new input framework for Linux
++OS. It provides full featured and user friendly input method user
++interface.  It also may help developers to develop input method easily.  
++
++.PP
++.B ibus
++is a command line utility which can restart or exit ibus-daemon,
++get or set the current ibus engine or list the ibus engines.
++
++.PP
++Homepage: http://code.google.com/p/ibus/
++
++.SH "COMMAND"
++.TP
++\fBhelp\fR
++Show the commands list.
++.TP
++\fBengine\fR [\fBENGINE_NAME\fR]
++Show the curent ibus engine when
++.B ENGINE_NAME
++is not given. Set 
++.B ENGINE_NAME
++to the current ibus engine.
++.TP
++\fBexit\fR
++Exit ibus-daemon.
++.TP
++\fBlist-engine\fR
++Show ibus engines list.
++.TP
++\fBrestart\fR
++Restart ibus-daemon.
++.TP
++\fBversion\fR
++Show the ibus version.
++.TP
++\fBwatch\fR
++Under construction.
++
++.SH BUGS
++If you find a bug, please report it at http://code.google.com/p/ibus/issues/list.
+-- 
+1.8.0
+
+From 62f07b7a6904b8b03a59f3baf413becb2d5d9e14 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Fri, 17 May 2013 12:12:54 +0900
+Subject: [PATCH] Let users know the default hotkey is Super+space with
+ libnotify.
+
+Review URL: https://codereview.appspot.com/9407043
+---
+ configure.ac         | 20 +++++++++--
+ data/ibus.schemas.in | 14 ++++++++
+ ui/gtk3/Makefile.am  | 19 +++++++++--
+ ui/gtk3/panel.vala   | 94 ++++++++++++++++++++++++++++++++++++++++++++++++++--
+ 4 files changed, 141 insertions(+), 6 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index 3036792..781bbf5 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -2,8 +2,8 @@
+ #
+ # ibus - The Input Bus
+ #
+-# Copyright (c) 2007-2010 Peng Huang <shawn.p.huang@gmail.com>
+-# Copyright (c) 2007-2010 Red Hat, Inc.
++# Copyright (c) 2007-2013 Peng Huang <shawn.p.huang@gmail.com>
++# Copyright (c) 2007-2013 Red Hat, Inc.
+ #
+ # This library is free software; you can redistribute it and/or
+ # modify it under the terms of the GNU Lesser General Public
+@@ -498,6 +498,21 @@ if test x"$enable_engine" = x"yes"; then
+     enable_engine="yes (enabled, use --disable-engine to disable)"
+ fi
+ 
++# --disable-libnotify
++AC_ARG_ENABLE(libnotify,
++    AS_HELP_STRING([--disable-libnotify],
++                   [Disable to link libnotify]),
++    [enable_libnotify=$enableval],
++    [enable_libnotify=yes]
++)
++AM_CONDITIONAL([ENABLE_LIBNOTIFY], [test x"$enable_libnotify" = x"yes"])
++if test x"$enable_libnotify" = x"yes"; then
++    PKG_CHECK_MODULES(LIBNOTIFY, [
++        libnotify >= 0.7
++    ])
++    enable_libnotify="yes (enabled, use --disable-libnotify to disable)"
++fi
++
+ # Check iso-codes.
+ PKG_CHECK_MODULES(ISOCODES, [
+     iso-codes
+@@ -574,6 +589,7 @@ Build options:
+   No snooper regexes        "$NO_SNOOPER_APPS"
+   Panel icon                "$IBUS_ICON_KEYBOARD"
+   Enable surrounding-text   $enable_surrounding_text
++  Enable libnotify          $enable_libnotify
+   Run test cases            $enable_tests
+ ])
+ 
+diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
+index 9263adc..9cfe83b 100644
+--- a/data/ibus.schemas.in
++++ b/data/ibus.schemas.in
+@@ -42,6 +42,20 @@
+       </locale>
+     </schema>
+     <schema>
++      <key>/schemas/desktop/ibus/general/version</key>
++      <applyto>/desktop/ibus/general/version</applyto>
++      <owner>ibus</owner>
++      <type>string</type>
++      <default></default>
++      <locale name="C">
++        <short>Saved version number</short>
++            <long>The saved version number will be used to check the
++                  difference between the version of the previous installed
++                  ibus and one of the current ibus.
++            </long>
++      </locale>
++    </schema>
++    <schema>
+       <key>/schemas/desktop/ibus/general/hotkey/trigger</key>
+       <applyto>/desktop/ibus/general/hotkey/trigger</applyto>
+       <owner>ibus</owner>
+diff --git a/ui/gtk3/Makefile.am b/ui/gtk3/Makefile.am
+index 43454bc..2038814 100644
+--- a/ui/gtk3/Makefile.am
++++ b/ui/gtk3/Makefile.am
+@@ -2,8 +2,8 @@
+ #
+ # ibus - The Input Bus
+ #
+-# Copyright (c) 2007-2010 Peng Huang <shawn.p.huang@gmail.com>
+-# Copyright (c) 2007-2010 Red Hat, Inc.
++# Copyright (c) 2007-2013 Peng Huang <shawn.p.huang@gmail.com>
++# Copyright (c) 2007-2013 Red Hat, Inc.
+ #
+ # This library is free software; you can redistribute it and/or
+ # modify it under the terms of the GNU Lesser General Public
+@@ -83,6 +83,21 @@ AM_VALAFLAGS = \
+ 	--pkg=xi \
+ 	$(NULL)
+ 
++if ENABLE_LIBNOTIFY
++AM_CFLAGS += \
++	@LIBNOTIFY_CFLAGS@ \
++	$(NULL)
++
++AM_LDADD += \
++	@LIBNOTIFY_LIBS@ \
++	$(NULL)
++
++AM_VALAFLAGS += \
++	--pkg=libnotify \
++	-D ENABLE_LIBNOTIFY \
++	$(NULL)
++endif
++
+ libexec_PROGRAMS = ibus-ui-gtk3
+ 
+ ibus_ui_gtk3_SOURCES = \
+diff --git a/ui/gtk3/panel.vala b/ui/gtk3/panel.vala
+index 0c793f4..39aca08 100644
+--- a/ui/gtk3/panel.vala
++++ b/ui/gtk3/panel.vala
+@@ -298,6 +298,95 @@ class Panel : IBus.PanelService {
+                                 var_embed_preedit);
+     }
+ 
++    private int compare_versions(string version1, string version2) {
++        string[] version1_list = version1.split(".");
++        string[] version2_list = version2.split(".");
++        int major1, minor1, micro1, major2, minor2, micro2;
++
++        if (version1 == version2) {
++            return 0;
++        }
++
++        // The initial dconf value of "version" is "".
++        if (version1 == "") {
++            return -1;
++        }
++        if (version2 == "") {
++            return 1;
++        }
++
++        assert(version1_list.length >= 3);
++        assert(version2_list.length >= 3);
++
++        major1 = int.parse(version1_list[0]);
++        minor1 = int.parse(version1_list[1]);
++        micro1 = int.parse(version1_list[2]);
++
++        major2 = int.parse(version2_list[0]);
++        minor2 = int.parse(version2_list[1]);
++        micro2 = int.parse(version2_list[2]);
++
++        if (major1 == minor1 && minor1 == minor2 && micro1 == micro2) {
++            return 0;
++        }
++        if ((major1 > major2) ||
++            (major1 == major2 && minor1 > minor2) ||
++            (major1 == major2 && minor1 == minor2 &&
++             micro1 > micro2)) {
++            return 1;
++        }
++        return -1;
++    }
++
++    private void update_version_1_5_3() {
++#if ENABLE_LIBNOTIFY
++        if (!Notify.is_initted()) {
++            Notify.init ("ibus");
++        }
++
++        var notification = new Notify.Notification(
++                _("IBus Update"),
++                _("Super+space is now the default hotkey."),
++                "ibus");
++        notification.set_timeout(30 * 1000);
++        notification.set_category("hotkey");
++
++        try {
++            notification.show();
++        } catch (GLib.Error e){
++            warning ("Notification is failed for IBus 1.5.3: %s", e.message);
++        }
++#else
++        warning(_("Super+space is now the default hotkey."));
++#endif
++    }
++
++    private void set_version() {
++        Variant var_prev_version = m_config.get_value("general", "version");
++        Variant var_current_version = null;
++        string prev_version = "".dup();
++        string current_version = null;
++
++        if (var_prev_version != null) {
++            prev_version = var_prev_version.dup_string();
++        }
++
++        if (compare_versions(prev_version, "1.5.3") < 0) {
++            update_version_1_5_3();
++        }
++
++        current_version = "%d.%d.%d".printf(IBus.MAJOR_VERSION,
++                                            IBus.MINOR_VERSION,
++                                            IBus.MICRO_VERSION);
++
++        if (prev_version == current_version) {
++            return;
++        }
++
++        var_current_version = new Variant.string(current_version);
++        m_config.set_value("general", "version", var_current_version);
++    }
++
+     public void set_config(IBus.Config config) {
+         if (m_config != null) {
+             m_config.value_changed.disconnect(config_value_changed_cb);
+@@ -325,11 +414,12 @@ class Panel : IBus.PanelService {
+             bind_switch_shortcut(null);
+             set_switcher_delay_time(null);
+             set_embed_preedit_text(null);
++            set_custom_font();
++
++            set_version();
+         } else {
+             update_engines(null, null);
+         }
+-
+-        set_custom_font();
+     }
+ 
+     private void exec_setxkbmap(IBus.EngineDesc engine) {
 -- 
 1.8.0
 

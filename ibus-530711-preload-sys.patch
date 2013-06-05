@@ -1,4 +1,4 @@
-From 5c7c6c12daee2ae48d5f1264855445ecc4f38b1d Mon Sep 17 00:00:00 2001
+From 95fd937e14ec2d2f1de0f5fa0e186cfdf996c921 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
 Date: Wed, 1 May 2013 13:35:01 +0900
 Subject: [PATCH] Reload preload engines until users customize the list.
@@ -25,7 +25,7 @@ IBUS_PRELOAD_ENGINE_MODE_USER and users can customize the value
  5 files changed, 254 insertions(+), 11 deletions(-)
 
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index fccab62..184de80 100644
+index d0b3db8..52ece27 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
 @@ -2,6 +2,30 @@
@@ -253,10 +253,10 @@ index 737b3e2..8ce5a16 100644
   * @x: x coordinate.
   * @y: y coordinate.
 diff --git a/ui/gtk3/panel.vala b/ui/gtk3/panel.vala
-index 4469963..d6d2228 100644
+index fb012c3..54251e7 100644
 --- a/ui/gtk3/panel.vala
 +++ b/ui/gtk3/panel.vala
-@@ -324,6 +324,8 @@ class Panel : IBus.PanelService {
+@@ -413,6 +413,8 @@ class Panel : IBus.PanelService {
          if (m_config != null) {
              m_config.value_changed.connect(config_value_changed_cb);
              m_config.watch("general", "preload_engines");
@@ -265,7 +265,7 @@ index 4469963..d6d2228 100644
              m_config.watch("general", "embed_preedit_text");
              m_config.watch("general", "engines_order");
              m_config.watch("general", "switcher_delay_time");
-@@ -397,7 +399,136 @@ class Panel : IBus.PanelService {
+@@ -487,7 +489,136 @@ class Panel : IBus.PanelService {
              init_gkbd();
          }
  
@@ -402,7 +402,7 @@ index 4469963..d6d2228 100644
      }
  
      private void update_xkb_engines() {
-@@ -614,6 +745,11 @@ class Panel : IBus.PanelService {
+@@ -704,6 +835,11 @@ class Panel : IBus.PanelService {
                                           string section,
                                           string name,
                                           Variant variant) {

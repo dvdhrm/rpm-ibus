@@ -1,4 +1,4 @@
-From 985443696823678f86d2340e2404f7d120fe5688 Mon Sep 17 00:00:00 2001
+From 056dfbe663a0dd8158f05baae764e2debd73c1e5 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
 Date: Thu, 31 Jan 2013 17:31:55 +0900
 Subject: [PATCH] Enable ibus-setup to show the frequently used languages
@@ -11,10 +11,10 @@ Subject: [PATCH] Enable ibus-setup to show the frequently used languages
  3 files changed, 300 insertions(+), 24 deletions(-)
 
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 184de80..c02ecde 100644
+index 52ece27..007fc66 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
-@@ -325,6 +325,174 @@ se,si,sk,sy,sy(ku),th,tj,tr,ua,uz,vn
+@@ -339,6 +339,174 @@ se,si,sk,sy,sy(ku),th,tj,tr,ua,uz,vn
        </locale>
      </schema>
      <schema>

@@ -41,7 +41,7 @@
 
 Name:       ibus
 Version:    1.5.2
-Release:    3%{?dist}
+Release:    4%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -52,9 +52,6 @@ Source1:    %{name}-xinput
 # ibus-gjs
 Source2:    http://fujiwara.fedorapeople.org/ibus/gnome-shell/%{name}-gjs-%{ibus_gjs_version}.tar.gz
 %endif
-Source3:    https://raw.github.com/ibus/ibus/master/debian/ibus.1
-Source4:    https://raw.github.com/ibus/ibus/master/debian/ibus-daemon.1
-Source5:    https://raw.github.com/ibus/ibus/master/debian/ibus-setup.1
 # Upstreamed patches.
 Patch0:     %{name}-HEAD.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=810211
@@ -74,6 +71,12 @@ Patch92:    %{name}-xx-g-s-disable-preedit.patch
 %if (0%{?fedora} < 18 && 0%{?rhel} < 7)
 # The patch enables to build on fedora 17.
 Patch93:    %{name}-xx-f17.patch
+%endif
+# The patch is applied until ibus 1.5.3 is released.
+Patch94:    %{name}-xx-1.5.2.patch
+%if (0%{?fedora} < 19 && 0%{?rhel} < 7)
+# Keep the default triggers for the back compatiblity.
+Patch95:    %{name}-xx-ctrl-space.patch
 %endif
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
@@ -97,6 +100,7 @@ BuildRequires:  vala-tools
 BuildRequires:  GConf2-devel
 BuildRequires:  intltool
 BuildRequires:  iso-codes-devel
+BuildRequires:  libnotify-devel
 %if %with_gkbd
 BuildRequires:  libgnomekbd-devel
 %endif
@@ -285,10 +289,14 @@ rm -f data/dconf/00-upstream-settings
 %if (0%{?fedora} < 18 && 0%{?rhel} < 7)
 %patch93 -p1 -b .f17
 %endif
+%patch94 -p1 -b .152
+%if (0%{?fedora} < 19 && 0%{?rhel} < 7)
+%patch95 -p1 -b .ctrl
+%endif
 
 %build
 %if %with_preload_xkb_engine
-autoreconf -f -i
+autoreconf -f -i -v
 %endif
 %configure \
     --disable-static \
@@ -365,14 +373,6 @@ if test -f ibus/_config.py.in -a \
         --basedir %{python2_sitelib}/ibus _config.py
   fi
 fi
-
-for S in %{SOURCE3} %{SOURCE4} %{SOURCE5}
-do
-  cp $S .
-  MP=`basename $S` 
-  gzip $MP
-  install -pm 644 -D ${MP}.gz $RPM_BUILD_ROOT%{_datadir}/man/man1/${MP}.gz
-done
 
 %if %with_gjs
 # https://bugzilla.redhat.com/show_bug.cgi?id=657165
@@ -518,6 +518,11 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Jun 05 2013 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.2-4
+- Updated ibus-HEAD.patch for upstream.
+- Added ibus-xx-1.5.2.patch until 1.5.3 will be released.
+- Added ibus-xx-ctrl-space.patch for back compatible triggers.
+
 * Wed May 01 2013 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.2-3
 - Updated ibus-HEAD.patch for upstream.
 - Deleted ibus-947318-reconnect-gtk-client.patch
