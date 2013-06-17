@@ -41,7 +41,7 @@
 
 Name:       ibus
 Version:    1.5.2
-Release:    5%{?dist}
+Release:    6%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -113,6 +113,10 @@ BuildRequires:  gnome-shell
 Requires:   %{name}-libs   = %{version}-%{release}
 Requires:   %{name}-gtk2   = %{version}-%{release}
 Requires:   %{name}-gtk3   = %{version}-%{release}
+%if %with_python_pkg
+Requires:   %{name}-panel  = %{version}-%{release}
+Requires:   %{name}-setup  = %{version}-%{release}
+%endif
 
 Requires:   iso-codes
 Requires:   dbus-python >= %{dbus_python_version}
@@ -530,6 +534,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon Jun 17 2013 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.2-6
+- Bug 972328 - Bring back the dependency of ibus-setup.
+
 * Tue Jun 11 2013 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.2-5
 - Removed dependencies of ibus-setup and ibus-pygtk2
 
