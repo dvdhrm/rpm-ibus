@@ -138,6 +138,9 @@ Requires:   gnome-icon-theme-symbolic
 # The feature in ibus-gnome3 is provided by gnome-shell.
 Obsoletes:  ibus-gnome3 < %{version}-%{release}
 %endif
+%if %with_python_pkg
+Obsoletes:  ibus-panel < %{version}-%{release}
+%endif
 %if ! %with_python_pkg
 %if %with_pygobject3
 Requires:       pygobject3
