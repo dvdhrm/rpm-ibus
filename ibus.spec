@@ -41,7 +41,7 @@
 
 Name:       ibus
 Version:    1.5.2
-Release:    6%{?dist}
+Release:    7%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -114,7 +114,6 @@ Requires:   %{name}-libs   = %{version}-%{release}
 Requires:   %{name}-gtk2   = %{version}-%{release}
 Requires:   %{name}-gtk3   = %{version}-%{release}
 %if %with_python_pkg
-Requires:   %{name}-panel  = %{version}-%{release}
 Requires:   %{name}-setup  = %{version}-%{release}
 %endif
 
@@ -203,7 +202,6 @@ This package contains ibus im module for gtk3
 Summary:        IBus setup utility
 Group:          System Environment/Libraries
 Requires:       %{name} = %{version}-%{release}
-Requires:       %{name}-panel = %{version}-%{release}
 Requires:       pygobject3
 BuildRequires:  gobject-introspection-devel
 BuildRequires:  pygobject3-devel
@@ -226,15 +224,6 @@ BuildArch:      noarch
 This is a pygtk2 library for IBus. Now major IBus engines use pygobject3
 and this package will be deprecated.
 %endif
-
-%package panel
-Summary:        IBus panel icon
-Group:          System Environment/Libraries
-Requires:       %{name} = %{version}-%{release}
-Requires:       %{name}-setup = %{version}-%{release}
-
-%description panel
-This is a GTK+ status icon on panel for IBus.
 %endif
 
 %if %with_gjs
@@ -458,8 +447,7 @@ fi
 %{_datadir}/bash-completion/completions/ibus.bash
 %{_datadir}/GConf/gsettings/*
 %{_datadir}/glib-2.0/schemas/*.xml
-%{_datadir}/ibus/component/*conf.xml
-%{_datadir}/ibus/component/simple.xml
+%{_datadir}/ibus/component
 %{_datadir}/ibus/engine
 %{_datadir}/ibus/keymaps
 %{_datadir}/icons/hicolor/*/apps/*
@@ -467,6 +455,7 @@ fi
 %{_datadir}/man/man1/ibus-daemon.1.gz
 %{_libexecdir}/ibus-engine-simple
 %{_libexecdir}/ibus-dconf
+%{_libexecdir}/ibus-ui-gtk3
 %{_libexecdir}/ibus-x11
 # {_sysconfdir}/xdg/autostart/ibus.desktop
 %{_sysconfdir}/dconf/db/ibus.d
@@ -483,8 +472,6 @@ fi
 %dir %{python2_sitelib}/ibus
 %{python2_sitelib}/ibus/*
 %endif
-%{_datadir}/ibus/component/gtkpanel.xml
-%{_libexecdir}/ibus-ui-gtk3
 %endif
 
 %files libs
@@ -510,10 +497,6 @@ fi
 %dir %{python2_sitelib}/ibus
 %{python2_sitelib}/ibus/*
 %endif
-
-%files panel
-%{_datadir}/ibus/component/gtkpanel.xml
-%{_libexecdir}/ibus-ui-gtk3
 %endif
 
 %if %with_gjs
@@ -534,6 +517,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon Jun 17 2013 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.2-7
+- Bug 972328 - Deleted ibus-panel
+
 * Mon Jun 17 2013 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.2-6
 - Bug 972328 - Bring back the dependency of ibus-setup.
 
