@@ -41,7 +41,7 @@
 
 Name:       ibus
 Version:    1.5.2
-Release:    7%{?dist}
+Release:    8%{?dist}
 Summary:    Intelligent Input Bus for Linux OS
 License:    LGPLv2+
 Group:      System Environment/Libraries
@@ -149,7 +149,6 @@ BuildRequires:  pygobject3-devel
 %endif
 %if %with_pygobject2
 Requires:       pygtk2
-Requires:       pyxdg
 %endif
 %endif
 
@@ -220,7 +219,6 @@ Summary:        IBus pygtk2 library
 Group:          System Environment/Libraries
 Requires:       %{name} = %{version}-%{release}
 Requires:       pygtk2
-Requires:       pyxdg
 BuildArch:      noarch
 
 %description pygtk2
@@ -520,6 +518,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Jul 11 2013 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.2-8
+- Updated ibus-HEAD.patch to delete pyxdg dependencies.
+
 * Mon Jun 17 2013 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.2-7
 - Bug 972328 - Deleted ibus-panel
 

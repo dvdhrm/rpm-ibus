@@ -1322,3 +1322,92 @@ index 0c793f4..39aca08 100644
 -- 
 1.8.0
 
+From 5ed2b8c8253717b6c26281a8721403b006db04e6 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Fri, 5 Jul 2013 13:03:49 +0900
+Subject: [PATCH] Delete the python xdg dependency.
+
+BUG=RH#980749
+
+Review URL: https://codereview.appspot.com/10930043
+---
+ debian/control |  2 +-
+ ibus.spec.in   |  1 -
+ ibus/common.py |  2 +-
+ setup/main.py  | 18 ++++++++++++------
+ 4 files changed, 14 insertions(+), 9 deletions(-)
+
+diff --git a/ibus.spec.in b/ibus.spec.in
+index 7989949..334f37e 100644
+--- a/ibus.spec.in
++++ b/ibus.spec.in
+@@ -47,7 +47,6 @@ Requires:   %{name}-gtk3 = %{version}-%{release}
+ Requires:   %{name}-conf = %{version}-%{release}
+ 
+ Requires:   pygtk2
+-Requires:   pyxdg
+ Requires:   iso-codes
+ Requires:   dbus-python >= %{dbus_python_version}
+ Requires:   im-chooser >= %{im_chooser_version}
+diff --git a/ibus/common.py b/ibus/common.py
+index fb39d56..ec4a4d8 100644
+--- a/ibus/common.py
++++ b/ibus/common.py
+@@ -57,7 +57,7 @@ __all__ = (
+ 
+ import os
+ import sys
+-from xdg import BaseDirectory
++#from xdg import BaseDirectory
+ import ctypes
+ import _config
+ 
+diff --git a/setup/main.py b/setup/main.py
+index 0281ac7..c1e05a7 100644
+--- a/setup/main.py
++++ b/setup/main.py
+@@ -29,7 +29,11 @@ from gi.repository import GLib
+ from gi.repository import Gtk
+ from gi.repository import IBus
+ from os import path
+-from xdg import BaseDirectory
++
++try:
++    from xdg.BaseDirectory import xdg_config_home
++except ImportError:
++    xdg_config_home = ".config"
+ 
+ import keyboardshortcut
+ import locale
+@@ -456,8 +460,9 @@ class Setup(object):
+         model.set(iter, COLUMN_PRELOAD, data[DATA_PRELOAD])
+ 
+     def __is_auto_start(self):
+-        link_file = path.join(BaseDirectory.xdg_config_home, "autostart/IBus.desktop")
+-        ibus_desktop = path.join(os.getenv("IBUS_PREFIX"), "share/applications/IBus.desktop")
++        link_file = path.join(xdg_config_home, "autostart/ibus.desktop")
++        ibus_desktop = path.join(os.getenv("IBUS_PREFIX"),
++                                 "share/applications/ibus.desktop")
+ 
+         if not path.exists(link_file):
+             return False
+@@ -468,12 +473,13 @@ class Setup(object):
+         return True
+ 
+     def __checkbutton_auto_start_toggled_cb(self, button):
+-        auto_start_dir = path.join(BaseDirectory.xdg_config_home, "autostart")
++        auto_start_dir = path.join(xdg_config_home, "autostart")
+         if not path.isdir(auto_start_dir):
+             os.makedirs(auto_start_dir)
+ 
+-        link_file = path.join(BaseDirectory.xdg_config_home, "autostart/IBus.desktop")
+-        ibus_desktop = path.join(os.getenv("IBUS_PREFIX"), "share/applications/IBus.desktop")
++        link_file = path.join(xdg_config_home, "autostart/ibus.desktop")
++        ibus_desktop = path.join(os.getenv("IBUS_PREFIX"),
++                                 "share/applications/ibus.desktop")
+         # unlink file
+         try:
+             os.unlink(link_file)
+-- 
+1.8.0
+
