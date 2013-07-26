@@ -1,6 +1,6 @@
-From 69171c9c9446a60da1979c88478055c9df35136f Mon Sep 17 00:00:00 2001
+From 53928ed24b12912fdec8e279f5e739b251a5084a Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 5 Jun 2013 11:48:54 +0900
+Date: Fri, 26 Jul 2013 11:27:37 +0900
 Subject: [PATCH] Add libgnomekbd and load preload engines.
 
 ---
@@ -105,10 +105,10 @@ index 0000000..172632c
 +glib-2.0
 +gmodule-2.0
 diff --git a/configure.ac b/configure.ac
-index 781bbf5..f576f46 100644
+index 45c195a..79cae77 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -237,6 +237,45 @@ else
+@@ -242,6 +242,45 @@ else
      enable_xim="no (disabled, use --enable-xim to enable)"
  fi
  
@@ -154,7 +154,7 @@ index 781bbf5..f576f46 100644
  # GObject introspection
  GOBJECT_INTROSPECTION_CHECK([0.6.8])
  
-@@ -590,6 +629,7 @@ Build options:
+@@ -595,6 +634,7 @@ Build options:
    Panel icon                "$IBUS_ICON_KEYBOARD"
    Enable surrounding-text   $enable_surrounding_text
    Enable libnotify          $enable_libnotify
@@ -252,7 +252,7 @@ index 9f593ab..c93a0ed 100644
  Name: IBus
  Description: IBus Library
 diff --git a/ibus.spec.in b/ibus.spec.in
-index 7989949..5391538 100644
+index 334f37e..2017af9 100644
 --- a/ibus.spec.in
 +++ b/ibus.spec.in
 @@ -5,6 +5,7 @@
@@ -274,7 +274,7 @@ index 7989949..5391538 100644
  
  Requires:   %{name}-libs = %{version}-%{release}
  Requires:   %{name}-gtk2 = %{version}-%{release}
-@@ -53,6 +58,9 @@ Requires:   dbus-python >= %{dbus_python_version}
+@@ -52,6 +57,9 @@ Requires:   dbus-python >= %{dbus_python_version}
  Requires:   im-chooser >= %{im_chooser_version}
  Requires:   notify-python
  Requires:   librsvg2
@@ -284,7 +284,7 @@ index 7989949..5391538 100644
  
  Requires(post):  desktop-file-utils
  Requires(postun):  desktop-file-utils
-@@ -153,6 +161,10 @@ OPTIONS="$OPTIONS --enable-python-library"
+@@ -152,6 +160,10 @@ OPTIONS="$OPTIONS --enable-python-library"
  OPTIONS="$OPTIONS --disable-python-library"
  %endif
  
@@ -296,10 +296,10 @@ index 7989949..5391538 100644
  
  # make -C po update-gmo
 diff --git a/src/Makefile.am b/src/Makefile.am
-index 7ee5df8..8fa954e 100644
+index 74b6838..2645314 100644
 --- a/src/Makefile.am
 +++ b/src/Makefile.am
-@@ -197,6 +197,9 @@ typelibs_DATA = $(INTROSPECTION_GIRS:.gir=.typelib)
+@@ -201,6 +201,9 @@ typelibs_DATA = $(INTROSPECTION_GIRS:.gir=.typelib)
  CLEANFILES += $(dist_gir_DATA) $(typelibs_DATA)
  endif
  
@@ -310,7 +310,7 @@ index 7ee5df8..8fa954e 100644
  ibusenumtypes.h: $(ibus_headers) ibusenumtypes.h.template
  	$(AM_V_GEN) ( top_builddir=`cd $(top_builddir) && pwd`; \
 diff --git a/src/ibus.h b/src/ibus.h
-index ef811a4..f82a162 100644
+index e27f845..4b3919c 100644
 --- a/src/ibus.h
 +++ b/src/ibus.h
 @@ -47,6 +47,7 @@
@@ -987,19 +987,19 @@ index 0000000..5aa486d
 +G_END_DECLS
 +#endif
 diff --git a/ui/gtk3/Makefile.am b/ui/gtk3/Makefile.am
-index 2038814..aa79eee 100644
+index 97c915c..5d53836 100644
 --- a/ui/gtk3/Makefile.am
 +++ b/ui/gtk3/Makefile.am
-@@ -45,6 +45,8 @@ USE_SYMBOL_ICON = FALSE
- # force include config.h before gi18n.h.
- AM_CPPFLAGS = -include $(CONFIG_HEADER)
+@@ -44,6 +44,8 @@ AM_CPPFLAGS = \
+ 
+ USE_SYMBOL_ICON = FALSE
  
 +HAVE_IBUS_GKBD_C = $(strip $(subst false, FALSE, $(subst true, TRUE, $(HAVE_IBUS_GKBD))))
 +
  AM_CFLAGS = \
  	@GLIB2_CFLAGS@ \
  	@GIO2_CFLAGS@ \
-@@ -56,6 +58,8 @@ AM_CFLAGS = \
+@@ -54,6 +56,8 @@ AM_CFLAGS = \
  	-DBINDIR=\"$(bindir)\" \
  	-DIBUS_DISABLE_DEPRECATED \
  	-DSWITCHER_USE_SYMBOL_ICON=$(USE_SYMBOL_ICON) \
@@ -1008,7 +1008,7 @@ index 2038814..aa79eee 100644
  	-Wno-unused-variable \
  	-Wno-unused-but-set-variable \
  	-Wno-unused-function \
-@@ -98,12 +102,40 @@ AM_VALAFLAGS += \
+@@ -97,12 +101,40 @@ AM_VALAFLAGS += \
  	$(NULL)
  endif
  
@@ -1049,7 +1049,7 @@ index 2038814..aa79eee 100644
  	handle.vala \
  	iconwidget.vala \
  	keybindingmanager.vala \
-@@ -112,6 +144,7 @@ ibus_ui_gtk3_SOURCES = \
+@@ -111,6 +143,7 @@ ibus_ui_gtk3_SOURCES = \
  	property.vala \
  	separator.vala \
  	switcher.vala \
@@ -1057,7 +1057,7 @@ index 2038814..aa79eee 100644
  	$(NULL)
  
  ibus_ui_gtk3_LDADD = \
-@@ -120,9 +153,12 @@ ibus_ui_gtk3_LDADD = \
+@@ -119,9 +152,12 @@ ibus_ui_gtk3_LDADD = \
  
  CLEANFILES = \
  	gtkpanel.xml \

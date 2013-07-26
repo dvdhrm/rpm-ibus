@@ -1,6 +1,6 @@
-From 95fd937e14ec2d2f1de0f5fa0e186cfdf996c921 Mon Sep 17 00:00:00 2001
+From 38a22f910f28d0babadd79d8430b2854281f705e Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 1 May 2013 13:35:01 +0900
+Date: Fri, 26 Jul 2013 11:28:51 +0900
 Subject: [PATCH] Reload preload engines until users customize the list.
 
 The idea is, if users don't customize the preload_engines with ibus-setup,
@@ -60,10 +60,10 @@ index d0b3db8..52ece27 100644
        <applyto>/desktop/ibus/general/preload_engines</applyto>
        <owner>ibus</owner>
 diff --git a/setup/main.py b/setup/main.py
-index 0281ac7..ba78eeb 100644
+index 9703d5e..b39a044 100644
 --- a/setup/main.py
 +++ b/setup/main.py
-@@ -190,16 +190,27 @@ class Setup(object):
+@@ -189,16 +189,27 @@ class Setup(object):
          self.__checkbutton_use_global_engine.connect("toggled",
                  self.__checkbutton_use_global_engine_toggled_cb)
  
@@ -95,7 +95,7 @@ index 0281ac7..ba78eeb 100644
  
          self.__treeview = self.__builder.get_object("treeview_engines")
          self.__treeview.set_engines(engines)
-@@ -243,6 +254,7 @@ class Setup(object):
+@@ -242,6 +253,7 @@ class Setup(object):
                  self.__checkbutton_auto_start_toggled_cb)
  
          self.__config = self.__bus.get_config()
@@ -103,7 +103,7 @@ index 0281ac7..ba78eeb 100644
  
          self.__init_hotkey()
          self.__init_panel()
-@@ -251,8 +263,8 @@ class Setup(object):
+@@ -250,8 +262,8 @@ class Setup(object):
      def __combobox_notify_active_engine_cb(self, combobox, property):
          engine = self.__combobox.get_active_engine()
          button = self.__builder.get_object("button_engine_add")
@@ -114,7 +114,7 @@ index 0281ac7..ba78eeb 100644
  
      def __get_engine_setup_exec_args(self, engine):
          args = []
-@@ -272,6 +284,13 @@ class Setup(object):
+@@ -271,6 +283,13 @@ class Setup(object):
              args.append(path.basename(setup_path))
          return args
  
@@ -128,7 +128,7 @@ index 0281ac7..ba78eeb 100644
      def __treeview_notify_cb(self, treeview, prop):
          if prop.name not in ("active-engine", "engines"):
              return
-@@ -324,6 +343,34 @@ class Setup(object):
+@@ -323,6 +342,34 @@ class Setup(object):
              del self.__engine_setup_exec_list[name]
          self.__engine_setup_exec_list[name] = os.spawnl(os.P_NOWAIT, *args)
  
@@ -163,7 +163,7 @@ index 0281ac7..ba78eeb 100644
      def __init_bus(self):
          self.__bus = IBus.Bus()
          if self.__bus.is_connected():
-@@ -538,8 +585,18 @@ class Setup(object):
+@@ -541,8 +588,18 @@ class Setup(object):
          value = GLib.Variant.new_boolean(value)
          self.__config.set_value("general", "use_global_engine", value)
  
@@ -185,7 +185,7 @@ index 0281ac7..ba78eeb 100644
      def __config_reloaded_cb(self, bus):
          pass
 diff --git a/setup/setup.ui b/setup/setup.ui
-index e56e917..b3165aa 100644
+index 2042263..33827f1 100644
 --- a/setup/setup.ui
 +++ b/setup/setup.ui
 @@ -669,7 +669,23 @@
