@@ -24,29 +24,29 @@
 
 %global dbus_python_version 0.83.0
 
-Name:       ibus
-Version:    1.5.3
-Release:    1%{?dist}
-Summary:    Intelligent Input Bus for Linux OS
-License:    LGPLv2+
-Group:      System Environment/Libraries
-URL:        http://code.google.com/p/ibus/
-Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
-Source1:    %{name}-xinput
+Name:           ibus
+Version:        1.5.3
+Release:        1%{?dist}
+Summary:        Intelligent Input Bus for Linux OS
+License:        LGPLv2+
+Group:          System Environment/Libraries
+URL:            http://code.google.com/p/ibus/
+Source0:        http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
+Source1:        %{name}-xinput
 # Upstreamed patches.
 # Patch0:     %{name}-HEAD.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=810211
-Patch1:     %{name}-810211-no-switch-by-no-trigger.patch
+Patch1:         %{name}-810211-no-switch-by-no-trigger.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=541492
-Patch2:     %{name}-541492-xkb.patch
+Patch2:         %{name}-541492-xkb.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=530711
-Patch3:     %{name}-530711-preload-sys.patch
+Patch3:         %{name}-530711-preload-sys.patch
 # Hide minor input method engines on ibus-setup by locale
-Patch4:     %{name}-xx-setup-frequent-lang.patch
+Patch4:         %{name}-xx-setup-frequent-lang.patch
 
 %if (0%{?fedora} < 19 && 0%{?rhel} < 7)
 # Keep the default triggers for the back compatiblity.
-Patch95:    %{name}-xx-ctrl-space.patch
+Patch95:        %{name}-xx-ctrl-space.patch
 %endif
 
 
@@ -70,23 +70,23 @@ BuildRequires:  intltool
 BuildRequires:  iso-codes-devel
 BuildRequires:  libnotify-devel
 
-Requires:   %{name}-libs   = %{version}-%{release}
-Requires:   %{name}-gtk2   = %{version}-%{release}
-Requires:   %{name}-gtk3   = %{version}-%{release}
+Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
+Requires:       %{name}-gtk2%{?_isa}   = %{version}-%{release}
+Requires:       %{name}-gtk3%{?_isa}   = %{version}-%{release}
 %if %with_python_pkg
-Requires:   %{name}-setup  = %{version}-%{release}
+Requires:       %{name}-setup          = %{version}-%{release}
 %endif
 
-Requires:   iso-codes
-Requires:   dbus-python >= %{dbus_python_version}
-Requires:   dbus-x11
-Requires:   dconf
-Requires:   notify-python
-Requires:   librsvg2
+Requires:       iso-codes
+Requires:       dbus-python >= %{dbus_python_version}
+Requires:       dbus-x11
+Requires:       dconf
+Requires:       notify-python
+Requires:       librsvg2
 # for setxkbmap
-Requires:   xorg-x11-xkb-utils
+Requires:       xorg-x11-xkb-utils
 # The feature in ibus-gnome3 is provided by gnome-shell.
-Obsoletes:  ibus-gnome3 < %{version}-%{release}
+Obsoletes:      ibus-gnome3 < %{version}-%{release}
 %if ! %with_python_pkg
 %if %with_pygobject3
 Requires:       pygobject3
@@ -112,33 +112,33 @@ Requires(postun):  %{_sbindir}/alternatives
 IBus means Intelligent Input Bus. It is an input framework for Linux OS.
 
 %package libs
-Summary:    IBus libraries
-Group:      System Environment/Libraries
+Summary:        IBus libraries
+Group:          System Environment/Libraries
 
-Requires:   glib2 >= %{glib_ver}
-Requires:   dbus >= 1.2.4
+Requires:       glib2 >= %{glib_ver}
+Requires:       dbus >= 1.2.4
 
 %description libs
 This package contains the libraries for IBus
 
 %package gtk2
-Summary:    IBus im module for gtk2
-Group:      System Environment/Libraries
-Requires:   %{name}%{?_isa} = %{version}-%{release}
-Requires:   %{name}-libs = %{version}-%{release}
+Summary:        IBus im module for gtk2
+Group:          System Environment/Libraries
+Requires:       %{name}%{?_isa}        = %{version}-%{release}
+Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
 Requires(post): glib2 >= %{glib_ver}
 # Added for upgrade el6 to el7
-Provides:  ibus-gtk = %{version}-%{release}
-Obsoletes:  ibus-gtk < %{version}-%{release}
+Provides:       ibus-gtk = %{version}-%{release}
+Obsoletes:      ibus-gtk < %{version}-%{release}
 
 %description gtk2
 This package contains ibus im module for gtk2
 
 %package gtk3
-Summary:    IBus im module for gtk3
-Group:      System Environment/Libraries
-Requires:   %{name}%{?_isa} = %{version}-%{release}
-Requires:   %{name}-libs = %{version}-%{release}
+Summary:        IBus im module for gtk3
+Group:          System Environment/Libraries
+Requires:       %{name}%{?_isa}        = %{version}-%{release}
+Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
 Requires(post): glib2 >= %{glib_ver}
 
 %description gtk3
@@ -174,25 +174,25 @@ and this package will be deprecated.
 %endif
 
 %package devel
-Summary:    Development tools for ibus
-Group:      Development/Libraries
-Requires:   %{name}%{?_isa} = %{version}-%{release}
-Requires:   %{name}-libs = %{version}-%{release}
-Requires:   glib2-devel
-Requires:   dbus-devel
+Summary:        Development tools for ibus
+Group:          Development/Libraries
+Requires:       %{name}%{?_isa}        = %{version}-%{release}
+Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
+Requires:       glib2-devel
+Requires:       dbus-devel
 
 %description devel
 The ibus-devel package contains the header files and developer
 docs for ibus.
 
 %package devel-docs
-Summary:    Developer documents for ibus
-Group:      Development/Libraries
+Summary:        Developer documents for ibus
+Group:          Development/Libraries
 %if (0%{?fedora} >= 19 || 0%{?rhel} >= 7)
-Requires:   %{name} = %{version}-%{release}
-BuildArch:  noarch
+Requires:       %{name}                = %{version}-%{release}
+BuildArch:      noarch
 %else
-Requires:   %{name}%{?_isa} = %{version}-%{release}
+Requires:       %{name}%{?_isa}        = %{version}-%{release}
 %endif
 
 %description devel-docs
@@ -392,7 +392,7 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Thu Jul 11 2013 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.3-1
+* Fri Jul 26 2013 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.3-1
 - Bumped to 1.5.3
 - Deleted ibus-xx-g-s-disable-preedit.patch as EOL.
 - Deleted ibus-gjs as EOL.
