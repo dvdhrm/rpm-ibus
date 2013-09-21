@@ -1,6 +1,6 @@
-From 53928ed24b12912fdec8e279f5e739b251a5084a Mon Sep 17 00:00:00 2001
+From 5c8ce9720f607512c2734f08d3e7141d8f5b9e99 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Fri, 26 Jul 2013 11:27:37 +0900
+Date: Fri, 20 Sep 2013 17:16:56 +0900
 Subject: [PATCH] Add libgnomekbd and load preload engines.
 
 ---
@@ -19,9 +19,9 @@ Subject: [PATCH] Add libgnomekbd and load preload engines.
  ui/gtk3/Makefile.am             |  36 ++++
  ui/gtk3/gkbdlayout.vala.false   |  63 ++++++
  ui/gtk3/gkbdlayout.vala.true    | 108 ++++++++++
- ui/gtk3/panel.vala              | 216 ++++++++++++++++++-
- ui/gtk3/xkblayout.vala          | 431 +++++++++++++++++++++++++++++++++++++
- 17 files changed, 1645 insertions(+), 4 deletions(-)
+ ui/gtk3/panel.vala              | 196 ++++++++++++++++-
+ ui/gtk3/xkblayout.vala          | 429 ++++++++++++++++++++++++++++++++++++
+ 17 files changed, 1623 insertions(+), 4 deletions(-)
  create mode 100644 bindings/vala/Gkbd-3.0.metadata
  create mode 100644 bindings/vala/Xkl-1.0.metadata
  create mode 100644 bindings/vala/gkbd.deps
@@ -39,7 +39,7 @@ index 0000000..661e6fd
 @@ -0,0 +1 @@
 +Configuration cheader_filename="libgnomekbd/gkbd-configuration.h"
 diff --git a/bindings/vala/Makefile.am b/bindings/vala/Makefile.am
-index be45e41..44b3e61 100644
+index 84aa1b4..4d8aae4 100644
 --- a/bindings/vala/Makefile.am
 +++ b/bindings/vala/Makefile.am
 @@ -28,8 +28,6 @@ vapi_deps = \
@@ -105,11 +105,11 @@ index 0000000..172632c
 +glib-2.0
 +gmodule-2.0
 diff --git a/configure.ac b/configure.ac
-index 45c195a..79cae77 100644
+index e8fde49..d084c8e 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -242,6 +242,45 @@ else
-     enable_xim="no (disabled, use --enable-xim to enable)"
+@@ -261,6 +261,45 @@ else
+     enable_wayland="no (disabled, use --enable-wayland to enable)"
  fi
  
 +# Option for XKB command.
@@ -154,7 +154,7 @@ index 45c195a..79cae77 100644
  # GObject introspection
  GOBJECT_INTROSPECTION_CHECK([0.6.8])
  
-@@ -595,6 +634,7 @@ Build options:
+@@ -619,6 +658,7 @@ Build options:
    Panel icon                "$IBUS_ICON_KEYBOARD"
    Enable surrounding-text   $enable_surrounding_text
    Enable libnotify          $enable_libnotify
@@ -163,7 +163,7 @@ index 45c195a..79cae77 100644
  ])
  
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 9cfe83b..d0b3db8 100644
+index 2779139..88a287f 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
 @@ -56,6 +56,52 @@
@@ -296,7 +296,7 @@ index 334f37e..2017af9 100644
  
  # make -C po update-gmo
 diff --git a/src/Makefile.am b/src/Makefile.am
-index 74b6838..2645314 100644
+index 811d097..912b75c 100644
 --- a/src/Makefile.am
 +++ b/src/Makefile.am
 @@ -201,6 +201,9 @@ typelibs_DATA = $(INTROSPECTION_GIRS:.gir=.typelib)
@@ -310,7 +310,7 @@ index 74b6838..2645314 100644
  ibusenumtypes.h: $(ibus_headers) ibusenumtypes.h.template
  	$(AM_V_GEN) ( top_builddir=`cd $(top_builddir) && pwd`; \
 diff --git a/src/ibus.h b/src/ibus.h
-index e27f845..4b3919c 100644
+index d8e226e..f0a9456 100644
 --- a/src/ibus.h
 +++ b/src/ibus.h
 @@ -47,6 +47,7 @@
@@ -987,7 +987,7 @@ index 0000000..5aa486d
 +G_END_DECLS
 +#endif
 diff --git a/ui/gtk3/Makefile.am b/ui/gtk3/Makefile.am
-index 97c915c..5d53836 100644
+index 547ef53..4b32d7e 100644
 --- a/ui/gtk3/Makefile.am
 +++ b/ui/gtk3/Makefile.am
 @@ -44,6 +44,8 @@ AM_CPPFLAGS = \
@@ -1254,10 +1254,10 @@ index 0000000..a6e0f8d
 +    */
 +}
 diff --git a/ui/gtk3/panel.vala b/ui/gtk3/panel.vala
-index 39aca08..fb012c3 100644
+index 82b9ee5..c08f6f4 100644
 --- a/ui/gtk3/panel.vala
 +++ b/ui/gtk3/panel.vala
-@@ -49,6 +49,13 @@ class Panel : IBus.PanelService {
+@@ -57,6 +57,13 @@ class Panel : IBus.PanelService {
      private Gtk.CssProvider m_css_provider;
      private int m_switcher_delay_time = 400;
      private bool m_use_system_keyboard_layout = false;
@@ -1268,10 +1268,10 @@ index 39aca08..fb012c3 100644
 +    private int m_fallback_lock_id = -1;
 +    private bool m_changed_xkb_option = false;
 +    private GLib.Timer m_changed_layout_timer;
-     private const string ACCELERATOR_SWITCH_IME_FOREWARD = "<Super>space";
  
      private GLib.List<Keybinding> m_keybindings = new GLib.List<Keybinding>();
-@@ -91,6 +98,14 @@ class Panel : IBus.PanelService {
+ 
+@@ -102,6 +109,14 @@ class Panel : IBus.PanelService {
  
      ~Panel() {
          unbind_switch_shortcut();
@@ -1285,17 +1285,17 @@ index 39aca08..fb012c3 100644
 +        m_xkblayout = null;
      }
  
-     private void keybinding_manager_bind(KeybindingManager keybinding_manager,
-@@ -405,6 +420,7 @@ class Panel : IBus.PanelService {
-             m_config.watch("general/hotkey", "triggers");
-             m_config.watch("panel", "custom_font");
-             m_config.watch("panel", "use_custom_font");
-+            init_engines_order();
-             // Update m_use_system_keyboard_layout before update_engines()
-             // is called.
-             set_use_system_keyboard_layout(null);
-@@ -422,6 +438,204 @@ class Panel : IBus.PanelService {
-         }
+     private void init_settings() {
+@@ -399,6 +414,7 @@ class Panel : IBus.PanelService {
+     }
+ 
+     public void load_settings() {
++        init_engines_order();
+         // Update m_use_system_keyboard_layout before update_engines()
+         // is called.
+         set_use_system_keyboard_layout();
+@@ -415,6 +431,184 @@ class Panel : IBus.PanelService {
+         set_version();
      }
  
 +    private void gkbdlayout_changed_cb() {
@@ -1334,11 +1334,7 @@ index 39aca08..fb012c3 100644
 +    }
 +
 +    private void init_engines_order() {
-+        if (m_config == null) {
-+            return;
-+        }
-+
-+        m_xkblayout = new XKBLayout(m_config);
++        m_xkblayout = new XKBLayout();
 +        string session = Environment.get_variable("DESKTOP_SESSION");
 +
 +        if (HAVE_IBUS_GKBD &&
@@ -1389,14 +1385,9 @@ index 39aca08..fb012c3 100644
 +            var_xkb_engine_names += "%s:%s:%s".printf("xkb", name, lang);
 +        }
 +
-+        GLib.Variant var_engines =
-+           m_config.get_value("general", "preload_engines");
-+        string[] engine_names = {};
++        string[] engine_names =
++                m_settings_general.get_strv("preload-engines");
 +        bool updated_engine_names = false;
-+
-+        if (var_engines != null) {
-+            engine_names = var_engines.dup_strv();
-+        }
 +
 +        foreach (string name in var_xkb_engine_names) {
 +            if (name in engine_names)
@@ -1405,20 +1396,12 @@ index 39aca08..fb012c3 100644
 +            engine_names += name;
 +        }
 +
-+        if (updated_engine_names) {
-+            m_config.set_value("general",
-+                               "preload_engines",
-+                               new GLib.Variant.strv(engine_names));
-+        }
++        if (updated_engine_names)
++            m_settings_general.set_strv("preload-engines", engine_names);
 +
-+        GLib.Variant var_order =
-+            m_config.get_value("general", "engines_order");
-+        string[] order_names = {};
++        string[] order_names =
++                m_settings_general.get_strv("engines-order");
 +        bool updated_order_names = false;
-+
-+        if (var_order != null) {
-+            order_names = var_order.dup_strv();
-+        }
 +
 +        foreach (var name in var_xkb_engine_names) {
 +            if (name in order_names)
@@ -1427,11 +1410,8 @@ index 39aca08..fb012c3 100644
 +            updated_order_names = true;
 +        }
 +
-+        if (updated_order_names) {
-+            m_config.set_value("general",
-+                               "engines_order",
-+                               new GLib.Variant.strv(order_names));
-+        }
++        if (updated_order_names)
++            m_settings_general.set_strv("engines-order", order_names);
 +    }
 +
 +    private void set_xkb_group_layout(IBus.EngineDesc engine) {
@@ -1499,21 +1479,21 @@ index 39aca08..fb012c3 100644
      private void exec_setxkbmap(IBus.EngineDesc engine) {
          string layout = engine.get_layout();
          string variant = engine.get_layout_variant();
-@@ -482,7 +696,7 @@ class Panel : IBus.PanelService {
-         }
+@@ -480,7 +674,7 @@ class Panel : IBus.PanelService {
+ 
          // set xkb layout
-         if (!m_use_system_keyboard_layout) {
+         if (!m_use_system_keyboard_layout)
 -            exec_setxkbmap(engine);
 +            set_layout(engine);
-         }
-     }
  
+         engine_contexts_insert(engine);
+     }
 diff --git a/ui/gtk3/xkblayout.vala b/ui/gtk3/xkblayout.vala
 new file mode 100644
-index 0000000..b4b54ff
+index 0000000..b7dfb3e
 --- /dev/null
 +++ b/ui/gtk3/xkblayout.vala
-@@ -0,0 +1,431 @@
+@@ -0,0 +1,429 @@
 +/* vim:set et sts=4 sw=4:
 + *
 + * ibus - The Input Bus
@@ -1544,7 +1524,7 @@ index 0000000..b4b54ff
 +class XKBLayout
 +{
 +    string m_xkb_command = "setxkbmap";
-+    IBus.Config m_config = null;
++    GLib.Settings m_settings_general;
 +    string[] m_xkb_latin_layouts = {};
 +    GLib.Pid m_xkb_pid = -1;
 +    GLib.Pid m_xmodmap_pid = -1;
@@ -1556,18 +1536,16 @@ index 0000000..b4b54ff
 +    string m_default_variant = "";
 +    string m_default_option = "";
 +
-+    public XKBLayout(IBus.Config? config) {
-+        m_config = config;
++    public XKBLayout() {
++        m_settings_general = new GLib.Settings("org.freedesktop.ibus.general");
 +
-+        if (config != null) {
-+            var value  = config.get_value("general", "xkb_latin_layouts");
-+            for (int i = 0; value != null && i < value.n_children(); i++) {
-+                m_xkb_latin_layouts +=
-+                        value.get_child_value(i).dup_string();
-+            }
-+            if (m_use_xmodmap) {
-+                m_use_xmodmap = config.get_value("general", "use_xmodmap").get_boolean();
-+            }
++        var value  = m_settings_general.get_value("xkb-latin-layouts");
++        for (int i = 0; value != null && i < value.n_children(); i++) {
++            m_xkb_latin_layouts +=
++                    value.get_child_value(i).dup_string();
++        }
++        if (m_use_xmodmap) {
++            m_use_xmodmap = m_settings_general.get_boolean("use-xmodmap");
 +        }
 +    }
 +

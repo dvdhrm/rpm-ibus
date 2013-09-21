@@ -10,7 +10,14 @@
 %global with_python_pkg 0
 %endif
 
+%if (0%{?fedora} > 19 || 0%{?rhel} > 7)
+%global with_wayland 1
+%else
+%global with_wayland 0
+%endif
+
 %global ibus_api_version 1.0
+%global ibus_xkb_version 1.5.0
 
 %if %with_pkg_config
 %{!?gtk2_binary_version: %global gtk2_binary_version %(pkg-config  --variable=gtk_binary_version gtk+-2.0)}
@@ -25,7 +32,7 @@
 %global dbus_python_version 0.83.0
 
 Name:           ibus
-Version:        1.5.3
+Version:        1.5.4
 Release:        1%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
@@ -33,8 +40,12 @@ Group:          System Environment/Libraries
 URL:            http://code.google.com/p/ibus/
 Source0:        http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 Source1:        %{name}-xinput
+Source2:        %{name}.conf.5
+# Actual path is https://github.com/.../%%{ibus_xkb_version}.tar.gz
+# Renamed %%{ibus_xkb_version}.tar.gz to ibus-xkb-%%{ibus_xkb_version}.tar.gz
+Source3:        https://github.com/ibus/ibus-xkb/archive/ibus-xkb-%{ibus_xkb_version}.tar.gz
 # Upstreamed patches.
-# Patch0:     %{name}-HEAD.patch
+# Patch0:     %%{name}-HEAD.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=810211
 Patch1:         %{name}-810211-no-switch-by-no-trigger.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=541492
@@ -47,6 +58,10 @@ Patch4:         %{name}-xx-setup-frequent-lang.patch
 %if (0%{?fedora} < 19 && 0%{?rhel} < 7)
 # Keep the default triggers for the back compatiblity.
 Patch95:        %{name}-xx-ctrl-space.patch
+%endif
+%if (0%{?fedora} < 20 && 0%{?rhel} < 8)
+# Disable IME on gnome-shell password for the back compatiblity.
+Patch96:        %{name}-xx-f19-password.patch
 %endif
 
 
@@ -69,12 +84,18 @@ BuildRequires:  GConf2-devel
 BuildRequires:  intltool
 BuildRequires:  iso-codes-devel
 BuildRequires:  libnotify-devel
+%if %with_wayland
+BuildRequires:  libwayland-client-devel
+%endif
 
 Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
 Requires:       %{name}-gtk2%{?_isa}   = %{version}-%{release}
 Requires:       %{name}-gtk3%{?_isa}   = %{version}-%{release}
 %if %with_python_pkg
 Requires:       %{name}-setup          = %{version}-%{release}
+%endif
+%if %with_wayland
+Requires:       %{name}-wayland%{?_isa} = %{version}-%{release}
 %endif
 
 Requires:       iso-codes
@@ -173,6 +194,17 @@ and this package will be deprecated.
 %endif
 %endif
 
+%if %with_wayland
+%package wayland
+Summary:        IBus im module for Wayland
+Group:          System Environment/Libraries
+Requires:       %{name}%{?_isa}        = %{version}-%{release}
+Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
+
+%description wayland
+This package contains IBus im module for Wayland
+%endif
+
 %package devel
 Summary:        Development tools for ibus
 Group:          Development/Libraries
@@ -201,9 +233,12 @@ The ibus-devel-docs package contains developer documentation for ibus
 
 %prep
 %setup -q
-
 # %%patch0 -p1
+%if (0%{?fedora} < 20 && 0%{?rhel} < 8)
+%patch96 -p1 -b .passwd
+%endif
 cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
+
 %patch1 -p1 -b .noswitch
 %if %with_preload_xkb_engine
 %patch2 -p1 -b .preload-xkb
@@ -216,6 +251,14 @@ rm -f data/dconf/00-upstream-settings
 %if (0%{?fedora} < 19 && 0%{?rhel} < 7)
 %patch95 -p1 -b .ctrl
 %endif
+
+zcat %SOURCE3 | tar xf -
+POS=`(cd ibus-xkb-%ibus_xkb_version/po; ls *.po)`
+for PO in $POS
+do
+  cp po/$PO po/$PO.orig
+  msgcat --use-first po/$PO ibus-xkb-%ibus_xkb_version/po/$PO -o po/$PO
+done
 
 %build
 %if %with_preload_xkb_engine
@@ -232,6 +275,9 @@ autoreconf -f -i -v
 %if %with_pygobject2
     --enable-python-library \
 %endif
+%if %with_wayland
+    --enable-wayland \
+%endif
     --enable-introspection
 
 %if %with_preload_xkb_engine
@@ -246,12 +292,21 @@ rm -f $RPM_BUILD_ROOT%{_libdir}/libibus-%{ibus_api_version}.la
 rm -f $RPM_BUILD_ROOT%{_libdir}/gtk-2.0/%{gtk2_binary_version}/immodules/im-ibus.la
 rm -f $RPM_BUILD_ROOT%{_libdir}/gtk-3.0/%{gtk3_binary_version}/immodules/im-ibus.la
 
+# install man page
+for S in %{SOURCE2}
+do
+  cp $S .
+  MP=`basename $S` 
+  gzip $MP
+  install -pm 644 -D ${MP}.gz $RPM_BUILD_ROOT%{_datadir}/man/man5/${MP}.gz
+done
+
 # install xinput config file
 install -pm 644 -D %{SOURCE1} $RPM_BUILD_ROOT%{_xinputconf}
 
 # install .desktop files
 echo "NoDisplay=true" >> $RPM_BUILD_ROOT%{_datadir}/applications/ibus-setup.desktop
-#echo "X-GNOME-Autostart-enabled=false" >> $RPM_BUILD_ROOT%{_sysconfdir}/xdg/autostart/ibus.desktop
+#echo "X-GNOME-Autostart-enabled=false" >> $RPM_BUILD_ROOT%%{_sysconfdir}/xdg/autostart/ibus.desktop
 
 desktop-file-install --delete-original          \
   --dir $RPM_BUILD_ROOT%{_datadir}/applications \
@@ -278,23 +333,20 @@ if [ "$1" -eq 0 ]; then
 
   glib-compile-schemas %{_datadir}/glib-2.0/schemas &>/dev/null || :
   # 'dconf update' sometimes does not update the db...
-  dconf update
-  if [ -f %{_sysconfdir}/dconf/db/ibus ] ; then
-      rm -f %{_sysconfdir}/dconf/db/ibus
-  fi
+  dconf update || :
+  [ -f %{_sysconfdir}/dconf/db/ibus ] && \
+      rm %{_sysconfdir}/dconf/db/ibus || :
   # 'ibus write-cache --system' updates the system cache.
-  if [ -f /var/cache/ibus/bus/registry ] ; then
-      rm -f /var/cache/ibus/bus/registry
-  fi
+  [ -f /var/cache/ibus/bus/registry ] && \
+      rm /var/cache/ibus/bus/registry || :
 fi
 
 %posttrans
 gtk-update-icon-cache %{_datadir}/icons/hicolor &>/dev/null || :
 glib-compile-schemas %{_datadir}/glib-2.0/schemas &>/dev/null || :
-dconf update
-if [ %{_bindir}/ibus ] ; then
+dconf update || :
+[ -x %{_bindir}/ibus ] && \
   %{_bindir}/ibus write-cache --system &>/dev/null || :
-fi
 
 %post libs -p /sbin/ldconfig
 
@@ -325,7 +377,6 @@ fi
 %dir %{_datadir}/ibus/
 %{_bindir}/ibus
 %{_bindir}/ibus-daemon
-%{_datadir}/applications/*
 %{_datadir}/bash-completion/completions/ibus.bash
 %{_datadir}/GConf/gsettings/*
 %{_datadir}/glib-2.0/schemas/*.xml
@@ -335,6 +386,7 @@ fi
 %{_datadir}/icons/hicolor/*/apps/*
 %{_datadir}/man/man1/ibus.1.gz
 %{_datadir}/man/man1/ibus-daemon.1.gz
+%{_datadir}/man/man5/ibus.conf.5.gz
 %{_libexecdir}/ibus-engine-simple
 %{_libexecdir}/ibus-dconf
 %{_libexecdir}/ibus-ui-gtk3
@@ -346,6 +398,7 @@ fi
 %if ! %with_python_pkg
 %if %with_pygobject3
 %{_bindir}/ibus-setup
+%{_datadir}/applications/ibus-setup.desktop
 %{_datadir}/ibus/setup
 %{_datadir}/man/man1/ibus-setup.1.gz
 %endif
@@ -369,6 +422,7 @@ fi
 %if %with_pygobject3
 %files setup
 %{_bindir}/ibus-setup
+%{_datadir}/applications/ibus-setup.desktop
 %{_datadir}/ibus/setup
 %{_datadir}/man/man1/ibus-setup.1.gz
 %endif
@@ -378,6 +432,11 @@ fi
 %dir %{python2_sitelib}/ibus
 %{python2_sitelib}/ibus/*
 %endif
+%endif
+
+%if %with_wayland
+%files wayland
+%{_libexecdir}/ibus-wayland
 %endif
 
 %files devel
@@ -392,6 +451,13 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Sep 20 2013 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.4-1
+- Bumped to 1.5.4
+- Added ibus.conf.5
+- Added ibus-xkb-1.5.0.tar.gz for po files.
+- Added ibus-xx-f19-password.patch for back compatibility.
+- Added ibus-wayland in f20 or later.
+
 * Fri Jul 26 2013 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.3-1
 - Bumped to 1.5.3
 - Deleted ibus-xx-g-s-disable-preedit.patch as EOL.
