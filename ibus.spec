@@ -33,7 +33,7 @@
 
 Name:           ibus
 Version:        1.5.4
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -46,6 +46,7 @@ Source2:        %{name}.conf.5
 Source3:        https://github.com/ibus/ibus-xkb/archive/ibus-xkb-%{ibus_xkb_version}.tar.gz
 # Upstreamed patches.
 # Patch0:     %%{name}-HEAD.patch
+Patch0:     %{name}-HEAD.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=810211
 Patch1:         %{name}-810211-no-switch-by-no-trigger.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=541492
@@ -234,6 +235,7 @@ The ibus-devel-docs package contains developer documentation for ibus
 %prep
 %setup -q
 # %%patch0 -p1
+%patch0 -p1
 %if (0%{?fedora} < 20 && 0%{?rhel} < 8)
 %patch96 -p1 -b .passwd
 %endif
@@ -451,6 +453,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Oct 04 2013 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.4-2
+- Added ibus-HEAD.patch to sync upstream.
+
 * Fri Sep 20 2013 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.4-1
 - Bumped to 1.5.4
 - Added ibus.conf.5
