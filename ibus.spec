@@ -17,7 +17,7 @@
 %endif
 
 %global ibus_api_version 1.0
-%global ibus_xkb_version 1.5.0
+%global ibus_xkb_version 1.5.0.20140114
 
 %if %with_pkg_config
 %{!?gtk2_binary_version: %global gtk2_binary_version %(pkg-config  --variable=gtk_binary_version gtk+-2.0)}
@@ -32,8 +32,8 @@
 %global dbus_python_version 0.83.0
 
 Name:           ibus
-Version:        1.5.4
-Release:        2%{?dist}
+Version:        1.5.5
+Release:        1%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -46,7 +46,6 @@ Source2:        %{name}.conf.5
 Source3:        https://github.com/ibus/ibus-xkb/archive/ibus-xkb-%{ibus_xkb_version}.tar.gz
 # Upstreamed patches.
 # Patch0:     %%{name}-HEAD.patch
-Patch0:     %{name}-HEAD.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=810211
 Patch1:         %{name}-810211-no-switch-by-no-trigger.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=541492
@@ -56,14 +55,12 @@ Patch3:         %{name}-530711-preload-sys.patch
 # Hide minor input method engines on ibus-setup by locale
 Patch4:         %{name}-xx-setup-frequent-lang.patch
 
-%if (0%{?fedora} < 19 && 0%{?rhel} < 7)
+# Removed the target.
+# Even if fedpkg srpm's target is rhel, it can run on fedora box.
 # Keep the default triggers for the back compatiblity.
 Patch95:        %{name}-xx-ctrl-space.patch
-%endif
-%if (0%{?fedora} < 20 && 0%{?rhel} < 8)
 # Disable IME on gnome-shell password for the back compatiblity.
 Patch96:        %{name}-xx-f19-password.patch
-%endif
 
 
 BuildRequires:  gettext-devel
@@ -103,7 +100,6 @@ Requires:       iso-codes
 Requires:       dbus-python >= %{dbus_python_version}
 Requires:       dbus-x11
 Requires:       dconf
-Requires:       notify-python
 Requires:       librsvg2
 # for setxkbmap
 Requires:       xorg-x11-xkb-utils
@@ -235,7 +231,6 @@ The ibus-devel-docs package contains developer documentation for ibus
 %prep
 %setup -q
 # %%patch0 -p1
-%patch0 -p1
 %if (0%{?fedora} < 20 && 0%{?rhel} < 8)
 %patch96 -p1 -b .passwd
 %endif
@@ -453,6 +448,10 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Tue Jan 14 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.5-1
+- Bumped to 1.5.5
+- Deleted notify-python in Requires
+
 * Fri Oct 04 2013 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.4-2
 - Added ibus-HEAD.patch to sync upstream.
 

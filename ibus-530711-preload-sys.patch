@@ -1,6 +1,6 @@
-From d566bc83a4672b88a38fa5de25741b99ebaeae62 Mon Sep 17 00:00:00 2001
+From a6d4b9ac9a22c5b88c362b659eaf6fd59a0cf5bd Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Fri, 20 Sep 2013 17:20:09 +0900
+Date: Tue, 14 Jan 2014 15:30:24 +0900
 Subject: [PATCH] Reload preload engines until users customize the list.
 
 The idea is, if users don't customize the preload_engines with ibus-setup,
@@ -25,7 +25,7 @@ IBUS_PRELOAD_ENGINE_MODE_USER and users can customize the value
  5 files changed, 210 insertions(+), 9 deletions(-)
 
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 88a287f..b6709fd 100644
+index 8fd7e15..28d2219 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
 @@ -2,6 +2,30 @@
@@ -168,7 +168,7 @@ index d3f4414..235ef9c 100644
          self.__bus = IBus.Bus()
          if self.__bus.is_connected():
 diff --git a/setup/setup.ui b/setup/setup.ui
-index 1638abb..72a5d57 100644
+index 65dcee4..a6a001b 100644
 --- a/setup/setup.ui
 +++ b/setup/setup.ui
 @@ -669,7 +669,23 @@
@@ -205,7 +205,7 @@ index 1638abb..72a5d57 100644
                        </packing>
                      </child>
                      <child>
-@@ -905,7 +921,7 @@ You may use up/down buttons to change it.&lt;/i&gt;&lt;/small&gt;</property>
+@@ -905,7 +921,7 @@
                        <packing>
                          <property name="expand">False</property>
                          <property name="fill">True</property>
@@ -215,10 +215,10 @@ index 1638abb..72a5d57 100644
                      </child>
                    </object>
 diff --git a/src/ibustypes.h b/src/ibustypes.h
-index 6d30a86..dac7f8f 100644
+index 86fc2cc..cb9eb22 100644
 --- a/src/ibustypes.h
 +++ b/src/ibustypes.h
-@@ -204,6 +204,16 @@ typedef enum {
+@@ -206,6 +206,16 @@ typedef enum {
  } IBusError;
  
  /**
@@ -236,10 +236,10 @@ index 6d30a86..dac7f8f 100644
   * @x: x coordinate.
   * @y: y coordinate.
 diff --git a/ui/gtk3/panel.vala b/ui/gtk3/panel.vala
-index c08f6f4..9c1fef5 100644
+index 1da7966..fc60fd4 100644
 --- a/ui/gtk3/panel.vala
 +++ b/ui/gtk3/panel.vala
-@@ -130,6 +130,10 @@ class Panel : IBus.PanelService {
+@@ -136,6 +136,10 @@ class Panel : IBus.PanelService {
                                 null);
          });
  
@@ -250,7 +250,7 @@ index c08f6f4..9c1fef5 100644
          m_settings_general.changed["switcher-delay-time"].connect((key) => {
                  set_switcher_delay_time();
          });
-@@ -476,7 +480,96 @@ class Panel : IBus.PanelService {
+@@ -524,7 +528,96 @@ class Panel : IBus.PanelService {
              init_gkbd();
          }
  
@@ -329,8 +329,8 @@ index c08f6f4..9c1fef5 100644
 +                preload_engines += name;
 +        }
 +
-+        if ("".joinv(",", orig_preload_engines) !=
-+            "".joinv(",", preload_engines))
++        if (string.joinv(",", orig_preload_engines) !=
++            string.joinv(",", preload_engines))
 +            m_settings_general.set_strv("preload-engines", preload_engines);
 +
 +        return true;

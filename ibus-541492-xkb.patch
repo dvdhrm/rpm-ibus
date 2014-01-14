@@ -1,6 +1,6 @@
-From 5c8ce9720f607512c2734f08d3e7141d8f5b9e99 Mon Sep 17 00:00:00 2001
+From 8085ca38cb9c2ea370ebe64d80a4d7894a485960 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Fri, 20 Sep 2013 17:16:56 +0900
+Date: Tue, 14 Jan 2014 15:27:50 +0900
 Subject: [PATCH] Add libgnomekbd and load preload engines.
 
 ---
@@ -8,6 +8,7 @@ Subject: [PATCH] Add libgnomekbd and load preload engines.
  bindings/vala/Makefile.am       |  19 +-
  bindings/vala/Xkl-1.0.metadata  |   3 +
  bindings/vala/gkbd.deps         |   3 +
+ bus/ibusimpl.c                  |  12 +-
  configure.ac                    |  40 ++++
  data/ibus.schemas.in            |  59 +++++
  ibus-1.0.pc.in                  |   1 +
@@ -21,7 +22,7 @@ Subject: [PATCH] Add libgnomekbd and load preload engines.
  ui/gtk3/gkbdlayout.vala.true    | 108 ++++++++++
  ui/gtk3/panel.vala              | 196 ++++++++++++++++-
  ui/gtk3/xkblayout.vala          | 429 ++++++++++++++++++++++++++++++++++++
- 17 files changed, 1623 insertions(+), 4 deletions(-)
+ 18 files changed, 1634 insertions(+), 5 deletions(-)
  create mode 100644 bindings/vala/Gkbd-3.0.metadata
  create mode 100644 bindings/vala/Xkl-1.0.metadata
  create mode 100644 bindings/vala/gkbd.deps
@@ -39,7 +40,7 @@ index 0000000..661e6fd
 @@ -0,0 +1 @@
 +Configuration cheader_filename="libgnomekbd/gkbd-configuration.h"
 diff --git a/bindings/vala/Makefile.am b/bindings/vala/Makefile.am
-index 84aa1b4..4d8aae4 100644
+index 29cc1eb..1d28501 100644
 --- a/bindings/vala/Makefile.am
 +++ b/bindings/vala/Makefile.am
 @@ -28,8 +28,6 @@ vapi_deps = \
@@ -51,7 +52,7 @@ index 84aa1b4..4d8aae4 100644
  VAPIGEN_VAPIS = ibus-1.0.vapi
  
  ibus_1_0_vapi_DEPS = gio-2.0
-@@ -39,18 +37,33 @@ ibus_1_0_vapi_FILES = \
+@@ -39,19 +37,34 @@ ibus_1_0_vapi_FILES = \
  	$(srcdir)/IBus-1.0-custom.vala \
  	$(NULL)
  
@@ -80,6 +81,7 @@ index 84aa1b4..4d8aae4 100644
  	IBus-1.0.metadata \
  	IBus-1.0-custom.vala \
  	ibus-1.0.deps \
+ 	ibus-private.vapi \
  	config.vapi \
  	xi.vapi \
 +	Xkl-1.0.metadata \
@@ -104,8 +106,31 @@ index 0000000..172632c
 +gtk+-3.0
 +glib-2.0
 +gmodule-2.0
+diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
+index eec6da3..f84c034 100644
+--- a/bus/ibusimpl.c
++++ b/bus/ibusimpl.c
+@@ -1135,7 +1135,17 @@ _ibus_get_engines_by_names (BusIBusImpl           *ibus,
+     g_variant_builder_init (&builder, G_VARIANT_TYPE ("av"));
+     while (names[i] != NULL) {
+         IBusEngineDesc *desc = (IBusEngineDesc *) g_hash_table_lookup (
+-                ibus->engine_table, names[i++]);
++                ibus->engine_table, names[i]);
++
++        /* preload engines return user XKB so if the engine does not
++         * exist in simple.xml, fall back to 'us' layout. */
++        if (desc == NULL && g_str_has_prefix (names[i], "xkb:")) {
++            desc = (IBusEngineDesc *) g_hash_table_lookup (
++                    ibus->engine_table, "xkb:us::eng");
++        }
++
++        i++;
++
+         if (desc == NULL)
+             continue;
+         g_variant_builder_add (
 diff --git a/configure.ac b/configure.ac
-index e8fde49..d084c8e 100644
+index d71c415..779e29e 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -261,6 +261,45 @@ else
@@ -163,7 +188,7 @@ index e8fde49..d084c8e 100644
  ])
  
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 2779139..88a287f 100644
+index d256cbb..8fd7e15 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
 @@ -56,6 +56,52 @@
@@ -296,10 +321,10 @@ index 334f37e..2017af9 100644
  
  # make -C po update-gmo
 diff --git a/src/Makefile.am b/src/Makefile.am
-index 811d097..912b75c 100644
+index 404e1d2..f00fab7 100644
 --- a/src/Makefile.am
 +++ b/src/Makefile.am
-@@ -201,6 +201,9 @@ typelibs_DATA = $(INTROSPECTION_GIRS:.gir=.typelib)
+@@ -202,6 +202,9 @@ typelibs_DATA = $(INTROSPECTION_GIRS:.gir=.typelib)
  CLEANFILES += $(dist_gir_DATA) $(typelibs_DATA)
  endif
  
@@ -987,7 +1012,7 @@ index 0000000..5aa486d
 +G_END_DECLS
 +#endif
 diff --git a/ui/gtk3/Makefile.am b/ui/gtk3/Makefile.am
-index 547ef53..4b32d7e 100644
+index 6012cfa..3dfa0df 100644
 --- a/ui/gtk3/Makefile.am
 +++ b/ui/gtk3/Makefile.am
 @@ -44,6 +44,8 @@ AM_CPPFLAGS = \
@@ -1049,15 +1074,15 @@ index 547ef53..4b32d7e 100644
  	handle.vala \
  	iconwidget.vala \
  	keybindingmanager.vala \
-@@ -111,6 +143,7 @@ ibus_ui_gtk3_SOURCES = \
- 	property.vala \
+@@ -112,6 +144,7 @@ ibus_ui_gtk3_SOURCES = \
+ 	propertypanel.vala \
  	separator.vala \
  	switcher.vala \
 +	xkblayout.vala \
  	$(NULL)
  
  ibus_ui_gtk3_LDADD = \
-@@ -119,9 +152,12 @@ ibus_ui_gtk3_LDADD = \
+@@ -120,9 +153,12 @@ ibus_ui_gtk3_LDADD = \
  
  CLEANFILES = \
  	gtkpanel.xml \
@@ -1254,10 +1279,10 @@ index 0000000..a6e0f8d
 +    */
 +}
 diff --git a/ui/gtk3/panel.vala b/ui/gtk3/panel.vala
-index 82b9ee5..c08f6f4 100644
+index a7a0c40..1da7966 100644
 --- a/ui/gtk3/panel.vala
 +++ b/ui/gtk3/panel.vala
-@@ -57,6 +57,13 @@ class Panel : IBus.PanelService {
+@@ -58,6 +58,13 @@ class Panel : IBus.PanelService {
      private Gtk.CssProvider m_css_provider;
      private int m_switcher_delay_time = 400;
      private bool m_use_system_keyboard_layout = false;
@@ -1271,7 +1296,7 @@ index 82b9ee5..c08f6f4 100644
  
      private GLib.List<Keybinding> m_keybindings = new GLib.List<Keybinding>();
  
-@@ -102,6 +109,14 @@ class Panel : IBus.PanelService {
+@@ -108,6 +115,14 @@ class Panel : IBus.PanelService {
  
      ~Panel() {
          unbind_switch_shortcut();
@@ -1286,7 +1311,7 @@ index 82b9ee5..c08f6f4 100644
      }
  
      private void init_settings() {
-@@ -399,6 +414,7 @@ class Panel : IBus.PanelService {
+@@ -444,6 +459,7 @@ class Panel : IBus.PanelService {
      }
  
      public void load_settings() {
@@ -1294,7 +1319,7 @@ index 82b9ee5..c08f6f4 100644
          // Update m_use_system_keyboard_layout before update_engines()
          // is called.
          set_use_system_keyboard_layout();
-@@ -415,6 +431,184 @@ class Panel : IBus.PanelService {
+@@ -463,6 +479,184 @@ class Panel : IBus.PanelService {
          set_version();
      }
  
@@ -1479,7 +1504,7 @@ index 82b9ee5..c08f6f4 100644
      private void exec_setxkbmap(IBus.EngineDesc engine) {
          string layout = engine.get_layout();
          string variant = engine.get_layout_variant();
-@@ -480,7 +674,7 @@ class Panel : IBus.PanelService {
+@@ -528,7 +722,7 @@ class Panel : IBus.PanelService {
  
          // set xkb layout
          if (!m_use_system_keyboard_layout)
