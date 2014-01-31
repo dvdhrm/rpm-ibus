@@ -4,16 +4,16 @@
 
 %global with_pkg_config %(pkg-config --version >/dev/null 2>&1 && echo -n "1" || echo -n "0")
 
-%if (0%{?fedora} > 18 || 0%{?rhel} > 6)
-%global with_python_pkg 1
-%else
-%global with_python_pkg 0
-%endif
-
 %if (0%{?fedora} > 19 || 0%{?rhel} > 7)
 %global with_wayland 1
 %else
 %global with_wayland 0
+%endif
+
+%if (0%{?fedora} > 20 || 0%{?rhel} > 7)
+%global with_python2_override_pkg 1
+%else
+%global with_python2_override_pkg 0
 %endif
 
 %global ibus_api_version 1.0
@@ -33,7 +33,7 @@
 
 Name:           ibus
 Version:        1.5.5
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -45,7 +45,8 @@ Source2:        %{name}.conf.5
 # Renamed %%{ibus_xkb_version}.tar.gz to ibus-xkb-%%{ibus_xkb_version}.tar.gz
 Source3:        https://github.com/ibus/ibus-xkb/archive/ibus-xkb-%{ibus_xkb_version}.tar.gz
 # Upstreamed patches.
-# Patch0:     %%{name}-HEAD.patch
+# Patch0:         %%{name}-HEAD.patch
+Patch0:         %{name}-HEAD.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=810211
 Patch1:         %{name}-810211-no-switch-by-no-trigger.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=541492
@@ -73,6 +74,8 @@ BuildRequires:  desktop-file-utils
 BuildRequires:  gtk-doc
 BuildRequires:  dconf-devel
 BuildRequires:  dbus-x11
+BuildRequires:  python3-devel
+BuildRequires:  python3-gobject
 BuildRequires:  python2-devel
 BuildRequires:  vala
 BuildRequires:  vala-devel
@@ -89,9 +92,7 @@ BuildRequires:  libwayland-client-devel
 Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
 Requires:       %{name}-gtk2%{?_isa}   = %{version}-%{release}
 Requires:       %{name}-gtk3%{?_isa}   = %{version}-%{release}
-%if %with_python_pkg
 Requires:       %{name}-setup          = %{version}-%{release}
-%endif
 %if %with_wayland
 Requires:       %{name}-wayland%{?_isa} = %{version}-%{release}
 %endif
@@ -101,20 +102,18 @@ Requires:       dbus-python >= %{dbus_python_version}
 Requires:       dbus-x11
 Requires:       dconf
 Requires:       librsvg2
+%if ! %with_python2_override_pkg
+# Owner of %%python2_sitearch/gi/overrides
+Requires:       pygobject3-base
+%endif
+# Owner of %%python3_sitearch/gi/overrides
+Requires:       python3-gobject
+# Owner of %%{_sysconfdir}/X11/xinit
+Requires:       xorg-x11-xinit
 # for setxkbmap
 Requires:       xorg-x11-xkb-utils
 # The feature in ibus-gnome3 is provided by gnome-shell.
 Obsoletes:      ibus-gnome3 < %{version}-%{release}
-%if ! %with_python_pkg
-%if %with_pygobject3
-Requires:       pygobject3
-BuildRequires:  gobject-introspection-devel
-BuildRequires:  pygobject3-devel
-%endif
-%if %with_pygobject2
-Requires:       pygtk2
-%endif
-%endif
 
 Requires(post):  desktop-file-utils
 Requires(postun):  desktop-file-utils
@@ -133,8 +132,10 @@ IBus means Intelligent Input Bus. It is an input framework for Linux OS.
 Summary:        IBus libraries
 Group:          System Environment/Libraries
 
-Requires:       glib2 >= %{glib_ver}
 Requires:       dbus >= 1.2.4
+Requires:       glib2 >= %{glib_ver}
+# Owner of %%{_libdir}/girepository-1.0
+Requires:       gobject-introspection
 
 %description libs
 This package contains the libraries for IBus
@@ -162,13 +163,13 @@ Requires(post): glib2 >= %{glib_ver}
 %description gtk3
 This package contains ibus im module for gtk3
 
-%if %with_python_pkg
 %if %with_pygobject3
 %package setup
 Summary:        IBus setup utility
 Group:          System Environment/Libraries
 Requires:       %{name} = %{version}-%{release}
-Requires:       pygobject3
+Requires:       python3
+Requires:       python3-gobject
 BuildRequires:  gobject-introspection-devel
 BuildRequires:  pygobject3-devel
 BuildArch:      noarch
@@ -189,6 +190,18 @@ BuildArch:      noarch
 This is a pygtk2 library for IBus. Now major IBus engines use pygobject3
 and this package will be deprecated.
 %endif
+
+%if %with_python2_override_pkg
+%package py2override
+Summary:        IBus python2 override library
+Group:          System Environment/Libraries
+Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
+# Owner of %%python2_sitearch/gi/overrides
+Requires:       pygobject3-base
+
+%description py2override
+This is a python2 override library for IBus. The python files override
+some functions in gobject-introspection.
 %endif
 
 %if %with_wayland
@@ -207,8 +220,12 @@ Summary:        Development tools for ibus
 Group:          Development/Libraries
 Requires:       %{name}%{?_isa}        = %{version}-%{release}
 Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
-Requires:       glib2-devel
 Requires:       dbus-devel
+Requires:       glib2-devel
+# Owner of %%{_datadir}/gir-1.0
+Requires:       gobject-introspection-devel
+# Owner of %%{_datadir}/vala/vapi
+Requires:       vala
 
 %description devel
 The ibus-devel package contains the header files and developer
@@ -223,6 +240,8 @@ BuildArch:      noarch
 %else
 Requires:       %{name}%{?_isa}        = %{version}-%{release}
 %endif
+# Owner of %%{_datadir}/gtk-doc/html
+Requires:       gtk-doc
 
 %description devel-docs
 The ibus-devel-docs package contains developer documentation for ibus
@@ -231,6 +250,7 @@ The ibus-devel-docs package contains developer documentation for ibus
 %prep
 %setup -q
 # %%patch0 -p1
+%patch0 -p1
 %if (0%{?fedora} < 20 && 0%{?rhel} < 8)
 %patch96 -p1 -b .passwd
 %endif
@@ -269,6 +289,7 @@ autoreconf -f -i -v
     --enable-gtk-doc \
     --with-no-snooper-apps='gnome-do,Do.*,firefox.*,.*chrome.*,.*chromium.*' \
     --enable-surrounding-text \
+    --with-python=python3 \
 %if %with_pygobject2
     --enable-python-library \
 %endif
@@ -390,20 +411,16 @@ fi
 %{_libexecdir}/ibus-x11
 %{_sysconfdir}/dconf/db/ibus.d
 %{_sysconfdir}/dconf/profile/ibus
+%python3_sitearch/gi/overrides/__pycache__
+%python3_sitearch/gi/overrides/IBus.py
+%if ! %with_python2_override_pkg
 %python2_sitearch/gi/overrides/IBus.py*
+%endif
+# ibus owns xinput.d because gnome does not like to depend on imsettings.
+%dir %{_sysconfdir}/X11/xinit/xinput.d
+# Do not use %%config(noreplace) to always get the new keywords in _xinputconf
+# For user customization, $HOME/.xinputrc can be used instead.
 %config %{_xinputconf}
-%if ! %with_python_pkg
-%if %with_pygobject3
-%{_bindir}/ibus-setup
-%{_datadir}/applications/ibus-setup.desktop
-%{_datadir}/ibus/setup
-%{_datadir}/man/man1/ibus-setup.1.gz
-%endif
-%if %with_pygobject2
-%dir %{python2_sitelib}/ibus
-%{python2_sitelib}/ibus/*
-%endif
-%endif
 
 %files libs
 %{_libdir}/libibus-%{ibus_api_version}.so.*
@@ -415,7 +432,6 @@ fi
 %files gtk3
 %{_libdir}/gtk-3.0/%{gtk3_binary_version}/immodules/im-ibus.so
 
-%if %with_python_pkg
 %if %with_pygobject3
 %files setup
 %{_bindir}/ibus-setup
@@ -429,6 +445,10 @@ fi
 %dir %{python2_sitelib}/ibus
 %{python2_sitelib}/ibus/*
 %endif
+
+%if %with_python2_override_pkg
+%files py2override
+%python2_sitearch/gi/overrides/IBus.py*
 %endif
 
 %if %with_wayland
@@ -448,6 +468,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Jan 31 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.5-2
+- Enabled python3 ibus-setup
+
 * Tue Jan 14 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.5-1
 - Bumped to 1.5.5
 - Deleted notify-python in Requires

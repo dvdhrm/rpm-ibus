@@ -63,7 +63,7 @@ diff --git a/setup/main.py b/setup/main.py
 index d3f4414..235ef9c 100644
 --- a/setup/main.py
 +++ b/setup/main.py
-@@ -187,16 +187,30 @@ class Setup(object):
+@@ -190,16 +190,30 @@ class Setup(object):
                                      'active',
                                      Gio.SettingsBindFlags.DEFAULT)
  
@@ -98,18 +98,19 @@ index d3f4414..235ef9c 100644
  
          self.__treeview = self.__builder.get_object("treeview_engines")
          self.__treeview.set_engines(engines)
-@@ -246,8 +260,8 @@ class Setup(object):
+@@ -249,8 +263,9 @@ class Setup(object):
      def __combobox_notify_active_engine_cb(self, combobox, property):
          engine = self.__combobox.get_active_engine()
          button = self.__builder.get_object("button_engine_add")
 -        button.set_sensitive(
 -                engine != None and engine not in self.__treeview.get_engines())
 +        button.set_sensitive(engine != None and \
-+                engine.get_name() not in map(lambda e: e.get_name(), self.__treeview.get_engines()))
++                engine.get_name() not in [e.get_name() for e \
++                                          in self.__treeview.get_engines()])
  
      def __get_engine_setup_exec_args(self, engine):
          args = []
-@@ -267,6 +281,13 @@ class Setup(object):
+@@ -270,6 +285,13 @@ class Setup(object):
              args.append(path.basename(setup_path))
          return args
  
@@ -123,7 +124,7 @@ index d3f4414..235ef9c 100644
      def __treeview_notify_cb(self, treeview, prop):
          if prop.name not in ("active-engine", "engines"):
              return
-@@ -318,6 +339,43 @@ class Setup(object):
+@@ -321,6 +343,43 @@ class Setup(object):
              del self.__engine_setup_exec_list[name]
          self.__engine_setup_exec_list[name] = os.spawnl(os.P_NOWAIT, *args)
  
@@ -158,9 +159,9 @@ index d3f4414..235ef9c 100644
 +        engine_names = self.__settings_general.get_strv('preload-engines')
 +        engines = self.__get_engine_descs_from_names(engine_names)
 +        current_engines = self.__treeview.get_engines()
-+        engines_csv = str.join(',', map(lambda e: e.get_name(), engines))
++        engines_csv = str.join(',', [e.get_name() for e in engines])
 +        current_engines_csv = \
-+                str.join(',', map(lambda e: e.get_name(), current_engines))
++                str.join(',', [e.get_name() for e in current_engines])
 +        if engines_csv != current_engines_csv:
 +            self.__treeview.set_engines(engines)
 +
