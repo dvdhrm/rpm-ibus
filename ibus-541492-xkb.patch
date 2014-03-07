@@ -179,7 +179,7 @@ index d71c415..779e29e 100644
  # GObject introspection
  GOBJECT_INTROSPECTION_CHECK([0.6.8])
  
-@@ -619,6 +658,7 @@ Build options:
+@@ -640,6 +679,7 @@ Build options:
    Panel icon                "$IBUS_ICON_KEYBOARD"
    Enable surrounding-text   $enable_surrounding_text
    Enable libnotify          $enable_libnotify
@@ -1015,25 +1015,25 @@ diff --git a/ui/gtk3/Makefile.am b/ui/gtk3/Makefile.am
 index 6012cfa..3dfa0df 100644
 --- a/ui/gtk3/Makefile.am
 +++ b/ui/gtk3/Makefile.am
-@@ -44,6 +44,8 @@ AM_CPPFLAGS = \
- 
- USE_SYMBOL_ICON = FALSE
+@@ -35,6 +35,8 @@ gtkpanel.xml: gtkpanel.xml.in
+ 		-e 's|@libexecdir[@]|$(libexecdir)|g' $< > $@.tmp && \
+ 		mv $@.tmp $@
  
 +HAVE_IBUS_GKBD_C = $(strip $(subst false, FALSE, $(subst true, TRUE, $(HAVE_IBUS_GKBD))))
 +
- AM_CFLAGS = \
- 	@GLIB2_CFLAGS@ \
- 	@GIO2_CFLAGS@ \
-@@ -54,6 +56,8 @@ AM_CFLAGS = \
+ # force include config.h before gi18n.h.
+ AM_CPPFLAGS = \
+ 	-I$(top_srcdir)/src \
+@@ -51,6 +53,8 @@ AM_CFLAGS = \
+ 	-DG_LOG_DOMAIN=\"IBUS\" \
  	-DBINDIR=\"$(bindir)\" \
  	-DIBUS_DISABLE_DEPRECATED \
- 	-DSWITCHER_USE_SYMBOL_ICON=$(USE_SYMBOL_ICON) \
 +	-DHAVE_IBUS_GKBD=$(HAVE_IBUS_GKBD_C) \
 +	-DXKB_LAYOUTS_MAX_LENGTH=4 \
  	-Wno-unused-variable \
  	-Wno-unused-but-set-variable \
  	-Wno-unused-function \
-@@ -97,12 +101,40 @@ AM_VALAFLAGS += \
+@@ -94,12 +98,40 @@ AM_VALAFLAGS += \
  	$(NULL)
  endif
  
@@ -1074,7 +1074,7 @@ index 6012cfa..3dfa0df 100644
  	handle.vala \
  	iconwidget.vala \
  	keybindingmanager.vala \
-@@ -112,6 +144,7 @@ ibus_ui_gtk3_SOURCES = \
+@@ -109,6 +141,7 @@ ibus_ui_gtk3_SOURCES = \
  	propertypanel.vala \
  	separator.vala \
  	switcher.vala \
@@ -1082,7 +1082,7 @@ index 6012cfa..3dfa0df 100644
  	$(NULL)
  
  ibus_ui_gtk3_LDADD = \
-@@ -120,9 +153,12 @@ ibus_ui_gtk3_LDADD = \
+@@ -117,9 +150,12 @@ ibus_ui_gtk3_LDADD = \
  
  CLEANFILES = \
  	gtkpanel.xml \
@@ -1282,10 +1282,10 @@ diff --git a/ui/gtk3/panel.vala b/ui/gtk3/panel.vala
 index a7a0c40..1da7966 100644
 --- a/ui/gtk3/panel.vala
 +++ b/ui/gtk3/panel.vala
-@@ -58,6 +58,13 @@ class Panel : IBus.PanelService {
-     private Gtk.CssProvider m_css_provider;
-     private int m_switcher_delay_time = 400;
-     private bool m_use_system_keyboard_layout = false;
+@@ -63,6 +63,13 @@ class Panel : IBus.PanelService {
+                                                    GLib.str_equal);
+     private Gdk.RGBA m_xkb_icon_rgba = Gdk.RGBA(){
+             red = 0.0, green = 0.0, blue = 0.0, alpha = 1.0 };
 +    private GkbdLayout m_gkbdlayout = null;
 +    private XKBLayout m_xkblayout = null;
 +    private string[] m_layouts = {};
@@ -1296,7 +1296,7 @@ index a7a0c40..1da7966 100644
  
      private GLib.List<Keybinding> m_keybindings = new GLib.List<Keybinding>();
  
-@@ -108,6 +115,14 @@ class Panel : IBus.PanelService {
+@@ -113,6 +120,14 @@ class Panel : IBus.PanelService {
  
      ~Panel() {
          unbind_switch_shortcut();
@@ -1311,7 +1311,7 @@ index a7a0c40..1da7966 100644
      }
  
      private void init_settings() {
-@@ -444,6 +459,7 @@ class Panel : IBus.PanelService {
+@@ -487,6 +502,7 @@ class Panel : IBus.PanelService {
      }
  
      public void load_settings() {
@@ -1319,7 +1319,7 @@ index a7a0c40..1da7966 100644
          // Update m_use_system_keyboard_layout before update_engines()
          // is called.
          set_use_system_keyboard_layout();
-@@ -463,6 +479,184 @@ class Panel : IBus.PanelService {
+@@ -508,6 +524,184 @@ class Panel : IBus.PanelService {
          set_version();
      }
  
@@ -1504,7 +1504,7 @@ index a7a0c40..1da7966 100644
      private void exec_setxkbmap(IBus.EngineDesc engine) {
          string layout = engine.get_layout();
          string variant = engine.get_layout_variant();
-@@ -528,7 +722,7 @@ class Panel : IBus.PanelService {
+@@ -573,7 +767,7 @@ class Panel : IBus.PanelService {
  
          // set xkb layout
          if (!m_use_system_keyboard_layout)

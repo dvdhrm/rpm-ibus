@@ -19,6 +19,9 @@
 %global ibus_api_version 1.0
 %global ibus_xkb_version 1.5.0.20140114
 
+# for bytecompile in %%{_datadir}/ibus/setup
+%global __python %{__python3}
+
 %if %with_pkg_config
 %{!?gtk2_binary_version: %global gtk2_binary_version %(pkg-config  --variable=gtk_binary_version gtk+-2.0)}
 %{!?gtk3_binary_version: %global gtk3_binary_version %(pkg-config  --variable=gtk_binary_version gtk+-3.0)}
@@ -32,13 +35,13 @@
 %global dbus_python_version 0.83.0
 
 Name:           ibus
-Version:        1.5.5
-Release:        2%{?dist}
+Version:        1.5.6
+Release:        1%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
 URL:            http://code.google.com/p/ibus/
-Source0:        http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
+Source0:        https://github.com/ibus/ibus/releases/download/%{version}/%{name}-%{version}.tar.gz
 Source1:        %{name}-xinput
 Source2:        %{name}.conf.5
 # Actual path is https://github.com/.../%%{ibus_xkb_version}.tar.gz
@@ -46,7 +49,6 @@ Source2:        %{name}.conf.5
 Source3:        https://github.com/ibus/ibus-xkb/archive/ibus-xkb-%{ibus_xkb_version}.tar.gz
 # Upstreamed patches.
 # Patch0:         %%{name}-HEAD.patch
-Patch0:         %{name}-HEAD.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=810211
 Patch1:         %{name}-810211-no-switch-by-no-trigger.patch
 # https://bugzilla.redhat.com/show_bug.cgi?id=541492
@@ -58,8 +60,6 @@ Patch4:         %{name}-xx-setup-frequent-lang.patch
 
 # Removed the target.
 # Even if fedpkg srpm's target is rhel, it can run on fedora box.
-# Keep the default triggers for the back compatiblity.
-Patch95:        %{name}-xx-ctrl-space.patch
 # Disable IME on gnome-shell password for the back compatiblity.
 Patch96:        %{name}-xx-f19-password.patch
 
@@ -250,7 +250,6 @@ The ibus-devel-docs package contains developer documentation for ibus
 %prep
 %setup -q
 # %%patch0 -p1
-%patch0 -p1
 %if (0%{?fedora} < 20 && 0%{?rhel} < 8)
 %patch96 -p1 -b .passwd
 %endif
@@ -264,10 +263,6 @@ rm -f data/dconf/00-upstream-settings
 %endif
 %patch3 -p1 -b .preload-sys
 %patch4 -p1 -b .setup-frequent-lang
-
-%if (0%{?fedora} < 19 && 0%{?rhel} < 7)
-%patch95 -p1 -b .ctrl
-%endif
 
 zcat %SOURCE3 | tar xf -
 POS=`(cd ibus-xkb-%ibus_xkb_version/po; ls *.po)`
@@ -411,7 +406,7 @@ fi
 %{_libexecdir}/ibus-x11
 %{_sysconfdir}/dconf/db/ibus.d
 %{_sysconfdir}/dconf/profile/ibus
-%python3_sitearch/gi/overrides/__pycache__
+%python3_sitearch/gi/overrides/__pycache__/*.py*
 %python3_sitearch/gi/overrides/IBus.py
 %if ! %with_python2_override_pkg
 %python2_sitearch/gi/overrides/IBus.py*
@@ -468,6 +463,10 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Mar 06 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.6-1
+- Bumped to 1.5.6
+- Deleted ibus-xx-ctrl-space.patch
+
 * Fri Jan 31 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.5-2
 - Enabled python3 ibus-setup
 
