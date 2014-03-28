@@ -1,1 +1,38 @@
+From 9782a20c544001a211a788975f55ded5064b7273 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Tue, 18 Mar 2014 11:41:33 +0900
+Subject: [PATCH] Add Czech (qwerty) keymap.
+
+BUG=rhbz#1074879
+
+Review URL: https://codereview.appspot.com/74520044
+---
+ engine/simple.xml.in | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/engine/simple.xml.in b/engine/simple.xml.in
+index 4218f6c..b3ac6a5 100644
+--- a/engine/simple.xml.in
++++ b/engine/simple.xml.in
+@@ -203,6 +203,18 @@
+                         <icon>ibus-keyboard</icon>
+ 			<rank>99</rank>
+ 		</engine>
++                <engine>
++                        <name>xkb:cz:qwerty:cze</name>
++                        <language>cze</language>
++                        <license>GPL</license>
++                        <author>Peng Huang &lt;shawn.p.huang@gmail.com&gt;</author>
++                        <layout>cz</layout>
++                        <layout_variant>qwerty</layout_variant>
++                        <longname>Czech (qwerty)</longname>
++                        <description>Czech (qwerty)</description>
++                        <icon>ibus-keyboard</icon>
++                        <rank>99</rank>
++                </engine>
+ 		<engine>
+ 			<name>xkb:dk::dan</name>
+ 			<language>dan</language>
+-- 
+1.8.5.3
 
