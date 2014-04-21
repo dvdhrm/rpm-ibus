@@ -36,7 +36,7 @@
 
 Name:           ibus
 Version:        1.5.6
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -241,8 +241,6 @@ BuildArch:      noarch
 %else
 Requires:       %{name}%{?_isa}        = %{version}-%{release}
 %endif
-# Owner of %%{_datadir}/gtk-doc/html
-Requires:       gtk-doc
 
 %description devel-docs
 The ibus-devel-docs package contains developer documentation for ibus
@@ -462,9 +460,15 @@ fi
 %{_datadir}/vala/vapi/ibus-1.0.deps
 
 %files devel-docs
+# Own html dir since gtk-doc is heavy.
+%dir %{_datadir}/gtk-doc
+%dir %{_datadir}/gtk-doc/html
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon Apr 21 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.6-3
+- Do not require gtk-doc in ibus-devel-docs
+
 * Fri Mar 28 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.6-2
 - Updated ibus-HEAD.patch for Czech (qwerty) keymap.
 
