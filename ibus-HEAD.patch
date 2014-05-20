@@ -1,1 +1,149 @@
+From 0be4664b2ea3071c01ff479443033eb1accdfb03 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Fri, 2 May 2014 11:55:08 +0900
+Subject: [PATCH] Set max-width-chars property in ibus-setup wrapped
+ GtkLabel.
+
+If GtkWindow has 'resizable' property = FALSE, the wrap in GtkLabel
+is not done automatically and need to set 'max-width-chars' property.
+
+TEST=ibus-setup
+
+Review URL: https://codereview.appspot.com/92940043
+---
+ setup/setup.ui | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/setup/setup.ui b/setup/setup.ui
+index 5ffbe47..bb78433 100644
+--- a/setup/setup.ui
++++ b/setup/setup.ui
+@@ -902,6 +902,7 @@
+                                 <property name="can_focus">False</property>
+                                 <property name="xalign">0</property>
+                                 <property name="wrap">True</property>
++                                <property name="max_width_chars">74</property>
+                                 <property name="label" translatable="yes">&lt;small&gt;&lt;i&gt;The active input method can be switched around from the selected ones in the above list by pressing the keyboard shortcut keys or clicking the panel icon.&lt;/i&gt;&lt;/small&gt;</property>
+                                 <property name="use_markup">True</property>
+                               </object>
+-- 
+1.8.5.3
+
+From 318836a647460e28dcc682543a118567474f9854 Mon Sep 17 00:00:00 2001
+From: Eike Hein <hein@kde.org>
+Date: Thu, 8 May 2014 11:16:02 +0900
+Subject: [PATCH] Add the nodeadkeys variant of the German keyboard layout.
+
+BUG=http://code.google.com/p/ibus/issues/detail?id=1710
+
+Review URL: https://codereview.appspot.com/96040043
+Patch from Eike Hein <hein@kde.org>.
+---
+ engine/simple.xml.in | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/engine/simple.xml.in b/engine/simple.xml.in
+index b3ac6a5..9736421 100644
+--- a/engine/simple.xml.in
++++ b/engine/simple.xml.in
+@@ -330,6 +330,18 @@
+                         <icon>ibus-keyboard</icon>
+ 			<rank>99</rank>
+ 		</engine>
++                <engine>
++                        <name>xkb:de:nodeadkeys:ger</name>
++                        <language>ger</language>
++                        <license>GPL</license>
++                        <author>Peng Huang &lt;shawn.p.huang@gmail.com&gt;</author>
++                        <layout>de</layout>
++                        <layout_variant>nodeadkeys</layout_variant>
++                        <longname>German (eliminate dead keys)</longname>
++                        <description>German (eliminate dead keys)</description>
++                        <icon>ibus-keyboard</icon>
++                        <rank>99</rank>
++                </engine>
+ 		<engine>
+ 			<name>xkb:gr::gre</name>
+ 			<language>gre</language>
+-- 
+1.8.5.3
+
+From 386bafb0b91a61d51385e0bba2b3fc4b1e2d9013 Mon Sep 17 00:00:00 2001
+From: Ryu Changwoo <ryu.changwoo@gmail.com>
+Date: Thu, 8 May 2014 11:23:14 +0900
+Subject: [PATCH] Delete Korean keymap.
+
+BUG=http://code.google.com/p/ibus/issues/detail?id=1708
+
+Review URL: https://codereview.appspot.com/92090043
+Patch from Ryu Changwoo <ryu.changwoo@gmail.com>.
+---
+ engine/simple.xml.in | 12 ------------
+ 1 file changed, 12 deletions(-)
+
+diff --git a/engine/simple.xml.in b/engine/simple.xml.in
+index 9736421..1b617f8 100644
+--- a/engine/simple.xml.in
++++ b/engine/simple.xml.in
+@@ -682,17 +682,5 @@
+                         <icon>ibus-keyboard</icon>
+ 			<rank>99</rank>
+ 		</engine>
+-		<engine>
+-			<name>xkb:kr:kr104:kor</name>
+-			<language>kor</language>
+-			<license>GPL</license>
+-			<author>Peng Huang &lt;shawn.p.huang@gmail.com&gt;</author>
+-			<layout>kr</layout>
+-			<layout_variant>kr104</layout_variant>
+-			<longname>Korean (101/104 key compatible)</longname>
+-			<description>Korean (101/104 key compatible)</description>
+-                        <icon>ibus-keyboard</icon>
+-			<rank>99</rank>
+-		</engine>
+ 	</engines>
+ </component>
+-- 
+1.8.5.3
+
+From 34692850bd58543e016e35ea7c863d311ca92519 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Fri, 9 May 2014 11:40:21 +0900
+Subject: [PATCH] Let ibus-ui-gtk3 not to show zero-lenght preedit text.
+
+preedit text is shown by ibus-ui-gtk3 on X11 applications
+and do not have to show it likes GTK+ when the lenght is zero.
+
+BUG=http://code.google.com/p/ibus/issues/detail?id=1709
+TEST=ibus-ui-gtk3 with ibus-pinyin and x11 applications
+
+Review URL: https://codereview.appspot.com/93150043
+---
+ ui/gtk3/candidatepanel.vala | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/ui/gtk3/candidatepanel.vala b/ui/gtk3/candidatepanel.vala
+index e22135b..db2d5aa 100644
+--- a/ui/gtk3/candidatepanel.vala
++++ b/ui/gtk3/candidatepanel.vala
+@@ -112,8 +112,15 @@ public class CandidatePanel : Gtk.Box{
+ 
+     public void set_preedit_text(IBus.Text? text, uint cursor) {
+         if (text != null) {
+-            m_preedit_label.set_text(text.get_text());
+-            m_preedit_label.show();
++            var str = text.get_text();
++
++            if (str.length > 0) {
++                m_preedit_label.set_text(str);
++                m_preedit_label.show();
++            } else {
++                m_preedit_label.set_text("");
++                m_preedit_label.hide();
++            }
+         } else {
+             m_preedit_label.set_text("");
+             m_preedit_label.hide();
+-- 
+1.8.5.3
 
