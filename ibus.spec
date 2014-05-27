@@ -36,7 +36,7 @@
 
 Name:           ibus
 Version:        1.5.7
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -466,6 +466,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Tue May 27 2014 Kalev Lember <kalevlember@gmail.com> - 1.5.7-3
+- Rebuilt for https://fedoraproject.org/wiki/Changes/Python_3.4
+
 * Tue May 20 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.7-2
 - Updated ibus-HEAD.patch for width of ibus-setup.
 
