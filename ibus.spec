@@ -36,7 +36,7 @@
 
 Name:           ibus
 Version:        1.5.7
-Release:        4%{?dist}
+Release:        5%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -466,6 +466,16 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon Jul 07 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.7-5
+- Updated ibus-HEAD.patch from upstream.
+  Added pl(qwertz).
+  Fixed escape key with Ctrl-Shift-U.
+  Updated pt-br compose table from the latest xorg.
+  Do not sort ibus engines when they are saved by ibus-setup.
+  Updated jp IBusKeymap.
+  Added ibus reset-config and read-config sub-commands.
+  Update ibus(1) for read-config and reset-config.
+
 * Sat Jun 07 2014 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.5.7-4
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_21_Mass_Rebuild
 
