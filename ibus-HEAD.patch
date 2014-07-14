@@ -212,7 +212,7 @@ index 1b617f8..c16f86a 100644
 From 9bad0c944162a1700dcb6615aab2a6a9cfd9eff5 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
 Date: Thu, 12 Jun 2014 11:38:43 +0900
-Subject: [PATCH 1/8] Fix escape key with Ctrl+Shift+U ISO 14755.
+Subject: [PATCH] Fix escape key with Ctrl+Shift+U ISO 14755.
 
 GtkIMContextSimple uses gdk_keymap_get_for_display() to check the readable
 hex codes but IBusEngineSimple ignored it because does not have the display
@@ -314,7 +314,7 @@ index 8c076ac..300a828 100644
 From b6afffbd1a06ecf17af009f1de3e513988ecb92e Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
 Date: Wed, 18 Jun 2014 11:42:34 +0900
-Subject: [PATCH 2/8] Update ibuscomposetable.h for pt-br.
+Subject: [PATCH] Update ibuscomposetable.h for pt-br.
 
 pt_BR.UTF-8/Compose file is updated:
 http://cgit.freedesktop.org/xorg/lib/libX11/commit/?id=e3dc0d1733
@@ -1000,7 +1000,7 @@ index 2ba3571..22aab48 100644
 From a5300750e38b5327bdd255d777544d0c0ebcb4d9 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
 Date: Tue, 24 Jun 2014 11:24:40 +0900
-Subject: [PATCH 4/8] Do not sort ibus engines when they are saved by
+Subject: [PATCH] Do not sort ibus engines when they are saved by
  ibus-setup.
 
 ibus 1.5 changes the engine order with Super+space shortcut key
@@ -1099,7 +1099,7 @@ index dee7be4..1d89f3d 100644
 From 8ef258ec31f12405e4f5ded6a7a4d80114a219d4 Mon Sep 17 00:00:00 2001
 From: Osamu Aoki <osamu@debian.org>
 Date: Thu, 3 Jul 2014 11:39:32 +0900
-Subject: [PATCH 5/8] Use "keycode Linux_keycode = X11_keysym" format
+Subject: [PATCH] Use "keycode Linux_keycode = X11_keysym" format
 
 Delete non-Linux keyboard compatibility.
 
@@ -1150,7 +1150,7 @@ index 2c78347..e5546fa 100644
 From 3dcf24742216d6234a45ace1b433b864efdf08a2 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
 Date: Fri, 4 Jul 2014 16:03:57 +0900
-Subject: [PATCH 7/8] Add ibus reset-config and read-config sub-commands.
+Subject: [PATCH] Add ibus reset-config and read-config sub-commands.
 
 BUG=rhbz#530711
 TEST=tools/ibus
@@ -1243,17 +1243,20 @@ index db4fd23..ecce80a 100644
 -- 
 1.8.5.3
 
-From 4c245bbbac3edea90980a0f47ef2d5c0c070f936 Mon Sep 17 00:00:00 2001
+From 9e5a2bd2c40f9eed8d99710b63b3dab737aa9b95 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Mon, 7 Jul 2014 16:17:25 +0900
-Subject: [PATCH 8/8] Update ibus(1) for read-config and reset-config.
+Date: Tue, 8 Jul 2014 11:42:12 +0900
+Subject: [PATCH] Update ibus(1) for read-config and reset-config.
 
+TEST=tools/ibus.1.gz
+
+Review URL: https://codereview.appspot.com/111900044
 ---
  tools/ibus.1.in | 7 +++++++
  1 file changed, 7 insertions(+)
 
 diff --git a/tools/ibus.1.in b/tools/ibus.1.in
-index ab99db4..f777f65 100644
+index ab99db4..6ac92ff 100644
 --- a/tools/ibus.1.in
 +++ b/tools/ibus.1.in
 @@ -85,6 +85,13 @@ directories, separated by ':'.
@@ -1261,7 +1264,7 @@ index ab99db4..f777f65 100644
  Show the D-Bus address of ibus-daemon.
  .TP
 +\fBread\-config\fR
-+Show the setting values in a gsettings configuration file.
++Print the setting values in a gsettings configuration file.
 +.TP
 +\fBreset\-config\fR
 +Reset the user setting values to the default ones in a gsettings
@@ -1270,6 +1273,417 @@ index ab99db4..f777f65 100644
  \fBwatch\fR
  Under construction.
  .TP
+-- 
+1.8.5.3
+
+From 10483bfebd1f51ffa52ad7d017193ae728f93bf5 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Thu, 10 Jul 2014 11:54:30 +0900
+Subject: [PATCH] Fix ibus-setup SEGV in enginetreeview.py
+
+When an engine is added on ibus-setup, enginetreeview.append_engine()
+calls self.__model.append(None) and it causes engine == None in
+__icon_cell_data_cb() and __name_cell_data_cb() in enginetreeview
+with python3-gobject 3.13.x which version has implemented several
+deprecated warnings in gi/overrides/Gtk.py .
+I think this problem also could happen in the old versions if
+the system would be slow.
+
+BUG=rhbz#1048429
+TEST=setup in Fedora 21
+
+Review URL: https://codereview.appspot.com/104620043
+---
+ setup/enginetreeview.py | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
+
+diff --git a/setup/enginetreeview.py b/setup/enginetreeview.py
+index 3ab81b7..afb23fc 100644
+--- a/setup/enginetreeview.py
++++ b/setup/enginetreeview.py
+@@ -128,12 +128,25 @@ class EngineTreeView(Gtk.TreeView):
+     def __icon_cell_data_cb(self, celllayout, renderer, model, it, data):
+         engine = self.__model.get_value(it, 0)
+ 
++        # When append_engine() is called, self.__model.append(None)
++        # is called internally and engine == None could happen in
++        # a slow system.
++        if engine == None:
++            return
++
+         icon_size = Gtk.icon_size_lookup(Gtk.IconSize.LARGE_TOOLBAR)[0]
+         pixbuf = load_icon(engine.get_icon(), Gtk.IconSize.LARGE_TOOLBAR)
+         renderer.set_property("pixbuf", pixbuf)
+ 
+     def __name_cell_data_cb(self, celllayout, renderer, model, it, data):
+         engine = self.__model.get_value(it, 0)
++
++        # When append_engine() is called, self.__model.append(None)
++        # is called internally and engine == None could happen in
++        # a slow system.
++        if engine == None:
++            return
++
+         renderer.set_property("sensitive", True)
+         language = IBus.get_language_name(engine.get_language())
+         renderer.set_property("text",
+@@ -215,7 +228,6 @@ class EngineTreeView(Gtk.TreeView):
+         it = self.__model.prepend(None)
+         self.__model.set(it, 0, engine)
+         self.__engines = [engine] + self.__engines
+-        self.scroll_to_cell(self.__model[0].path, None)
+ 
+     def append_engine(self, engine):
+         if engine == None or engine in self.__engines:
+@@ -223,7 +235,6 @@ class EngineTreeView(Gtk.TreeView):
+         it = self.__model.append(None)
+         self.__model.set(it, 0, engine)
+         self.__engines.append(engine)
+-        self.scroll_to_cell(self.__model[-1].path, None)
+ 
+     def remove_engine(self):
+         it = self.get_selected_iter()
+-- 
+1.8.5.3
+
+From a17dc8e8bd288adedb77ae417d6825419337daae Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Fri, 11 Jul 2014 11:45:05 +0900
+Subject: [PATCH] Fix deprecated warnings with python3-gobject 3.13.3.
+
+python3-gobject adds several warnings in gi/overrides/Gtk.py
+
+/usr/share/ibus/setup/main.py:74: PyGIDeprecationWarning:
+Using positional arguments with the GObject constructor has been
+deprecated. Please specify keyword(s) for "schema" or use a class
+specific constructor.
+See: https://wiki.gnome.org/PyGObject/InitializerDeprecations
+
+/usr/share/ibus/setup/main.py:364: PyGTKDeprecationWarning:
+The keyword(s) "type" have been deprecated in favor of "message_type"
+respectively.
+See: https://wiki.gnome.org/PyGObject/InitializerDeprecations
+
+TEST=setup
+
+Review URL: https://codereview.appspot.com/110990044
+---
+ setup/engineabout.py      | 12 +++++++-----
+ setup/keyboardshortcut.py | 32 ++++++++++++++++++--------------
+ setup/main.py             | 30 ++++++++++++++++++------------
+ setup/setup.ui            |  2 ++
+ 4 files changed, 45 insertions(+), 31 deletions(-)
+
+diff --git a/setup/engineabout.py b/setup/engineabout.py
+index 50ab001..09e9b5c 100644
+--- a/setup/engineabout.py
++++ b/setup/engineabout.py
+@@ -29,12 +29,14 @@ from gi.repository import Pango
+ from i18n import _, N_
+ 
+ class EngineAbout(Gtk.Dialog):
+-    def __init__(self, enginedesc):
+-        self.__engine_desc = enginedesc
+-        super(EngineAbout, self).__init__(_("About"), None,
+-                Gtk.DialogFlags.MODAL,
+-                (_("_Close"), Gtk.ResponseType.CLOSE))
++    def __init__(self, engine, transient_for = None):
++        self.__engine_desc = engine
++        super(EngineAbout, self).__init__(
++                title = _("About"),
++                transient_for = transient_for)
+ 
++        buttons = (_("_Close"), Gtk.ResponseType.CLOSE)
++        self.add_buttons(*buttons)
+         self.__init_ui()
+ 
+     def __init_ui(self):
+diff --git a/setup/keyboardshortcut.py b/setup/keyboardshortcut.py
+index d82fea8..91595f7 100644
+--- a/setup/keyboardshortcut.py
++++ b/setup/keyboardshortcut.py
+@@ -49,7 +49,8 @@ class KeyboardShortcutSelection(Gtk.Box):
+         # self.pack_start(label, False, True, 4)
+ 
+         # shortcuts view
+-        self.__shortcut_view = Gtk.TreeView(Gtk.ListStore(GObject.TYPE_STRING))
++        self.__shortcut_view = Gtk.TreeView(
++                model = Gtk.ListStore(GObject.TYPE_STRING))
+         self.__shortcut_view.set_size_request(-1, 100)
+         renderer = Gtk.CellRendererText()
+         column = Gtk.TreeViewColumn(_("Keyboard shortcuts"), renderer, text = 0)
+@@ -63,7 +64,7 @@ class KeyboardShortcutSelection(Gtk.Box):
+ 
+         # key code
+         hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+-        label = Gtk.Label(_("Key code:"))
++        label = Gtk.Label(label = _("Key code:"))
+         label.set_justify(Gtk.Justification.LEFT)
+         label.set_alignment(0.0, 0.5)
+         hbox.pack_start(label, False, True, 4)
+@@ -71,19 +72,19 @@ class KeyboardShortcutSelection(Gtk.Box):
+         self.__keycode_entry = Gtk.Entry()
+         self.__keycode_entry.connect("notify::text", self.__keycode_entry_notify_cb)
+         hbox.pack_start(self.__keycode_entry, True, True, 4)
+-        self.__keycode_button = Gtk.Button("...")
++        self.__keycode_button = Gtk.Button(label = "...")
+         self.__keycode_button.connect("clicked", self.__keycode_button_clicked_cb)
+         hbox.pack_start(self.__keycode_button, False, True, 4)
+         self.pack_start(hbox, False, True, 4)
+ 
+         # modifiers
+         hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+-        label = Gtk.Label(_("Modifiers:"))
++        label = Gtk.Label(label = _("Modifiers:"))
+         label.set_justify(Gtk.Justification.LEFT)
+         label.set_alignment(0.0, 0.5)
+         hbox.pack_start(label, False, True, 4)
+ 
+-        table = Gtk.Table(4, 2)
++        table = Gtk.Table(n_rows = 4, n_columns = 2)
+         self.__modifier_buttons = []
+         self.__modifier_buttons.append(("Control",
+                                         Gtk.CheckButton.new_with_mnemonic("_Control"),
+@@ -250,8 +251,10 @@ class KeyboardShortcutSelection(Gtk.Box):
+ 
+     def __keycode_button_clicked_cb(self, button):
+         out = []
+-        dlg = Gtk.MessageDialog(parent = self.get_toplevel(), buttons = Gtk.ButtonsType.CLOSE)
+-        message = _("Please press a key (or a key combination).\nThe dialog will be closed when the key is released.")
++        dlg = Gtk.MessageDialog(transient_for = self.get_toplevel(),
++                                buttons = Gtk.ButtonsType.CLOSE)
++        message = _("Please press a key (or a key combination).\n" \
++                    "The dialog will be closed when the key is released.")
+         dlg.set_markup(message)
+         dlg.set_title(_("Please press a key (or a key combination)"))
+         sw = Gtk.ScrolledWindow()
+@@ -265,7 +268,7 @@ class KeyboardShortcutSelection(Gtk.Box):
+         model = Gtk.ListStore(GObject.TYPE_INT,
+                               GObject.TYPE_UINT,
+                               GObject.TYPE_UINT)
+-        accel_view = Gtk.TreeView(model)
++        accel_view = Gtk.TreeView(model = model)
+         sw.add(accel_view)
+         column = Gtk.TreeViewColumn()
+         renderer = Gtk.CellRendererAccel(accel_mode=Gtk.CellRendererAccelMode.OTHER,
+@@ -315,8 +318,9 @@ class KeyboardShortcutSelection(Gtk.Box):
+         self.__apply_button.set_sensitive(False)
+ 
+ class KeyboardShortcutSelectionDialog(Gtk.Dialog):
+-    def __init__(self, title = None, parent = None, flags = 0, buttons = None):
+-        super(KeyboardShortcutSelectionDialog, self).__init__(title, parent, flags, buttons)
++    def __init__(self, title = None, transient_for = None, flags = 0):
++        super(KeyboardShortcutSelectionDialog, self).__init__(
++                title = title, transient_for = transient_for, flags = flags)
+         self.__selection_view = KeyboardShortcutSelection()
+         self.vbox.pack_start(self.__selection_view, False, True, 0)
+         self.vbox.show_all()
+@@ -333,10 +337,10 @@ class KeyboardShortcutSelectionDialog(Gtk.Dialog):
+ 
+ 
+ if __name__ == "__main__":
+-    dlg = KeyboardShortcutSelectionDialog(
+-        title = "Select test",
+-        buttons = (_("_Cancel"), Gtk.ResponseType.CANCEL,
+-                   _("_OK"), Gtk.ResponseType.OK))
++    dlg = KeyboardShortcutSelectionDialog(title = "Select test")
++    buttons = (_("_Cancel"), Gtk.ResponseType.CANCEL,
++               _("_OK"), Gtk.ResponseType.OK)
++    dlg.add_buttons(buttons)
+     dlg.add_shortcut("Control+Shift+space")
+     dlg.set_shortcuts(None)
+     print((dlg.run()))
+diff --git a/setup/main.py b/setup/main.py
+index 1d89f3d..1bc9cfb 100644
+--- a/setup/main.py
++++ b/setup/main.py
+@@ -70,10 +70,12 @@ class Setup(object):
+     def __init__(self):
+         super(Setup, self).__init__()
+ 
+-        self.__settings_general = Gio.Settings("org.freedesktop.ibus.general");
++        self.__settings_general = Gio.Settings(
++                schema = "org.freedesktop.ibus.general");
+         self.__settings_hotkey = Gio.Settings(
+-                "org.freedesktop.ibus.general.hotkey");
+-        self.__settings_panel = Gio.Settings("org.freedesktop.ibus.panel");
++                schema = "org.freedesktop.ibus.general.hotkey");
++        self.__settings_panel = Gio.Settings(
++                schema = "org.freedesktop.ibus.panel");
+ 
+         # IBus.Bus() calls ibus_bus_new().
+         # Gtk.Builder().add_from_file() also calls ibus_bus_new_async()
+@@ -300,7 +302,7 @@ class Setup(object):
+     def __button_engine_about_cb(self, button):
+         engine = self.__treeview.get_active_engine()
+         if engine:
+-            about = EngineAbout(engine)
++            about = EngineAbout(engine = engine, transient_for = self.__window)
+             about.run()
+             about.destroy()
+ 
+@@ -328,7 +330,7 @@ class Setup(object):
+             return
+ 
+         message = _("The IBus daemon is not running. Do you wish to start it?")
+-        dlg = Gtk.MessageDialog(type = Gtk.MessageType.QUESTION,
++        dlg = Gtk.MessageDialog(message_type = Gtk.MessageType.QUESTION,
+                                 buttons = Gtk.ButtonsType.YES_NO,
+                                 text = message)
+         id = dlg.run()
+@@ -354,7 +356,7 @@ class Setup(object):
+                 "  export XMODIFIERS=@im=ibus\n"
+                 "  export QT_IM_MODULE=ibus"
+                 )
+-            dlg = Gtk.MessageDialog(type = Gtk.MessageType.INFO,
++            dlg = Gtk.MessageDialog(message_type = Gtk.MessageType.INFO,
+                                     buttons = Gtk.ButtonsType.OK,
+                                     text = message)
+             id = dlg.run()
+@@ -363,7 +365,7 @@ class Setup(object):
+         else:
+             # Translators: %d == 5 currently
+             message = _("IBus daemon could not be started in %d seconds")
+-            dlg = Gtk.MessageDialog(type = Gtk.MessageType.INFO,
++            dlg = Gtk.MessageDialog(message_type = Gtk.MessageType.INFO,
+                                     buttons = Gtk.ButtonsType.OK,
+                                     text = message % timeout)
+             id = dlg.run()
+@@ -378,7 +380,9 @@ class Setup(object):
+         # Translators: Title of the window
+         title2 = _("switching input methods")
+         title = title1 % title2
+-        dialog = keyboardshortcut.KeyboardShortcutSelectionDialog(buttons = buttons, title = title)
++        dialog = keyboardshortcut.KeyboardShortcutSelectionDialog(
++                title = title, transient_for = self.__window)
++        dialog.add_buttons(*buttons)
+         text = entry.get_text()
+         if text:
+             shortcuts = text.split("; ")
+@@ -409,9 +413,10 @@ class Setup(object):
+             try:
+                 self.__bus.register_start_engine(data[DATA_LANG], data[DATA_NAME])
+             except Exception as e:
+-                dlg = Gtk.MessageDialog(type = Gtk.MessageType.ERROR,
++                dlg = Gtk.MessageDialog(message_type = Gtk.MessageType.ERROR,
++                        transient_for = self.__window,
+                         buttons = Gtk.ButtonsType.CLOSE,
+-                        message_format = str(e))
++                        text = str(e))
+                 dlg.run()
+                 dlg.destroy()
+                 self.__flush_gtk_events()
+@@ -420,9 +425,10 @@ class Setup(object):
+             try:
+                 self.__bus.register_stop_engine(data[DATA_LANG], data[DATA_NAME])
+             except Exception as e:
+-                dlg = Gtk.MessageDialog(type = Gtk.MessageType.ERROR,
++                dlg = Gtk.MessageDialog(message_type = Gtk.MessageType.ERROR,
++                        transient_for = self.__window,
+                         buttons = Gtk.ButtonsType.CLOSE,
+-                        message_format = str(e))
++                        text = str(e))
+                 dlg.run()
+                 dlg.destroy()
+                 self.__flush_gtk_events()
+diff --git a/setup/setup.ui b/setup/setup.ui
+index bb78433..d7801ea 100644
+--- a/setup/setup.ui
++++ b/setup/setup.ui
+@@ -62,6 +62,8 @@
+     <property name="resizable">False</property>
+     <property name="window_position">center-always</property>
+     <property name="icon_name">ibus-setup</property>
++    <!-- for GtkFontChooserDialog -->
++    <property name="modal">True</property>
+     <child>
+       <object class="GtkBox" id="vbox1">
+         <property name="orientation">vertical</property>
+-- 
+1.8.5.3
+
+From b1b4e2946682e3d53aa396d8469c7fa16a2dbca8 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Fri, 11 Jul 2014 11:50:04 +0900
+Subject: [PATCH] Export the 'IBUS_SETUP_XID' environment variable for each
+ engine setup.
+
+Follow GNOME_CONTROL_CENTER_XID.
+https://wiki.gnome.org/AllanDay/IMEGuidelines
+
+TEST=setup
+
+Review URL: https://codereview.appspot.com/112920044
+---
+ setup/main.py | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/setup/main.py b/setup/main.py
+index 1bc9cfb..e4ddd45 100644
+--- a/setup/main.py
++++ b/setup/main.py
+@@ -28,6 +28,7 @@ import signal
+ import sys
+ import time
+ 
++from gi.repository import GdkX11
+ from gi.repository import Gio
+ from gi.repository import GLib
+ from gi.repository import Gtk
+@@ -233,6 +234,7 @@ class Setup(object):
+         # add icon search path
+         self.__window = self.__builder.get_object("window_preferences")
+         self.__window.connect("delete-event", Gtk.main_quit)
++        self.__window.connect("notify::window", self.__gdk_window_set_cb)
+ 
+         self.__button_close = self.__builder.get_object("button_close")
+         self.__button_close.connect("clicked", Gtk.main_quit)
+@@ -248,6 +250,10 @@ class Setup(object):
+         self.__init_panel()
+         self.__init_general()
+ 
++    def __gdk_window_set_cb(self, object, pspec):
++        str = '%u' % GdkX11.X11Window.get_xid(object.get_window())
++        GLib.setenv('IBUS_SETUP_XID', str, True)
++
+     def __combobox_notify_active_engine_cb(self, combobox, property):
+         engine = self.__combobox.get_active_engine()
+         button = self.__builder.get_object("button_engine_add")
+-- 
+1.8.5.3
+
+From 9b2004efcd26e11bbd56cf51656fe326fc11be8e Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Mon, 14 Jul 2014 11:45:25 +0900
+Subject: [PATCH] Call GLib.set_prgname('ibus-setup') for ibus-setup
+ main.py
+
+TEST=xlsclients
+
+Review URL: https://codereview.appspot.com/108550043
+---
+ setup/main.py | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/setup/main.py b/setup/main.py
+index e4ddd45..9bd0af1 100644
+--- a/setup/main.py
++++ b/setup/main.py
+@@ -28,9 +28,13 @@ import signal
+ import sys
+ import time
+ 
++from gi.repository import GLib
++# set_prgname before importing other modules to show the name in warning
++# messages when import modules are failed.
++GLib.set_prgname('ibus-setup')
++
+ from gi.repository import GdkX11
+ from gi.repository import Gio
+-from gi.repository import GLib
+ from gi.repository import Gtk
+ from gi.repository import IBus
+ from os import path
 -- 
 1.8.5.3
 

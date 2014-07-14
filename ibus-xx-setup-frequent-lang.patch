@@ -1,6 +1,6 @@
-From 6c5b4f197afde5185c23ed725eecb36da43507e6 Mon Sep 17 00:00:00 2001
+From 79587f187998b6e89c478ac23c7dbcba56a91637 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Tue, 14 Jan 2014 15:30:54 +0900
+Date: Mon, 14 Jul 2014 16:21:19 +0900
 Subject: [PATCH] Enable ibus-setup to show the frequently used languages
  only in IME list.
 
@@ -10,7 +10,7 @@ Subject: [PATCH] Enable ibus-setup to show the frequently used languages
  2 files changed, 292 insertions(+), 24 deletions(-)
 
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 28d2219..0600133 100644
+index 9ee0b1a..c638e7d 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
 @@ -384,6 +384,174 @@ se,si,sk,sy,sy(ku),th,tj,tr,ua,uz,vn
@@ -189,7 +189,7 @@ index 28d2219..0600133 100644
        <applyto>/desktop/ibus/panel/custom_font</applyto>
        <owner>ibus</owner>
 diff --git a/setup/enginecombobox.py b/setup/enginecombobox.py
-index b45ad56..830f0e8 100644
+index 2a2a677..a203b25 100644
 --- a/setup/enginecombobox.py
 +++ b/setup/enginecombobox.py
 @@ -24,6 +24,7 @@ import locale
@@ -207,7 +207,7 @@ index b45ad56..830f0e8 100644
 +        self.__all_model = None
 +        self.__show_sub_lang = False
 +        self.__settings_xkblayoutconfig = Gio.Settings(
-+                "org.freedesktop.ibus.general.xkblayoutconfig");
++                schema = "org.freedesktop.ibus.general.xkblayoutconfig");
  
          renderer = Gtk.CellRendererPixbuf()
          renderer.set_property("xalign", 0)
@@ -217,17 +217,6 @@ index b45ad56..830f0e8 100644
  
 -    def set_engines(self, engines):
 -        self.__model = Gtk.TreeStore(object)
--
--        iter1 = self.__model.append(None)
--        self.__model.set(iter1, 0, 0)
--        langs = {}
--        for e in engines:
--            l = IBus.get_language_name(e.get_language())
--            if l == None:
--                l = ""
--            if l not in langs:
--                langs[l] = []
--            langs[l].append(e)
 +    def __gconf_get_lang_list_from_locale(self):
 +        common_list = ['en', 'Other']
 +        loc = None
@@ -256,7 +245,17 @@ index b45ad56..830f0e8 100644
 +        if lang_list == None:
 +            return [loc] + common_list
 +        return lang_list + common_list
-+
+ 
+-        iter1 = self.__model.append(None)
+-        self.__model.set(iter1, 0, 0)
+-        langs = {}
+-        for e in engines:
+-            l = IBus.get_language_name(e.get_language())
+-            if l == None:
+-                l = ""
+-            if l not in langs:
+-                langs[l] = []
+-            langs[l].append(e)
 +    def __has_engine_in_lang_list(self, engine, lang_list):
 +        retval = False
 +        for lang in lang_list:
@@ -410,5 +409,5 @@ index b45ad56..830f0e8 100644
              raise AttributeError('unknown property %s' % property.name)
  
 -- 
-1.8.0
+1.8.5.3
 

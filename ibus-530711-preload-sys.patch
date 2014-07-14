@@ -1,6 +1,6 @@
-From a6d4b9ac9a22c5b88c362b659eaf6fd59a0cf5bd Mon Sep 17 00:00:00 2001
+From 91f6d9f3d0fc854711c2ba151c0dc5105a0a9152 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Tue, 14 Jan 2014 15:30:24 +0900
+Date: Mon, 14 Jul 2014 16:20:21 +0900
 Subject: [PATCH] Reload preload engines until users customize the list.
 
 The idea is, if users don't customize the preload_engines with ibus-setup,
@@ -18,14 +18,14 @@ IBUS_PRELOAD_ENGINE_MODE_USER and users can customize the value
 'preload-engines'.
 ---
  data/ibus.schemas.in | 24 ++++++++++++++
- setup/main.py        | 70 +++++++++++++++++++++++++++++++++++----
+ setup/main.py        | 72 ++++++++++++++++++++++++++++++++++++----
  setup/setup.ui       | 22 +++++++++++--
  src/ibustypes.h      | 10 ++++++
  ui/gtk3/panel.vala   | 93 ++++++++++++++++++++++++++++++++++++++++++++++++++++
- 5 files changed, 210 insertions(+), 9 deletions(-)
+ 5 files changed, 212 insertions(+), 9 deletions(-)
 
 diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
-index 8fd7e15..28d2219 100644
+index 1e4776b..9ee0b1a 100644
 --- a/data/ibus.schemas.in
 +++ b/data/ibus.schemas.in
 @@ -2,6 +2,30 @@
@@ -60,7 +60,7 @@ index 8fd7e15..28d2219 100644
        <applyto>/desktop/ibus/general/preload_engines</applyto>
        <owner>ibus</owner>
 diff --git a/setup/main.py b/setup/main.py
-index d3f4414..235ef9c 100644
+index dee7be4..a991438 100644
 --- a/setup/main.py
 +++ b/setup/main.py
 @@ -190,16 +190,30 @@ class Setup(object):
@@ -124,7 +124,7 @@ index d3f4414..235ef9c 100644
      def __treeview_notify_cb(self, treeview, prop):
          if prop.name not in ("active-engine", "engines"):
              return
-@@ -321,6 +343,43 @@ class Setup(object):
+@@ -321,6 +343,44 @@ class Setup(object):
              del self.__engine_setup_exec_list[name]
          self.__engine_setup_exec_list[name] = os.spawnl(os.P_NOWAIT, *args)
  
@@ -140,9 +140,10 @@ index d3f4414..235ef9c 100644
 +                        "cleared immediately and the list will be " \
 +                        "configured by the login language every time. " \
 +                        "Do you agree with this?")
-+            dlg = Gtk.MessageDialog(type = Gtk.MessageType.QUESTION,
++            dlg = Gtk.MessageDialog(message_type = Gtk.MessageType.QUESTION,
++                    transient_for = self.__window,
 +                    buttons = Gtk.ButtonsType.YES_NO,
-+                    message_format = message)
++                    text = message)
 +            id = dlg.run()
 +            dlg.destroy()
 +            self.__flush_gtk_events()
@@ -169,7 +170,7 @@ index d3f4414..235ef9c 100644
          self.__bus = IBus.Bus()
          if self.__bus.is_connected():
 diff --git a/setup/setup.ui b/setup/setup.ui
-index 65dcee4..a6a001b 100644
+index 5ffbe47..7c60b72 100644
 --- a/setup/setup.ui
 +++ b/setup/setup.ui
 @@ -677,7 +677,23 @@
@@ -197,7 +198,7 @@ index 65dcee4..a6a001b 100644
                          <property name="orientation">horizontal</property>
                          <property name="visible">True</property>
                          <property name="can_focus">False</property>
-@@ -868,7 +884,7 @@
+@@ -869,7 +885,7 @@
                        <packing>
                          <property name="expand">True</property>
                          <property name="fill">True</property>
@@ -206,7 +207,7 @@ index 65dcee4..a6a001b 100644
                        </packing>
                      </child>
                      <child>
-@@ -916,7 +932,7 @@
+@@ -917,7 +933,7 @@
                        <packing>
                          <property name="expand">False</property>
                          <property name="fill">True</property>
@@ -237,7 +238,7 @@ index 86fc2cc..cb9eb22 100644
   * @x: x coordinate.
   * @y: y coordinate.
 diff --git a/ui/gtk3/panel.vala b/ui/gtk3/panel.vala
-index 1da7966..fc60fd4 100644
+index 7a15049..e6c128a 100644
 --- a/ui/gtk3/panel.vala
 +++ b/ui/gtk3/panel.vala
 @@ -141,6 +141,10 @@ class Panel : IBus.PanelService {
@@ -349,5 +350,5 @@ index 1da7966..fc60fd4 100644
  
      private void update_xkb_engines() {
 -- 
-1.8.0
+1.8.5.3
 

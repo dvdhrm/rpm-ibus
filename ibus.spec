@@ -36,7 +36,7 @@
 
 Name:           ibus
 Version:        1.5.7
-Release:        5%{?dist}
+Release:        6%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -466,6 +466,13 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon Jul 14 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.7-6
+- Updated ibus-HEAD.patch from upstream.
+  Fixed ibus-setup SEGV when an engine is selected.
+  Fixed ibus-setup deprecated warnings with the latest python3-gobject.
+  Integrated the 'IBUS_SETUP_XID' environment variable for each engine setup.
+  Set prgname 'ibus-setup' for ibus-setup.
+
 * Mon Jul 07 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.7-5
 - Updated ibus-HEAD.patch from upstream.
   Added pl(qwertz).
