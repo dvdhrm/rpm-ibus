@@ -36,7 +36,7 @@
 
 Name:           ibus
 Version:        1.5.7
-Release:        6%{?dist}
+Release:        7%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -466,6 +466,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Tue Jul 22 2014 Kalev Lember <kalevlember@gmail.com> - 1.5.7-7
+- Rebuilt for gobject-introspection 1.41.4
+
 * Mon Jul 14 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.7-6
 - Updated ibus-HEAD.patch from upstream.
   Fixed ibus-setup SEGV when an engine is selected.
