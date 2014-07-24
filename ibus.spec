@@ -1,14 +1,7 @@
-%global with_preload_xkb_engine 1
 %global with_pygobject2 1
 %global with_pygobject3 1
 
 %global with_pkg_config %(pkg-config --version >/dev/null 2>&1 && echo -n "1" || echo -n "0")
-
-%if (0%{?fedora} > 19 || 0%{?rhel} > 7)
-%global with_wayland 1
-%else
-%global with_wayland 0
-%endif
 
 %if (0%{?fedora} > 20 || 0%{?rhel} > 7)
 %global with_python2_override_pkg 1
@@ -17,7 +10,6 @@
 %endif
 
 %global ibus_api_version 1.0
-%global ibus_xkb_version 1.5.0.20140114
 
 # for bytecompile in %%{_datadir}/ibus/setup
 %global __python %{__python3}
@@ -35,8 +27,8 @@
 %global dbus_python_version 0.83.0
 
 Name:           ibus
-Version:        1.5.7
-Release:        7%{?dist}
+Version:        1.5.8
+Release:        1%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -44,26 +36,8 @@ URL:            http://code.google.com/p/ibus/
 Source0:        https://github.com/ibus/ibus/releases/download/%{version}/%{name}-%{version}.tar.gz
 Source1:        %{name}-xinput
 Source2:        %{name}.conf.5
-# Actual path is https://github.com/.../%%{ibus_xkb_version}.tar.gz
-# Renamed %%{ibus_xkb_version}.tar.gz to ibus-xkb-%%{ibus_xkb_version}.tar.gz
-Source3:        https://github.com/ibus/ibus-xkb/archive/ibus-xkb-%{ibus_xkb_version}.tar.gz
 # Upstreamed patches.
 # Patch0:         %%{name}-HEAD.patch
-Patch0:         %{name}-HEAD.patch
-# https://bugzilla.redhat.com/show_bug.cgi?id=810211
-Patch1:         %{name}-810211-no-switch-by-no-trigger.patch
-# https://bugzilla.redhat.com/show_bug.cgi?id=541492
-Patch2:         %{name}-541492-xkb.patch
-# https://bugzilla.redhat.com/show_bug.cgi?id=530711
-Patch3:         %{name}-530711-preload-sys.patch
-# Hide minor input method engines on ibus-setup by locale
-Patch4:         %{name}-xx-setup-frequent-lang.patch
-
-# Removed the target.
-# Even if fedpkg srpm's target is rhel, it can run on fedora box.
-# Disable IME on gnome-shell password for the back compatiblity.
-Patch96:        %{name}-xx-f19-password.patch
-
 
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
@@ -86,17 +60,13 @@ BuildRequires:  GConf2-devel
 BuildRequires:  intltool
 BuildRequires:  iso-codes-devel
 BuildRequires:  libnotify-devel
-%if %with_wayland
 BuildRequires:  libwayland-client-devel
-%endif
 
 Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
 Requires:       %{name}-gtk2%{?_isa}   = %{version}-%{release}
 Requires:       %{name}-gtk3%{?_isa}   = %{version}-%{release}
 Requires:       %{name}-setup          = %{version}-%{release}
-%if %with_wayland
 Requires:       %{name}-wayland%{?_isa} = %{version}-%{release}
-%endif
 
 Requires:       iso-codes
 Requires:       dbus-python >= %{dbus_python_version}
@@ -113,8 +83,6 @@ Requires:       python3-gobject
 Requires:       xorg-x11-xinit
 # for setxkbmap
 Requires:       xorg-x11-xkb-utils
-# The feature in ibus-gnome3 is provided by gnome-shell.
-Obsoletes:      ibus-gnome3 < %{version}-%{release}
 
 Requires(post):  desktop-file-utils
 Requires(postun):  desktop-file-utils
@@ -142,7 +110,7 @@ Requires:       gobject-introspection
 This package contains the libraries for IBus
 
 %package gtk2
-Summary:        IBus im module for gtk2
+Summary:        IBus IM module for GTK2
 Group:          System Environment/Libraries
 Requires:       %{name}%{?_isa}        = %{version}-%{release}
 Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
@@ -152,17 +120,17 @@ Provides:       ibus-gtk = %{version}-%{release}
 Obsoletes:      ibus-gtk < %{version}-%{release}
 
 %description gtk2
-This package contains ibus im module for gtk2
+This package contains IBus IM module for GTK2
 
 %package gtk3
-Summary:        IBus im module for gtk3
+Summary:        IBus IM module for GTK3
 Group:          System Environment/Libraries
 Requires:       %{name}%{?_isa}        = %{version}-%{release}
 Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
 Requires(post): glib2 >= %{glib_ver}
 
 %description gtk3
-This package contains ibus im module for gtk3
+This package contains IBus IM module for GTK3
 
 %if %with_pygobject3
 %package setup
@@ -181,40 +149,38 @@ This is a setup utility for IBus.
 
 %if %with_pygobject2
 %package pygtk2
-Summary:        IBus pygtk2 library
+Summary:        IBus PyGTK2 library
 Group:          System Environment/Libraries
 Requires:       %{name} = %{version}-%{release}
 Requires:       pygtk2
 BuildArch:      noarch
 
 %description pygtk2
-This is a pygtk2 library for IBus. Now major IBus engines use pygobject3
+This is a PyGTK2 library for IBus. Now major IBus engines use PyGObject3
 and this package will be deprecated.
 %endif
 
 %if %with_python2_override_pkg
 %package py2override
-Summary:        IBus python2 override library
+Summary:        IBus Python2 override library
 Group:          System Environment/Libraries
 Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
 # Owner of %%python2_sitearch/gi/overrides
 Requires:       pygobject3-base
 
 %description py2override
-This is a python2 override library for IBus. The python files override
-some functions in gobject-introspection.
+This is a Python2 override library for IBus. The Python files override
+some functions in GObject-Introspection.
 %endif
 
-%if %with_wayland
 %package wayland
-Summary:        IBus im module for Wayland
+Summary:        IBus IM module for Wayland
 Group:          System Environment/Libraries
 Requires:       %{name}%{?_isa}        = %{version}-%{release}
 Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
 
 %description wayland
-This package contains IBus im module for Wayland
-%endif
+This package contains IBus IM module for Wayland
 
 %package devel
 Summary:        Development tools for ibus
@@ -233,7 +199,7 @@ The ibus-devel package contains the header files and developer
 docs for ibus.
 
 %package devel-docs
-Summary:        Developer documents for ibus
+Summary:        Developer documents for IBus
 Group:          Development/Libraries
 %if (0%{?fedora} >= 19 || 0%{?rhel} >= 7)
 Requires:       %{name}                = %{version}-%{release}
@@ -243,39 +209,17 @@ Requires:       %{name}%{?_isa}        = %{version}-%{release}
 %endif
 
 %description devel-docs
-The ibus-devel-docs package contains developer documentation for ibus
+The ibus-devel-docs package contains developer documentation for IBus
 
 
 %prep
 %setup -q
 # %%patch0 -p1
-%patch0 -p1
-%if (0%{?fedora} < 20 && 0%{?rhel} < 8)
-%patch96 -p1 -b .passwd
-%endif
-cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
-
-%patch1 -p1 -b .noswitch
-%if %with_preload_xkb_engine
-%patch2 -p1 -b .preload-xkb
-rm -f bindings/vala/ibus-1.0.vapi
-rm -f data/dconf/00-upstream-settings
-%endif
-%patch3 -p1 -b .preload-sys
-%patch4 -p1 -b .setup-frequent-lang
-
-zcat %SOURCE3 | tar xf -
-POS=`(cd ibus-xkb-%ibus_xkb_version/po; ls *.po)`
-for PO in $POS
-do
-  cp po/$PO po/$PO.orig
-  msgcat --use-first po/$PO ibus-xkb-%ibus_xkb_version/po/$PO -o po/$PO
-done
+# cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 
 %build
-%if %with_preload_xkb_engine
-autoreconf -f -i -v
-%endif
+#autoreconf -f -i -v
+#make -C ui/gtk3 maintainer-clean-generic
 %configure \
     --disable-static \
     --enable-gtk2 \
@@ -288,15 +232,9 @@ autoreconf -f -i -v
 %if %with_pygobject2
     --enable-python-library \
 %endif
-%if %with_wayland
     --enable-wayland \
-%endif
     --enable-introspection
 
-%if %with_preload_xkb_engine
-make -C ui/gtk3 maintainer-clean-generic
-%endif
-# make -C po update-gmo
 make %{?_smp_mflags}
 
 %install
@@ -446,10 +384,8 @@ fi
 %python2_sitearch/gi/overrides/IBus.py*
 %endif
 
-%if %with_wayland
 %files wayland
 %{_libexecdir}/ibus-wayland
-%endif
 
 %files devel
 %{_libdir}/lib*.so
@@ -466,6 +402,14 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Jul 24 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.8-1
+- Bumped to 1.5.8
+- Deleted ibus-810211-no-switch-by-no-trigger.patch
+- Deleted ibus-541492-xkb.patch
+- Deleted ibus-530711-preload-sys.patch
+- Deleted ibus-xx-setup-frequent-lang.patch
+- Deleted ibus-xx-f19-password.patch
+
 * Tue Jul 22 2014 Kalev Lember <kalevlember@gmail.com> - 1.5.7-7
 - Rebuilt for gobject-introspection 1.41.4
 
