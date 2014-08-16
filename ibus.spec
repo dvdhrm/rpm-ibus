@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.8
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -402,6 +402,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Sat Aug 16 2014 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.5.8-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_21_22_Mass_Rebuild
+
 * Thu Jul 24 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.8-1
 - Bumped to 1.5.8
 - Deleted ibus-810211-no-switch-by-no-trigger.patch
