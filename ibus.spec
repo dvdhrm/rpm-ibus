@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.9
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -36,8 +36,10 @@ URL:            http://code.google.com/p/ibus/
 Source0:        https://github.com/ibus/ibus/releases/download/%{version}/%{name}-%{version}.tar.gz
 Source1:        %{name}-xinput
 Source2:        %{name}.conf.5
+Source3:        https://fujiwara.fedorapeople.org/ibus/po/%{name}-po-%{version}-20141001.tar.gz
 # Upstreamed patches.
 # Patch0:         %%{name}-HEAD.patch
+Patch0:         %{name}-HEAD.patch
 
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
@@ -214,7 +216,9 @@ The ibus-devel-docs package contains developer documentation for IBus
 
 %prep
 %setup -q
+zcat %SOURCE3 | tar xfv -
 # %%patch0 -p1
+%patch0 -p1
 # cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 
 %build
@@ -402,6 +406,10 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Oct 01 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.9-2
+- Updated ibus-HEAD.patch for rhbz#1136623.
+- Added ibus-po-1.5.9-20141001.tar.gz
+
 * Tue Sep 16 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.9-1
 - Bumped to 1.5.9
 
