@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.9
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -40,6 +40,7 @@ Source3:        https://fujiwara.fedorapeople.org/ibus/po/%{name}-po-%{version}-
 # Upstreamed patches.
 # Patch0:         %%{name}-HEAD.patch
 Patch0:         %{name}-HEAD.patch
+Patch1:         %{name}-xx-increase-timeout.patch
 
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
@@ -219,6 +220,7 @@ The ibus-devel-docs package contains developer documentation for IBus
 zcat %SOURCE3 | tar xfv -
 # %%patch0 -p1
 %patch0 -p1
+%patch1 -p1 -b .tmout
 # cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 
 %build
@@ -406,6 +408,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Oct 24 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.9-3
+- Added ibus-xx-increase-timeout.patch
+
 * Wed Oct 01 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.9-2
 - Updated ibus-HEAD.patch for rhbz#1136623.
 - Added ibus-po-1.5.9-20141001.tar.gz

@@ -1,0 +1,88 @@
+--- ibus-1.5.8/bus/global.c.orig	2014-10-24 11:39:02.992359855 +0900
++++ ibus-1.5.8/bus/global.c	2014-10-24 11:40:33.917051813 +0900
+@@ -28,4 +28,4 @@ gchar *g_address = "unix:tmpdir=/tmp";
+ gchar *g_cache = "auto";
+ gboolean g_mempro = FALSE;
+ gboolean g_verbose = FALSE;
+-gint   g_gdbus_timeout = 5000;
++gint   g_gdbus_timeout = 20000;
+--- ibus-1.5.8/bus/ibusimpl.c.orig	2014-10-14 12:15:30.547369108 +0900
++++ ibus-1.5.8/bus/ibusimpl.c	2014-10-14 12:16:23.182396247 +0900
+@@ -1390,11 +1390,12 @@ _ibus_set_global_engine_ready_cb (BusInp
+ 
+     GError *error = NULL;
+     if (!bus_input_context_set_engine_by_desc_finish (context, res, &error)) {
+-        g_error_free (error);
+         g_dbus_method_invocation_return_error (data->invocation,
+                                                G_DBUS_ERROR,
+                                                G_DBUS_ERROR_FAILED,
+-                                               "Set global engine failed.");
++                                               "Set global engine failed: %s",
++                                               error->message);
++        g_error_free (error);
+     }
+     else {
+         g_dbus_method_invocation_return_value (data->invocation, NULL);
+--- ibus-1.5.8/bus/main.c.orig	2014-10-24 11:41:32.579140912 +0900
++++ ibus-1.5.8/bus/main.c	2014-10-24 11:41:43.520343867 +0900
+@@ -64,7 +64,7 @@ static const GOptionEntry entries[] =
+     { "address",   'a', 0, G_OPTION_ARG_STRING, &g_address,   "specify the address of ibus daemon.", "address" },
+     { "replace",   'r', 0, G_OPTION_ARG_NONE,   &replace,   "if there is an old ibus-daemon is running, it will be replaced.", NULL },
+     { "cache",     't', 0, G_OPTION_ARG_STRING, &g_cache,   "specify the cache mode. [auto/refresh/none]", NULL },
+-    { "timeout",   'o', 0, G_OPTION_ARG_INT,    &g_gdbus_timeout, "gdbus reply timeout in milliseconds. pass -1 to use the default timeout of gdbus.", "timeout [default is 5000]" },
++    { "timeout",   'o', 0, G_OPTION_ARG_INT,    &g_gdbus_timeout, "gdbus reply timeout in milliseconds. pass -1 to use the default timeout of gdbus.", "timeout [default is 20000]" },
+     { "mem-profile", 'm', 0, G_OPTION_ARG_NONE,   &g_mempro,   "enable memory profile, send SIGUSR2 to print out the memory profile.", NULL },
+     { "restart",     'R', 0, G_OPTION_ARG_NONE,   &restart,    "restart panel and config processes when they die.", NULL },
+     { "verbose",   'v', 0, G_OPTION_ARG_NONE,   &g_verbose,   "verbose.", NULL },
+--- ibus-1.5.8/src/ibusshare.c.orig	2014-10-22 11:49:55.386913376 +0900
++++ ibus-1.5.8/src/ibusshare.c	2014-10-24 11:44:15.719249951 +0900
+@@ -158,8 +158,9 @@ ibus_get_socket_path (void)
+ gint
+ ibus_get_timeout (void)
+ {
+-    /* 6000 ms is the default timeout on the ibus-daemon side (5 sec) plus 1. */
+-    static const gint default_timeout = 6000;
++    /* 21000 ms is the default timeout on the ibus-daemon side
++     * (20 sec) plus 1. */
++    static const gint default_timeout = 21000;
+ 
+     static gint64 timeout = -2;
+     if (timeout == -2) {
+--- ibus-1.5.8/ui/gtk3/panel.vala.orig	2014-10-22 12:00:37.017604825 +0900
++++ ibus-1.5.8/ui/gtk3/panel.vala	2014-10-22 15:00:47.742187430 +0900
+@@ -687,14 +687,28 @@ class Panel : IBus.PanelService {
+     }
+ 
+     private void set_engine(IBus.EngineDesc engine) {
+-        if (!m_bus.set_global_engine(engine.get_name())) {
+-            warning("Switch engine to %s failed.", engine.get_name());
+-            return;
+-        }
++        /* Use async because IBus.Bus.set_global_engine() uses
++         * IBus.get_timeout() internally and the value does not follow
++         * ibus-daemon --timeout.
++         */
++        m_bus.set_global_engine_async.begin(engine.get_name(), -1, null,
++                (obj, res) => {
++                    try {
++                        bool result =
++                                m_bus.set_global_engine_async_finish(res);
++                        if (!result)
++                            warning("Switch engine to %s failed.",
++                                    engine.get_name());
++                    } catch (GLib.Error e) {
++                        warning("Switch engine to %s failed.: GLib.Error: %s",
++                                engine.get_name(),
++                                e.message);
++                    }
+ 
+-        // set xkb layout
+-        if (!m_use_system_keyboard_layout)
+-            m_xkblayout.set_layout(engine);
++                    // set xkb layout
++                    if (!m_use_system_keyboard_layout)
++                        m_xkblayout.set_layout(engine);
++                });
+ 
+         engine_contexts_insert(engine);
+     }
