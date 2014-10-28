@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.9
-Release:        3%{?dist}
+Release:        4%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -408,6 +408,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Tue Oct 28 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.9-4
+- Updated ibus-HEAD.patch for upstream #1744.
+
 * Fri Oct 24 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.9-3
 - Added ibus-xx-increase-timeout.patch
 
