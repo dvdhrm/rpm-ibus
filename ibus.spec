@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.9
-Release:        4%{?dist}
+Release:        5%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -82,6 +82,9 @@ Requires:       pygobject3-base
 %endif
 # Owner of %%python3_sitearch/gi/overrides
 Requires:       python3-gobject
+# https://bugzilla.redhat.com/show_bug.cgi?id=1161871
+Requires:       python
+Requires:       python3
 # Owner of %%{_sysconfdir}/X11/xinit
 Requires:       xorg-x11-xinit
 # for setxkbmap
@@ -408,6 +411,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Nov 12 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.9-5
+- rhbz#1161871 Added BR of python and python3
+
 * Tue Oct 28 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.9-4
 - Updated ibus-HEAD.patch for upstream #1744.
 
