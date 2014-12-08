@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.9
-Release:        6%{?dist}
+Release:        7%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -41,6 +41,7 @@ Source3:        https://fujiwara.fedorapeople.org/ibus/po/%{name}-po-%{version}-
 # Patch0:         %%{name}-HEAD.patch
 Patch0:         %{name}-HEAD.patch
 Patch1:         %{name}-xx-increase-timeout.patch
+Patch2:         %{name}-1136623-lost-by-another-focus.patch
 
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
@@ -224,7 +225,9 @@ zcat %SOURCE3 | tar xfv -
 # %%patch0 -p1
 %patch0 -p1
 %patch1 -p1 -b .tmout
+%patch2 -p1 -b .fout
 # cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
+cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 
 %build
 #autoreconf -f -i -v
@@ -411,6 +414,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon Dec 08 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.9-7
+- Added ibus-1136623-lost-by-another-focus.patch to fix #1136623
+
 * Mon Dec 08 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.9-6
 - Updated ibus-xx-increase-timeout.patch to fix #1163722
 - Updated ibus-HEAD.patch for upstream #1747, #1748, #1753
