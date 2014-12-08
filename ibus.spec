@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.9
-Release:        5%{?dist}
+Release:        6%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -411,6 +411,11 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon Dec 08 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.9-6
+- Updated ibus-xx-increase-timeout.patch to fix #1163722
+- Updated ibus-HEAD.patch for upstream #1747, #1748, #1753
+  and gnome #703020, gnome #730628
+
 * Wed Nov 12 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.9-5
 - rhbz#1161871 Added BR of python and python3
 
