@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.9
-Release:        7%{?dist}
+Release:        8%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -231,6 +231,7 @@ cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 
 %build
 #autoreconf -f -i -v
+autoreconf -f -i -v
 #make -C ui/gtk3 maintainer-clean-generic
 %configure \
     --disable-static \
@@ -414,6 +415,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Dec 18 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.9-8
+- Updated ibus-HEAD.patch to fix #1175595 ibus-x11 freeze
+
 * Mon Dec 08 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.9-7
 - Added ibus-1136623-lost-by-another-focus.patch to fix #1136623
 

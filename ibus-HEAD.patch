@@ -670,3 +670,386 @@ index 7601d80..476b159 100644
 -- 
 1.8.5.3
 
+From 576ebc3633aa1fb3076ffac031255c3da4e2cd09 Mon Sep 17 00:00:00 2001
+From: Klemens Baum <klemensbaum@gmail.com>
+Date: Thu, 18 Dec 2014 16:27:23 +0900
+Subject: [PATCH] IMdkit: Track window property offsets correctly
+
+The XIM specification requires that XIM tranports over 20 bytes in size
+be transferred via window properties. The sender calls XChangeProperty
+with PropModeAppend, and instructs the recipient via ClientMessage to
+call XGetWindowProperty with delete set to True.
+
+Naive implementations exhibit a race condition because the receiver
+could have written more data in the meantime, and XGetWindowProperty
+only deletes the property when bytes_after_return is zero. If
+bytes_after_return is non-zero, it is necessary to use an offset when
+reading from the property again.
+
+To ensure that the property data does not grow indefinitely, Xlib
+recycles 21 Atoms in round-robin fashion. Because the XIM specification
+does not limit the number of Atom names of the form "_clientXXX" to be
+used for data transfer over window properties, an XIM server should be
+able to keep of track any number of Atoms, remembering the offset into
+each property.
+
+This patch implements correct tracking of property offsets.
+
+Signed-off-by: Klemens Baum <klemensbaum@gmail.com>
+Reviewed-by: Keith Packard <keithp@keithp.com>
+
+rhbz#1175595
+BUG=https://code.google.com/p/ibus/issues/detail?id=1751
+TEST=client/x11/ibus-x11
+
+Review URL: https://codereview.appspot.com/176190044
+Patch from Klemens Baum <klemensbaum@gmail.com>.
+---
+ util/IMdkit/Makefile.am       |  5 ++-
+ util/IMdkit/Xi18n.h           | 23 +++++++++--
+ util/IMdkit/i18nOffsetCache.c | 89 +++++++++++++++++++++++++++++++++++++++++++
+ util/IMdkit/i18nUtil.c        |  9 +++--
+ util/IMdkit/i18nX.c           | 73 ++++++++++++++++++-----------------
+ 5 files changed, 154 insertions(+), 45 deletions(-)
+ create mode 100644 util/IMdkit/i18nOffsetCache.c
+
+diff --git a/util/IMdkit/Makefile.am b/util/IMdkit/Makefile.am
+index e3946d7..6cbb908 100644
+--- a/util/IMdkit/Makefile.am
++++ b/util/IMdkit/Makefile.am
+@@ -2,8 +2,8 @@
+ #
+ # ibus - The Input Bus
+ #
+-# Copyright (c) 2007-2010 Peng Huang <shawn.p.huang@gmail.com>
+-# Copyright (c) 2007-2010 Red Hat, Inc.
++# Copyright (c) 2007-2014 Peng Huang <shawn.p.huang@gmail.com>
++# Copyright (c) 2007-2014 Red Hat, Inc.
+ #
+ # This library is free software; you can redistribute it and/or
+ # modify it under the terms of the GNU Lesser General Public
+@@ -29,6 +29,7 @@ libIMdkit_la_SOURCES = \
+ 	i18nIc.c \
+ 	i18nIMProto.c \
+ 	i18nMethod.c \
++	i18nOffsetCache.c \
+ 	i18nPtHdr.c \
+ 	i18nUtil.c \
+ 	i18nX.c \
+diff --git a/util/IMdkit/Xi18n.h b/util/IMdkit/Xi18n.h
+index 484cc62..e1d24d5 100644
+--- a/util/IMdkit/Xi18n.h
++++ b/util/IMdkit/Xi18n.h
+@@ -1,7 +1,9 @@
+ /******************************************************************
+  
+-         Copyright 1994, 1995 by Sun Microsystems, Inc.
+-         Copyright 1993, 1994 by Hewlett-Packard Company
++         Copyright (C) 1994-1995 Sun Microsystems, Inc.
++         Copyright (C) 1993-1994 Hewlett-Packard Company
++         Copyright (C) 2014 Peng Huang <shawn.p.huang@gmail.com>
++         Copyright (C) 2014 Red Hat, Inc.
+  
+ Permission to use, copy, modify, distribute, and sell this software
+ and its documentation for any purpose is hereby granted without fee,
+@@ -45,6 +47,7 @@ IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ #define XIM_EXT_MOVE				(0x33)
+ #define COMMON_EXTENSIONS_NUM   		3
+ 
++#include <stddef.h>
+ #include <stdlib.h>
+ #include "IMdkit.h"
+ 
+@@ -138,6 +141,19 @@ typedef struct
+     char	*name;
+ } XIMExt;
+ 
++typedef struct
++{
++    Atom key;
++    unsigned long offset;
++} Xi18nAtomOffsetPair;
++
++typedef struct
++{
++    size_t capacity;
++    size_t size;
++    Xi18nAtomOffsetPair *data;
++} Xi18nOffsetCache;
++
+ typedef struct _Xi18nClient
+ {
+     int		connect_id;
+@@ -149,8 +165,7 @@ typedef struct _Xi18nClient
+      */
+     int		sync;
+     XIMPending  *pending;
+-    /* property offset to read next data */
+-    long        property_offset;
++    Xi18nOffsetCache offset_cache;
+     void *trans_rec;		/* contains transport specific data  */
+     struct _Xi18nClient *next;
+ } Xi18nClient;
+diff --git a/util/IMdkit/i18nOffsetCache.c b/util/IMdkit/i18nOffsetCache.c
+new file mode 100644
+index 0000000..c952d5b
+--- /dev/null
++++ b/util/IMdkit/i18nOffsetCache.c
+@@ -0,0 +1,89 @@
++/*
++ * Copyright (C) 2014 Peng Huang <shawn.p.huang@gmail.com>
++ * Copyright (C) 2014 Red Hat, Inc.
++ *
++ * Permission to use, copy, modify, distribute, and sell this
++ * software and its documentation for any purpose is hereby granted
++ * without fee, provided that the above copyright notice appear in
++ * all copies and that both that copyright notice and this permission
++ * notice appear in supporting documentation, and that the name of
++ * the copyright holders not be used in advertising or publicity
++ * pertaining to distribution of the software without specific,
++ * written prior permission.  The copyright holders make no
++ * representations about the suitability of this software for any
++ * purpose.  It is provided "as is" without express or implied
++ * warranty.
++ *
++ * THE COPYRIGHT HOLDERS DISCLAIM ALL WARRANTIES WITH REGARD TO THIS
++ * SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
++ * FITNESS, IN NO EVENT SHALL THE COPYRIGHT HOLDERS BE LIABLE FOR ANY
++ * SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
++ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
++ * AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
++ * ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
++ * THIS SOFTWARE.
++ *
++ * Author: Klemens Baum <klemensbaum@gmail.com>
++ */
++
++#include <X11/Xlib.h>
++#include <stddef.h>
++#include "IMdkit.h"
++#include "Xi18n.h"
++
++/*
++ * The XIM specification does not limit the number of window properties
++ * that can be used to transfer data, but Xlib uses the atom strings
++ * _client0 through _client20.
++ *
++ * So use that as a sensible initial size for the offset cache.
++ */
++#define INITIAL_OFFSET_CACHE_CAPACITY 21
++#define OFFSET_CACHE_GROWTH_FACTOR 2
++
++void _Xi18nInitOffsetCache (Xi18nOffsetCache *offset_cache)
++{
++    offset_cache->size = 0;
++    offset_cache->capacity = INITIAL_OFFSET_CACHE_CAPACITY;
++    offset_cache->data = (Xi18nAtomOffsetPair *) malloc (
++        INITIAL_OFFSET_CACHE_CAPACITY * sizeof (Xi18nAtomOffsetPair));
++}
++
++unsigned long _Xi18nLookupPropertyOffset (Xi18nOffsetCache *offset_cache,
++                                          Atom key)
++{
++    Xi18nAtomOffsetPair *data = offset_cache->data;
++    size_t i;
++
++    for (i = 0; i < offset_cache->size; ++i) {
++        if (data[i].key == key) {
++            return data[i].offset;
++        }
++    }
++
++    return 0;
++}
++
++void _Xi18nSetPropertyOffset (Xi18nOffsetCache *offset_cache, Atom key,
++                              unsigned long offset)
++{
++    Xi18nAtomOffsetPair *data = offset_cache->data;
++    size_t i;
++
++    for (i = 0; i < offset_cache->size; ++i) {
++        if (data[i].key == key) {
++            data[i].offset = offset;
++            return;
++        }
++    }
++
++    if (++offset_cache->size > offset_cache->capacity) {
++        offset_cache->capacity *= OFFSET_CACHE_GROWTH_FACTOR;
++        offset_cache->data = data = (Xi18nAtomOffsetPair *) realloc (data,
++                offset_cache->capacity * sizeof (Xi18nAtomOffsetPair));
++    }
++
++    data[i].key = key;
++    data[i].offset = offset;
++}
++
+diff --git a/util/IMdkit/i18nUtil.c b/util/IMdkit/i18nUtil.c
+index c07de48..6557bd1 100644
+--- a/util/IMdkit/i18nUtil.c
++++ b/util/IMdkit/i18nUtil.c
+@@ -1,7 +1,9 @@
+ /******************************************************************
+  
+-         Copyright 1994, 1995 by Sun Microsystems, Inc.
+-         Copyright 1993, 1994 by Hewlett-Packard Company
++         Copyright (C) 1994-1995 Sun Microsystems, Inc.
++         Copyright (C) 1993-1994 Hewlett-Packard Company
++         Copyright (C) 2014 Peng Huang <shawn.p.huang@gmail.com>
++         Copyright (C) 2014 Red Hat, Inc.
+  
+ Permission to use, copy, modify, distribute, and sell this software
+ and its documentation for any purpose is hereby granted without fee,
+@@ -36,6 +38,7 @@ IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ #include "XimFunc.h"
+ 
+ Xi18nClient *_Xi18nFindClient (Xi18n, CARD16);
++void _Xi18nInitOffsetCache (Xi18nOffsetCache *);
+ 
+ int
+ _Xi18nNeedSwap (Xi18n i18n_core, CARD16 connect_id)
+@@ -70,7 +73,7 @@ Xi18nClient *_Xi18nNewClient(Xi18n i18n_core)
+     client->sync = False;
+     client->byte_order = '?'; 	/* initial value */
+     memset (&client->pending, 0, sizeof (XIMPending *));
+-    client->property_offset = 0;
++    _Xi18nInitOffsetCache (&client->offset_cache);
+     client->next = i18n_core->address.clients;
+     i18n_core->address.clients = client;
+ 
+diff --git a/util/IMdkit/i18nX.c b/util/IMdkit/i18nX.c
+index 0a54058..8385aba 100644
+--- a/util/IMdkit/i18nX.c
++++ b/util/IMdkit/i18nX.c
+@@ -1,7 +1,9 @@
+ /******************************************************************
+  
+-         Copyright 1994, 1995 by Sun Microsystems, Inc.
+-         Copyright 1993, 1994 by Hewlett-Packard Company
++         Copyright (C) 1994-1995 Sun Microsystems, Inc.
++         Copyright (C) 1993-1994 Hewlett-Packard Company
++         Copyright (C) 2014 Peng Huang <shawn.p.huang@gmail.com>
++         Copyright (C) 2014 Red Hat, Inc.
+  
+ Permission to use, copy, modify, distribute, and sell this software
+ and its documentation for any purpose is hereby granted without fee,
+@@ -29,6 +31,7 @@ IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  
+ ******************************************************************/
+ 
++#include <stddef.h>
+ #include <limits.h>
+ #include <X11/Xlib.h>
+ #include <X11/Xatom.h>
+@@ -38,12 +41,14 @@ IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ #include "Xi18nX.h"
+ #include "XimFunc.h"
+ 
+-extern Xi18nClient *_Xi18nFindClient(Xi18n, CARD16);
+-extern Xi18nClient *_Xi18nNewClient(Xi18n);
+-extern void _Xi18nDeleteClient(Xi18n, CARD16);
+-static Bool WaitXConnectMessage(Display*, Window,
+-                                XEvent*, XPointer);
+-static Bool WaitXIMProtocol(Display*, Window, XEvent*, XPointer);
++extern Xi18nClient *_Xi18nFindClient (Xi18n, CARD16);
++extern Xi18nClient *_Xi18nNewClient (Xi18n);
++extern void _Xi18nDeleteClient (Xi18n, CARD16);
++extern unsigned long _Xi18nLookupPropertyOffset (Xi18nOffsetCache *, Atom);
++extern void _Xi18nSetPropertyOffset (Xi18nOffsetCache *, Atom, unsigned long);
++static Bool WaitXConnectMessage (Display*, Window,
++                                 XEvent*, XPointer);
++static Bool WaitXIMProtocol (Display*, Window, XEvent*, XPointer);
+ 
+ static XClient *NewXClient (Xi18n i18n_core, Window new_client)
+ {
+@@ -129,7 +134,6 @@ static unsigned char *ReadXIMMessage (XIMS ims,
+     else if (ev->format == 32) {
+         /* ClientMessage and WindowProperty */
+         unsigned long length = (unsigned long) ev->data.l[0];
+-        unsigned long get_length;
+         Atom atom = (Atom) ev->data.l[1];
+         int return_code;
+         Atom actual_type_ret;
+@@ -137,21 +141,28 @@ static unsigned char *ReadXIMMessage (XIMS ims,
+         unsigned long bytes_after_ret;
+         unsigned char *prop;
+         unsigned long nitems;
+-
+-        /* Round up length to next 4 byte value. */
+-        get_length = length + 3;
+-        if (get_length > LONG_MAX)
+-            get_length = LONG_MAX;
+-        get_length /= 4;
+-        if (get_length == 0) {
+-            fprintf(stderr, "%s: invalid length 0\n", __func__);
++        Xi18nOffsetCache *offset_cache = &client->offset_cache;
++        unsigned long offset;
++        unsigned long end;
++        unsigned long long_begin;
++        unsigned long long_end;
++
++        if (length == 0) {
++            fprintf (stderr, "%s: invalid length 0\n", __func__);
+             return NULL;
+         }
++
++        offset = _Xi18nLookupPropertyOffset (offset_cache, atom);
++        end = offset + length;
++
++        /* The property data is retrieved in 32-bit chunks */
++        long_begin = offset / 4;
++        long_end = (end + 3) / 4;
+         return_code = XGetWindowProperty (i18n_core->address.dpy,
+                                           x_client->accept_win,
+                                           atom,
+-                                          client->property_offset / 4,
+-                                          get_length,
++                                          long_begin,
++                                          long_end - long_begin,
+                                           True,
+                                           AnyPropertyType,
+                                           &actual_type_ret,
+@@ -162,32 +173,22 @@ static unsigned char *ReadXIMMessage (XIMS ims,
+         if (return_code != Success || actual_format_ret == 0 || nitems == 0) {
+             if (return_code == Success)
+                 XFree (prop);
+-            client->property_offset = 0;
++            fprintf (stderr,
++                    "(XIM-IMdkit) ERROR: XGetWindowProperty failed.\n"
++                    "Protocol data is likely to be inconsistent.\n");
++            _Xi18nSetPropertyOffset (offset_cache, atom, 0);
+             return (unsigned char *) NULL;
+         }
+         /* Update the offset to read next time as needed */
+         if (bytes_after_ret > 0)
+-            client->property_offset += length;
++            _Xi18nSetPropertyOffset (offset_cache, atom, offset + length);
+         else
+-            client->property_offset = 0;
+-        switch (actual_format_ret) {
+-        case 8:
+-        case 16:
+-        case 32:
+-            length = nitems * actual_format_ret / 8;
+-            break;
+-        default:
+-            fprintf(stderr, "%s: unknown property return format: %d\n",
+-                        __func__, actual_format_ret);
+-            XFree(prop);
+-            client->property_offset = 0;
+-            return NULL;
+-        }
++            _Xi18nSetPropertyOffset (offset_cache, atom, 0);
+         /* if hit, it might be an error */
+         if ((p = (unsigned char *) malloc (length)) == NULL)
+             return (unsigned char *) NULL;
+ 
+-        memmove (p, prop, length);
++        memcpy (p, prop + (offset % 4), length);
+         XFree (prop);
+     }
+     return (unsigned char *) p;
+-- 
+2.1.0
+
