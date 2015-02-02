@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.9
-Release:        8%{?dist}
+Release:        9%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -415,6 +415,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon Feb 02 2015 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.9-9
+- Updated ibus-HEAD.patch to fix #1187956 IBusRegistry segv.
+
 * Thu Dec 18 2014 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.9-8
 - Updated ibus-HEAD.patch to fix #1175595 ibus-x11 freeze
 
