@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.9
-Release:        9%{?dist}
+Release:        10%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -73,7 +73,6 @@ Requires:       %{name}-setup          = %{version}-%{release}
 Requires:       %{name}-wayland%{?_isa} = %{version}-%{release}
 
 Requires:       iso-codes
-Requires:       dbus-python >= %{dbus_python_version}
 Requires:       dbus-x11
 Requires:       dconf
 Requires:       librsvg2
@@ -84,7 +83,6 @@ Requires:       pygobject3-base
 # Owner of %%python3_sitearch/gi/overrides
 Requires:       python3-gobject
 # https://bugzilla.redhat.com/show_bug.cgi?id=1161871
-Requires:       python
 Requires:       python3
 # Owner of %%{_sysconfdir}/X11/xinit
 Requires:       xorg-x11-xinit
@@ -159,6 +157,8 @@ This is a setup utility for IBus.
 Summary:        IBus PyGTK2 library
 Group:          System Environment/Libraries
 Requires:       %{name} = %{version}-%{release}
+Requires:       dbus-python >= %{dbus_python_version}
+Requires:       python
 Requires:       pygtk2
 BuildArch:      noarch
 
@@ -174,6 +174,7 @@ Group:          System Environment/Libraries
 Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
 # Owner of %%python2_sitearch/gi/overrides
 Requires:       pygobject3-base
+Requires:       python
 
 %description py2override
 This is a Python2 override library for IBus. The Python files override
@@ -415,6 +416,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon Feb 02 2015 Petr Viktorin <pviktori@redhat.com> - 1.5.9-10
+- Remove dependency on Python 2 from main package
+
 * Mon Feb 02 2015 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.9-9
 - Updated ibus-HEAD.patch to fix #1187956 IBusRegistry segv.
 
