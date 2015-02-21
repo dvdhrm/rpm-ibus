@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.9
-Release:        10%{?dist}
+Release:        11%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -416,6 +416,10 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Sat Feb 21 2015 Till Maas <opensource@till.name> - 1.5.9-11
+- Rebuilt for Fedora 23 Change
+  https://fedoraproject.org/wiki/Changes/Harden_all_packages_with_position-independent_code
+
 * Mon Feb 02 2015 Petr Viktorin <pviktori@redhat.com> - 1.5.9-10
 - Remove dependency on Python 2 from main package
 
