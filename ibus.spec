@@ -9,6 +9,12 @@
 %global with_python2_override_pkg 0
 %endif
 
+%if (0%{?fedora} > 21 || 0%{?rhel} > 7)
+%global with_kde5 1
+%else
+%global with_kde5 0
+%endif
+
 %global ibus_api_version 1.0
 
 # for bytecompile in %%{_datadir}/ibus/setup
@@ -27,8 +33,8 @@
 %global dbus_python_version 0.83.0
 
 Name:           ibus
-Version:        1.5.9
-Release:        11%{?dist}
+Version:        1.5.10
+Release:        1%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -36,12 +42,8 @@ URL:            http://code.google.com/p/ibus/
 Source0:        https://github.com/ibus/ibus/releases/download/%{version}/%{name}-%{version}.tar.gz
 Source1:        %{name}-xinput
 Source2:        %{name}.conf.5
-Source3:        https://fujiwara.fedorapeople.org/ibus/po/%{name}-po-%{version}-20141001.tar.gz
 # Upstreamed patches.
 # Patch0:         %%{name}-HEAD.patch
-Patch0:         %{name}-HEAD.patch
-Patch1:         %{name}-xx-increase-timeout.patch
-Patch2:         %{name}-1136623-lost-by-another-focus.patch
 
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
@@ -222,17 +224,11 @@ The ibus-devel-docs package contains developer documentation for IBus
 
 %prep
 %setup -q
-zcat %SOURCE3 | tar xfv -
 # %%patch0 -p1
-%patch0 -p1
-%patch1 -p1 -b .tmout
-%patch2 -p1 -b .fout
 # cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
-cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 
 %build
 #autoreconf -f -i -v
-autoreconf -f -i -v
 #make -C ui/gtk3 maintainer-clean-generic
 %configure \
     --disable-static \
@@ -247,6 +243,9 @@ autoreconf -f -i -v
     --enable-python-library \
 %endif
     --enable-wayland \
+%if ! %with_kde5
+    --disable-appindicator \
+%endif
     --enable-introspection
 
 make %{?_smp_mflags}
@@ -416,6 +415,9 @@ fi
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Feb 25 2015 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.10-1
+- Bumped to 1.5.10
+
 * Sat Feb 21 2015 Till Maas <opensource@till.name> - 1.5.9-11
 - Rebuilt for Fedora 23 Change
   https://fedoraproject.org/wiki/Changes/Harden_all_packages_with_position-independent_code
