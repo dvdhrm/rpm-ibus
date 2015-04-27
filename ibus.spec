@@ -34,7 +34,7 @@
 
 Name:           ibus
 Version:        1.5.10
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -232,6 +232,7 @@ The ibus-devel-docs package contains developer documentation for IBus
 # %%patch0 -p1
 %patch0 -p1
 # cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
+cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 zcat %SOURCE3 | tar xfv -
 
 %build
@@ -423,6 +424,11 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Apr 24 2015 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.10-3
+- Updated ibus-HEAD.patch from upstream
+  Fixed to show shortcuts on ibus-setup.
+  Bug 1214271 Fixed to enable IME with GTK3 applications in wayland.
+
 * Thu Apr 02 2015 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.10-2
 - Updated ibus-HEAD.patch from upstream
   Added Swedish svdvorak

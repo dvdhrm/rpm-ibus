@@ -1483,3 +1483,74 @@ index 1379860..c77bd2f 100644
 -- 
 2.1.0
 
+From 5d9109b3c56bca60be441ad286688467c67664c8 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Tue, 21 Apr 2015 11:26:04 +0900
+Subject: [PATCH] Fix to show keyboard shortcuts in ibus-setup.
+
+BUG=http://code.google.com/p/ibus/issues/detail?id=1771
+TEST=setup
+
+Review URL: https://codereview.appspot.com/233720043
+---
+ setup/keyboardshortcut.py | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/setup/keyboardshortcut.py b/setup/keyboardshortcut.py
+index 86463cb..39a6d47 100644
+--- a/setup/keyboardshortcut.py
++++ b/setup/keyboardshortcut.py
+@@ -2,8 +2,8 @@
+ #
+ # ibus - The Input Bus
+ #
+-# Copyright (c) 2007-2014 Peng Huang <shawn.p.huang@gmail.com>
+-# Copyright (c) 2007-2014 Red Hat, Inc.
++# Copyright (c) 2007-2015 Peng Huang <shawn.p.huang@gmail.com>
++# Copyright (c) 2007-2015 Red Hat, Inc.
+ #
+ # This library is free software; you can redistribute it and/or
+ # modify it under the terms of the GNU Lesser General Public
+@@ -51,13 +51,13 @@ class KeyboardShortcutSelection(Gtk.Box):
+         # shortcuts view
+         self.__shortcut_view = Gtk.TreeView(
+                 model = Gtk.ListStore(GObject.TYPE_STRING))
+-        self.__shortcut_view.set_size_request(-1, 100)
+         renderer = Gtk.CellRendererText()
+         column = Gtk.TreeViewColumn(_("Keyboard shortcuts"), renderer, text = 0)
+         self.__shortcut_view.append_column(column)
+         self.__shortcut_view.connect("cursor-changed", self.__shortcut_view_cursor_changed_cb)
+         scrolledwindow = Gtk.ScrolledWindow()
+         scrolledwindow.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
++        scrolledwindow.set_min_content_height(100)
+         scrolledwindow.add(self.__shortcut_view)
+         scrolledwindow.set_shadow_type(Gtk.ShadowType.IN)
+         self.pack_start(scrolledwindow, True, True, 4)
+@@ -265,7 +265,9 @@ class KeyboardShortcutSelection(Gtk.Box):
+                               GObject.TYPE_UINT,
+                               GObject.TYPE_UINT)
+         accel_view = Gtk.TreeView(model = model)
++        accel_view.set_headers_visible(False)
+         sw.add(accel_view)
++        sw.set_min_content_height(30)
+         column = Gtk.TreeViewColumn()
+         renderer = Gtk.CellRendererAccel(accel_mode=Gtk.CellRendererAccelMode.OTHER,
+                                          editable=True)
+-- 
+2.3.5
+
+--- ibus-1.5.10/client/gtk2/ibusimcontext.c.orig	2015-04-24 13:49:05.148023921 +0900
++++ ibus-1.5.10/client/gtk2/ibusimcontext.c	2015-04-24 13:52:58.871389692 +0900
+@@ -579,7 +579,11 @@ ibus_im_context_class_init (IBusIMContex
+ 
+     /* init bus object */
+     if (_bus == NULL) {
+-        ibus_set_display (gdk_display_get_name (gdk_display_get_default ()));
++        const gchar *dname = gdk_display_get_name (gdk_display_get_default ());
++        /* ibus-daemon uses DISPLAY variable. */
++        if (g_strcmp0 (dname, "Wayland") == 0)
++            dname = g_getenv ("DISPLAY");
++        ibus_set_display (dname);
+         _bus = ibus_bus_new_async ();
+ 
+         /* init the global fake context */
