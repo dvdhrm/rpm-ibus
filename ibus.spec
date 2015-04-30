@@ -34,7 +34,7 @@
 
 Name:           ibus
 Version:        1.5.10
-Release:        3%{?dist}
+Release:        4%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -424,6 +424,9 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Apr 24 2015 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.10-4
+- Bug 1217410 Updated ibus-xinput for KDE5.
+
 * Fri Apr 24 2015 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.10-3
 - Updated ibus-HEAD.patch from upstream
   Fixed to show shortcuts on ibus-setup.
