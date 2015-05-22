@@ -34,7 +34,7 @@
 
 Name:           ibus
 Version:        1.5.10
-Release:        4%{?dist}
+Release:        5%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -424,6 +424,10 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri May 22 2015 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.10-5
+- Updated ibus-HEAD.patch
+  Fixed Bug 1224025 - IBus radio menu items does not work
+
 * Fri Apr 24 2015 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.10-4
 - Bug 1217410 Updated ibus-xinput for KDE5.
 
