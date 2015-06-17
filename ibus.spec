@@ -34,7 +34,7 @@
 
 Name:           ibus
 Version:        1.5.10
-Release:        5%{?dist}
+Release:        6%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -424,6 +424,9 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Jun 17 2015 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.5.10-6
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_23_Mass_Rebuild
+
 * Fri May 22 2015 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.10-5
 - Updated ibus-HEAD.patch
   Fixed Bug 1224025 - IBus radio menu items does not work
