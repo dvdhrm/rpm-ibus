@@ -3,12 +3,6 @@
 
 %global with_pkg_config %(pkg-config --version >/dev/null 2>&1 && echo -n "1" || echo -n "0")
 
-%if (0%{?fedora} > 20 || 0%{?rhel} > 7)
-%global with_python2_override_pkg 1
-%else
-%global with_python2_override_pkg 0
-%endif
-
 %if (0%{?fedora} > 21 || 0%{?rhel} > 7)
 %global with_kde5 1
 %else
@@ -33,8 +27,8 @@
 %global dbus_python_version 0.83.0
 
 Name:           ibus
-Version:        1.5.10
-Release:        6%{?dist}
+Version:        1.5.11
+Release:        1%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -42,13 +36,13 @@ URL:            http://code.google.com/p/ibus/
 Source0:        https://github.com/ibus/ibus/releases/download/%{version}/%{name}-%{version}.tar.gz
 Source1:        %{name}-xinput
 Source2:        %{name}.conf.5
-Source3:        https://fujiwara.fedorapeople.org/ibus/po/%{name}-po-1.5.10-20150402.tar.gz
 # Upstreamed patches.
 # Patch0:         %%{name}-HEAD.patch
-Patch0:         %%{name}-HEAD.patch
 
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
+# for gtkdoc-fixxref
+BuildRequires:  glib2-doc
 BuildRequires:  gtk2-devel
 BuildRequires:  gtk3-devel
 BuildRequires:  dbus-glib-devel
@@ -83,10 +77,6 @@ Requires:       iso-codes
 Requires:       dbus-x11
 Requires:       dconf
 Requires:       librsvg2
-%if ! %with_python2_override_pkg
-# Owner of %%python2_sitearch/gi/overrides
-Requires:       pygobject3-base
-%endif
 # Owner of %%python3_sitearch/gi/overrides
 Requires:       python3-gobject
 # https://bugzilla.redhat.com/show_bug.cgi?id=1161871
@@ -174,7 +164,6 @@ This is a PyGTK2 library for IBus. Now major IBus engines use PyGObject3
 and this package will be deprecated.
 %endif
 
-%if %with_python2_override_pkg
 %package py2override
 Summary:        IBus Python2 override library
 Group:          System Environment/Libraries
@@ -186,7 +175,6 @@ Requires:       python
 %description py2override
 This is a Python2 override library for IBus. The Python files override
 some functions in GObject-Introspection.
-%endif
 
 %package wayland
 Summary:        IBus IM module for Wayland
@@ -230,14 +218,10 @@ The ibus-devel-docs package contains developer documentation for IBus
 %prep
 %setup -q
 # %%patch0 -p1
-%patch0 -p1
 # cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
-cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
-zcat %SOURCE3 | tar xfv -
 
 %build
 #autoreconf -f -i -v
-autoreconf -f -i -v
 #make -C ui/gtk3 maintainer-clean-generic
 %configure \
     --disable-static \
@@ -245,7 +229,6 @@ autoreconf -f -i -v
     --enable-gtk3 \
     --enable-xim \
     --enable-gtk-doc \
-    --with-no-snooper-apps='gnome-do,Do.*,firefox.*,.*chrome.*,.*chromium.*' \
     --enable-surrounding-text \
     --with-python=python3 \
 %if %with_pygobject2
@@ -368,9 +351,6 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_sysconfdir}/dconf/profile/ibus
 %python3_sitearch/gi/overrides/__pycache__/*.py*
 %python3_sitearch/gi/overrides/IBus.py
-%if ! %with_python2_override_pkg
-%python2_sitearch/gi/overrides/IBus.py*
-%endif
 # ibus owns xinput.d because gnome does not like to depend on imsettings.
 %dir %{_sysconfdir}/X11/xinit/xinput.d
 # Do not use %%config(noreplace) to always get the new keywords in _xinputconf
@@ -401,10 +381,8 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{python2_sitelib}/ibus/*
 %endif
 
-%if %with_python2_override_pkg
 %files py2override
 %python2_sitearch/gi/overrides/IBus.py*
-%endif
 
 %files wayland
 %{_libexecdir}/ibus-wayland
@@ -424,6 +402,11 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Jul 16 2015 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.11-1
+- Bumped to 1.5.11
+- Deleted with_python2_override_pkg macro
+- Added glib2-doc BR
+
 * Wed Jun 17 2015 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.5.10-6
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_23_Mass_Rebuild
 
