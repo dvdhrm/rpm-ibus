@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.11
-Release:        1%{?dist}
+Release:        1%{?dist}.1
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
