@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.11
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -402,6 +402,9 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Tue Nov 10 2015 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.5.11-2
+- Rebuilt for https://fedoraproject.org/wiki/Changes/python3.5
+
 * Thu Jul 16 2015 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.11-1
 - Bumped to 1.5.11
 - Deleted with_python2_override_pkg macro
