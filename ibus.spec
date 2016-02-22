@@ -27,8 +27,8 @@
 %global dbus_python_version 0.83.0
 
 Name:           ibus
-Version:        1.5.12
-Release:        2%{?dist}
+Version:        1.5.13
+Release:        1%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -402,6 +402,9 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon Feb 22 2016 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.13-1
+- Bumped to 1.5.13
+
 * Thu Feb 04 2016 Fedora Release Engineering <releng@fedoraproject.org> - 1.5.12-2
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_24_Mass_Rebuild
 
