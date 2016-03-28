@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.13
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -86,13 +86,16 @@ Requires:       xorg-x11-xinit
 # for setxkbmap
 Requires:       xorg-x11-xkb-utils
 
-Requires(post):  desktop-file-utils
-Requires(postun):  desktop-file-utils
-Requires(postun):  dconf
-Requires(posttrans): dconf
+Requires:               desktop-file-utils
+Requires(post):         desktop-file-utils
+Requires(postun):       desktop-file-utils
+Requires:               dconf
+Requires(postun):       dconf
+Requires(posttrans):    dconf
 
-Requires(post):  %{_sbindir}/alternatives
-Requires(postun):  %{_sbindir}/alternatives
+Requires:               %{_sbindir}/alternatives
+Requires(post):         %{_sbindir}/alternatives
+Requires(postun):       %{_sbindir}/alternatives
 
 %global _xinputconf %{_sysconfdir}/X11/xinit/xinput.d/ibus.conf
 
@@ -116,6 +119,7 @@ Summary:        IBus IM module for GTK2
 Group:          System Environment/Libraries
 Requires:       %{name}%{?_isa}        = %{version}-%{release}
 Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
+Requires:       glib2 >= %{glib_ver}
 Requires(post): glib2 >= %{glib_ver}
 # Added for upgrade el6 to el7
 Provides:       ibus-gtk = %{version}-%{release}
@@ -129,6 +133,7 @@ Summary:        IBus IM module for GTK3
 Group:          System Environment/Libraries
 Requires:       %{name}%{?_isa}        = %{version}-%{release}
 Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
+Requires:       glib2 >= %{glib_ver}
 Requires(post): glib2 >= %{glib_ver}
 
 %description gtk3
@@ -402,6 +407,9 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon Mar 28 2016 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.13-2
+- Bug 1319215 - Add Requires besides Requires(post)
+
 * Mon Feb 22 2016 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.13-1
 - Bumped to 1.5.13
 
