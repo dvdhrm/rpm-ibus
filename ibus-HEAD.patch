@@ -1,1 +1,281 @@
+From 0432aa66b8728bc266da3c2cca84587bc44b3557 Mon Sep 17 00:00:00 2001
+From: Matthias Clasen <mclasen@redhat.com>
+Date: Tue, 8 Mar 2016 11:16:24 +0900
+Subject: [PATCH] Don't warn if DISPLAY is not set
+
+This is normal under Wayland, and not worth warning about.
+The warnings disrupt unit tests in GNOME continuous, which
+treat warnings as fatal.
+
+BUG=https://github.com/ibus/ibus/pull/1844
+R=shawn.p.huang@gmail.com
+
+Review URL: https://codereview.appspot.com/289430043
+
+Patch from Matthias Clasen <mclasen@redhat.com>.
+---
+ src/ibusshare.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/src/ibusshare.c b/src/ibusshare.c
+index 63800a6..b793a96 100644
+--- a/src/ibusshare.c
++++ b/src/ibusshare.c
+@@ -113,10 +113,7 @@ ibus_get_socket_path (void)
+             display = g_strdup (_display);
+         }
+ 
+-        if (display == NULL) {
+-            g_warning ("DISPLAY is empty! We use default DISPLAY (:0.0)");
+-        }
+-        else {
++        if (display) {
+             p = display;
+             hostname = display;
+             for (; *p != ':' && *p != '\0'; p++);
+-- 
+2.7.4
+
+From 84c18f1d382548c52138822a11473d2dac79e485 Mon Sep 17 00:00:00 2001
+From: Rui Matos <tiagomatos@gmail.com>
+Date: Wed, 25 May 2016 11:21:09 +0900
+Subject: [PATCH] Install a DBus service file
+
+With the transition to user scoped DBus sessions (vs. login sessions)
+there's a need to start ibus-daemon via DBus activation so that the
+process gets properly tracked and disposed of when the login session
+ends. Otherwise the ibus-daemon process lingers on and keeps the whole
+login session up.
+
+We already connect and own a well known name on DBus. The remaining
+missing piece is the DBus service file which we introduce here.
+
+BUG=https://github.com/ibus/ibus/pull/1853
+R=Shawn.P.Huang@gmail.com
+
+Review URL: https://codereview.appspot.com/295340043
+
+Patch from Rui Matos <tiagomatos@gmail.com>.
+---
+ bus/Makefile.am                     | 11 +++++++++++
+ bus/org.freedesktop.IBus.service.in |  3 +++
+ 2 files changed, 14 insertions(+)
+ create mode 100644 bus/org.freedesktop.IBus.service.in
+
+diff --git a/bus/Makefile.am b/bus/Makefile.am
+index 26cb2f8..4dabacf 100644
+--- a/bus/Makefile.am
++++ b/bus/Makefile.am
+@@ -174,4 +174,15 @@ man_onedir = $(mandir)/man1
+ %.1.gz: %.1
+ 	$(AM_V_GEN) gzip -c $< > $@.tmp && mv $@.tmp $@
+ 
++
++dbusservice_in_files = org.freedesktop.IBus.service.in
++dbusservice_DATA = $(dbusservice_in_files:.service.in=.service)
++dbusservicedir=${datadir}/dbus-1/services
++
++org.freedesktop.IBus.service: org.freedesktop.IBus.service.in
++	$(AM_V_GEN) sed -e "s|\@bindir\@|$(bindir)|" $< > $@.tmp && mv $@.tmp $@
++
++EXTRA_DIST += $(dbusservice_in_files)
++CLEANFILES += $(dbusservice_DATA)
++
+ -include $(top_srcdir)/git.mk
+diff --git a/bus/org.freedesktop.IBus.service.in b/bus/org.freedesktop.IBus.service.in
+new file mode 100644
+index 0000000..cc88834
+--- /dev/null
++++ b/bus/org.freedesktop.IBus.service.in
+@@ -0,0 +1,3 @@
++[D-BUS Service]
++Name=org.freedesktop.IBus
++Exec=@bindir@/ibus-daemon --replace --xim --panel disable
+-- 
+2.7.4
+
+From 3ef21fef0135f7b4fe9611d201f15611734f6c51 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Fri, 3 Jun 2016 11:52:29 +0900
+Subject: [PATCH] client/gtk2: Fix SEGV with Wayland display
+
+Delete gdk_display_get_name() in GTK clients because ibus-daemon
+does not use gdk_display_get_name().
+GdkX11Dislay and GdkX11Window does not work with Wayland.
+
+BUG=https://github.com/ibus/ibus/issues/1859
+R=Shawn.P.Huang@gmail.com
+
+Review URL: https://codereview.appspot.com/301760043
+---
+ client/gtk2/ibusimcontext.c | 5 -----
+ setup/main.py               | 7 +++++--
+ 2 files changed, 5 insertions(+), 7 deletions(-)
+
+diff --git a/client/gtk2/ibusimcontext.c b/client/gtk2/ibusimcontext.c
+index 9d927e6..0df0062 100644
+--- a/client/gtk2/ibusimcontext.c
++++ b/client/gtk2/ibusimcontext.c
+@@ -583,11 +583,6 @@ ibus_im_context_class_init (IBusIMContextClass *class)
+ 
+     /* init bus object */
+     if (_bus == NULL) {
+-        const gchar *dname = gdk_display_get_name (gdk_display_get_default ());
+-        /* ibus-daemon uses DISPLAY variable. */
+-        if (g_strcmp0 (dname, "Wayland") == 0)
+-            dname = g_getenv ("DISPLAY");
+-        ibus_set_display (dname);
+         _bus = ibus_bus_new_async ();
+ 
+         /* init the global fake context */
+diff --git a/setup/main.py b/setup/main.py
+index 26c2b0f..e1f7a9d 100644
+--- a/setup/main.py
++++ b/setup/main.py
+@@ -275,8 +275,11 @@ class Setup(object):
+         self.__init_general()
+ 
+     def __gdk_window_set_cb(self, object, pspec):
+-        str = '%u' % GdkX11.X11Window.get_xid(object.get_window())
+-        GLib.setenv('IBUS_SETUP_XID', str, True)
++        window = object.get_window()
++        if type(window) != GdkX11.X11Window:
++            return
++        s = '%u' % GdkX11.X11Window.get_xid(window)
++        GLib.setenv('IBUS_SETUP_XID', s, True)
+ 
+     def __combobox_notify_active_engine_cb(self, combobox, property):
+         engine = self.__combobox.get_active_engine()
+-- 
+2.7.4
+
+From a598ae29223d1ca25e76bf7d7de9703f63ea337e Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Fri, 3 Jun 2016 19:44:11 +0900
+Subject: [PATCH] ui/gtk3: Fix panel CSS format for GTK 3.20
+
+CSS node names have been changed since GTK 3.20 and the font size and
+widget color no longer work with the previous node names.
+
+BUG=https://github.com/ibus/ibus/issues/1856
+
+Review URL: https://codereview.appspot.com/297380043
+---
+ ui/gtk3/candidatearea.vala | 16 +++++++++++++---
+ ui/gtk3/handle.vala        | 10 ++++++++--
+ ui/gtk3/panel.vala         |  9 +++++++--
+ 3 files changed, 28 insertions(+), 7 deletions(-)
+
+diff --git a/ui/gtk3/candidatearea.vala b/ui/gtk3/candidatearea.vala
+index c969312..3848f0d 100644
+--- a/ui/gtk3/candidatearea.vala
++++ b/ui/gtk3/candidatearea.vala
+@@ -3,7 +3,7 @@
+  * ibus - The Input Bus
+  *
+  * Copyright(c) 2011-2015 Peng Huang <shawn.p.huang@gmail.com>
+- * Copyright(c) 2015 Takao Fujiwara <takao.fujiwara1@gmail.com>
++ * Copyright(c) 2015-2016 Takao Fujiwara <takao.fujiwara1@gmail.com>
+  *
+  * This library is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU Lesser General Public
+@@ -31,6 +31,10 @@ class CandidateArea : Gtk.Box {
+     private uint m_focus_candidate;
+     private bool m_show_cursor;
+ 
++    private bool m_use_latest_css_format =
++            ((Gtk.MAJOR_VERSION > 3) ||
++             (Gtk.MAJOR_VERSION == 3) && (Gtk.MINOR_VERSION >= 20));
++
+     private const string LABELS[] = {
+         "1.", "2.", "3.", "4.", "5.", "6.", "7.", "8.",
+         "9.", "0.", "a.", "b.", "c.", "d.", "e.", "f."
+@@ -103,7 +107,8 @@ class CandidateArea : Gtk.Box {
+                 Pango.AttrList attrs = get_pango_attr_list_from_ibus_text(candidates[i]);
+                 if (i == focus_candidate && show_cursor) {
+                     Gtk.StyleContext context = m_candidates[i].get_style_context();
+-                    Gdk.RGBA color = context.get_color(Gtk.StateFlags.SELECTED);
++                    Gdk.RGBA *color = null;
++                    context.get(Gtk.StateFlags.SELECTED, "color", out color);
+                     Pango.Attribute pango_attr = Pango.attr_foreground_new(
+                             (uint16)(color.red * uint16.MAX),
+                             (uint16)(color.green * uint16.MAX),
+@@ -112,7 +117,12 @@ class CandidateArea : Gtk.Box {
+                     pango_attr.end_index = candidates[i].get_text().length;
+                     attrs.insert((owned)pango_attr);
+ 
+-                    color = context.get_background_color(Gtk.StateFlags.SELECTED);
++                    color = null;
++                    string bg_prop =
++                            m_use_latest_css_format
++                            ? "-gtk-secondary-caret-color"
++                            : "background-color";
++                    context.get(Gtk.StateFlags.SELECTED, bg_prop, out color);
+                     pango_attr = Pango.attr_background_new(
+                             (uint16)(color.red * uint16.MAX),
+                             (uint16)(color.green * uint16.MAX),
+diff --git a/ui/gtk3/handle.vala b/ui/gtk3/handle.vala
+index 1edb537..bef5e8b 100644
+--- a/ui/gtk3/handle.vala
++++ b/ui/gtk3/handle.vala
+@@ -2,7 +2,8 @@
+  *
+  * ibus - The Input Bus
+  *
+- * Copyright(c) 2011-2015 Peng Huang <shawn.p.huang@gmail.com>
++ * Copyright(c) 2011-2016 Peng Huang <shawn.p.huang@gmail.com>
++ * Copyright(c) 2016 Takao Fujiwara <takao.fujiwara1@gmail.com>
+  *
+  * This library is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU Lesser General Public
+@@ -29,6 +30,11 @@ class Handle : Gtk.EventBox {
+     public signal void move_end();
+ 
+     public Handle() {
++        // Call base class constructor
++        GLib.Object(
++            name : "IBusHandle"
++        );
++
+         set_size_request(6, -1);
+         Gdk.EventMask mask = Gdk.EventMask.EXPOSURE_MASK |
+                              Gdk.EventMask.BUTTON_PRESS_MASK |
+@@ -42,7 +48,7 @@ class Handle : Gtk.EventBox {
+         Gtk.CssProvider css_provider = new Gtk.CssProvider();
+         try {
+             css_provider.load_from_data(
+-                    "GtkEventBox { background-color: gray }", -1);
++                    "#IBusHandle { background-color: gray }", -1);
+         } catch (GLib.Error error) {
+             warning("Parse error in Handle: %s", error.message);
+         }
+diff --git a/ui/gtk3/panel.vala b/ui/gtk3/panel.vala
+index 2ca3a5e..cc19350 100644
+--- a/ui/gtk3/panel.vala
++++ b/ui/gtk3/panel.vala
+@@ -3,7 +3,7 @@
+  * ibus - The Input Bus
+  *
+  * Copyright(c) 2011-2014 Peng Huang <shawn.p.huang@gmail.com>
+- * Copyright(c) 2015 Takao Fujwiara <takao.fujiwara1@gmail.com>
++ * Copyright(c) 2015-2016 Takao Fujwiara <takao.fujiwara1@gmail.com>
+  *
+  * This library is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU Lesser General Public
+@@ -543,7 +543,12 @@ class Panel : IBus.PanelService {
+             return;
+         }
+ 
+-        string data_format = "GtkLabel { font: %s; }";
++        string data_format = "label { font: %s; }";
++        if (Gtk.MAJOR_VERSION < 3 ||
++            (Gtk.MAJOR_VERSION == 3 && Gtk.MINOR_VERSION < 20)) {
++            data_format = "GtkLabel { font: %s; }";
++        }
++
+         string data = data_format.printf(font_name);
+         m_css_provider = new Gtk.CssProvider();
+ 
+-- 
+2.7.4
 

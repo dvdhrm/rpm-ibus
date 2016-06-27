@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.13
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -38,6 +38,7 @@ Source1:        %{name}-xinput
 Source2:        %{name}.conf.5
 # Upstreamed patches.
 # Patch0:         %%{name}-HEAD.patch
+Patch0:         %{name}-HEAD.patch
 
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
@@ -223,10 +224,13 @@ The ibus-devel-docs package contains developer documentation for IBus
 %prep
 %setup -q
 # %%patch0 -p1
+%patch0 -p1
 # cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
+cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 
 %build
 #autoreconf -f -i -v
+autoreconf -f -i -v
 #make -C ui/gtk3 maintainer-clean-generic
 %configure \
     --disable-static \
@@ -339,6 +343,7 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_bindir}/ibus
 %{_bindir}/ibus-daemon
 %{_datadir}/bash-completion/completions/ibus.bash
+%{_datadir}/dbus-1/services/*.service
 %{_datadir}/GConf/gsettings/*
 %{_datadir}/glib-2.0/schemas/*.xml
 %{_datadir}/ibus/component
@@ -407,6 +412,11 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon Jun 27 2016 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.13-3
+- Bug 1349732 - ibus not working at all in Gnome Wayland
+- Add ibus service file
+- Fix CSS color format and font size
+
 * Mon Mar 28 2016 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.13-2
 - Bug 1319215 - Add Requires besides Requires(post)
 
