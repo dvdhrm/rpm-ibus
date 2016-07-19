@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.13
-Release:        3%{?dist}
+Release:        4%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -412,6 +412,9 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Tue Jul 19 2016 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.5.13-4
+- https://fedoraproject.org/wiki/Changes/Automatic_Provides_for_Python_RPM_Packages
+
 * Mon Jun 27 2016 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.13-3
 - Bug 1349732 - ibus not working at all in Gnome Wayland
 - Add ibus service file
