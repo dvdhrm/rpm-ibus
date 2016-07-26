@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.13
-Release:        4%{?dist}
+Release:        5%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -67,6 +67,8 @@ BuildRequires:  libwayland-client-devel
 %if %with_kde5
 BuildRequires:  qt5-qtbase-devel
 %endif
+BuildRequires:  nodejs-emojione-json
+BuildRequires:  json-glib-devel
 
 Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
 Requires:       %{name}-gtk2%{?_isa}   = %{version}-%{release}
@@ -347,6 +349,7 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/GConf/gsettings/*
 %{_datadir}/glib-2.0/schemas/*.xml
 %{_datadir}/ibus/component
+%{_datadir}/ibus/dicts
 %{_datadir}/ibus/engine
 %{_datadir}/ibus/keymaps
 %{_datadir}/icons/hicolor/*/apps/*
@@ -412,6 +415,9 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Tue Jul 26 2016 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.13-5
+- Bug 1359753 - Implement Emoji typing
+
 * Tue Jul 19 2016 Fedora Release Engineering <rel-eng@lists.fedoraproject.org> - 1.5.13-4
 - https://fedoraproject.org/wiki/Changes/Automatic_Provides_for_Python_RPM_Packages
 
