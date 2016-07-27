@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.13
-Release:        5%{?dist}
+Release:        6%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -67,8 +67,10 @@ BuildRequires:  libwayland-client-devel
 %if %with_kde5
 BuildRequires:  qt5-qtbase-devel
 %endif
+%ifarch %{nodejs_arches}
 BuildRequires:  nodejs-emojione-json
 BuildRequires:  json-glib-devel
+%endif
 
 Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
 Requires:       %{name}-gtk2%{?_isa}   = %{version}-%{release}
@@ -249,7 +251,11 @@ autoreconf -f -i -v
 %if ! %with_kde5
     --disable-appindicator \
 %endif
-    --enable-introspection
+    --enable-introspection \
+%ifnarch %{nodejs_arches}
+    --disable-emoji-dict \
+%endif
+    %{nil}
 
 make %{?_smp_mflags}
 
@@ -349,7 +355,9 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/GConf/gsettings/*
 %{_datadir}/glib-2.0/schemas/*.xml
 %{_datadir}/ibus/component
+%ifarch %{nodejs_arches}
 %{_datadir}/ibus/dicts
+%endif
 %{_datadir}/ibus/engine
 %{_datadir}/ibus/keymaps
 %{_datadir}/icons/hicolor/*/apps/*
