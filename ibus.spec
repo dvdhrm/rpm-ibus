@@ -423,6 +423,9 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Jul 27 2016 Dan Horák <dan[at]danny.cz> - 1.5.13-6
+- enable Emoji only on arches providing nodejs functionality
+
 * Tue Jul 26 2016 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.13-5
 - Bug 1359753 - Implement Emoji typing
 
