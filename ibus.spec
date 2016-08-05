@@ -27,8 +27,8 @@
 %global dbus_python_version 0.83.0
 
 Name:           ibus
-Version:        1.5.13
-Release:        6%{?dist}
+Version:        1.5.14
+Release:        1%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -38,7 +38,6 @@ Source1:        %{name}-xinput
 Source2:        %{name}.conf.5
 # Upstreamed patches.
 # Patch0:         %%{name}-HEAD.patch
-Patch0:         %{name}-HEAD.patch
 
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
@@ -228,13 +227,10 @@ The ibus-devel-docs package contains developer documentation for IBus
 %prep
 %setup -q
 # %%patch0 -p1
-%patch0 -p1
 # cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
-cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 
 %build
 #autoreconf -f -i -v
-autoreconf -f -i -v
 #make -C ui/gtk3 maintainer-clean-generic
 %configure \
     --disable-static \
@@ -423,6 +419,9 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Aug 05 2016 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.14-1
+- Bump to 1.5.14
+
 * Wed Jul 27 2016 Dan Horák <dan[at]danny.cz> - 1.5.13-6
 - enable Emoji only on arches providing nodejs functionality
 
