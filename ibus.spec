@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.14
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -36,8 +36,10 @@ URL:            https://github.com/ibus/ibus/wiki
 Source0:        https://github.com/ibus/ibus/releases/download/%{version}/%{name}-%{version}.tar.gz
 Source1:        %{name}-xinput
 Source2:        %{name}.conf.5
+Source3:        https://fujiwara.fedorapeople.org/ibus/po/%{name}-po-1.5.14-20160909.tar.gz
 # Upstreamed patches.
 # Patch0:         %%{name}-HEAD.patch
+Patch0:         %{name}-HEAD.patch
 
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
@@ -228,6 +230,8 @@ The ibus-devel-docs package contains developer documentation for IBus
 %setup -q
 # %%patch0 -p1
 # cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
+%patch0 -p1
+zcat %SOURCE3 | tar xfv -
 
 %build
 #autoreconf -f -i -v
@@ -253,6 +257,7 @@ The ibus-devel-docs package contains developer documentation for IBus
 %endif
     %{nil}
 
+make -C ui/gtk3 maintainer-clean-generic
 make %{?_smp_mflags}
 
 %install
@@ -419,6 +424,10 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Sep 09 2016 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.14-2
+- Fixed radio button on PropertyPanel.
+- Updated translations.
+
 * Fri Aug 05 2016 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.14-1
 - Bump to 1.5.14
 
