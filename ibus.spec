@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.14
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -424,6 +424,11 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Oct 06 2016 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.14-3
+- Fixed Bug 1380675 - Emoji leaves the candidates of @laugh when @laughing
+- Fixed Bug 1380690 - User is not able to select emojis from digit keys
+- Fixed Bug 1380691 - PageUp PageDown buttons on emoji lookup not working
+
 * Fri Sep 09 2016 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.14-2
 - Fixed radio button on PropertyPanel.
 - Updated translations.

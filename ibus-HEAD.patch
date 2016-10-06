@@ -111,3 +111,284 @@ index 6d5fd81..ea960b8 100644
 -- 
 2.7.4
 
+From e795eda1a3b054e6fdc921bfe04c83733761905f Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Thu, 6 Oct 2016 15:28:24 +0900
+Subject: [PATCH 1/3] src: Hide lookup table if emoji annotation does not hit
+
+If emoji annotation hits "aaa" but not "aaab", hide the lookup
+window with "aaab".
+Also hide the lookup window with Escape key.
+
+BUG=rhbz#1380675
+
+Review URL: https://codereview.appspot.com/307400043
+---
+ src/ibusenginesimple.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
+
+diff --git a/src/ibusenginesimple.c b/src/ibusenginesimple.c
+index 8efe5a9..b22b06f 100644
+--- a/src/ibusenginesimple.c
++++ b/src/ibusenginesimple.c
+@@ -1018,6 +1018,10 @@ ibus_engine_simple_process_key_event (IBusEngine *engine,
+         }
+         else if (is_escape) {
+             ibus_engine_simple_reset (engine);
++            if (priv->lookup_table != NULL && priv->lookup_table_visible) {
++                priv->lookup_table_visible = FALSE;
++                ibus_engine_simple_update_lookup_and_aux_table (simple);
++            }
+             return TRUE;
+         }
+ 
+@@ -1165,6 +1169,10 @@ ibus_engine_simple_process_key_event (IBusEngine *engine,
+         }
+         else if (is_escape) {
+             ibus_engine_simple_reset (engine);
++            if (priv->lookup_table != NULL && priv->lookup_table_visible) {
++                priv->lookup_table_visible = FALSE;
++                ibus_engine_simple_update_lookup_and_aux_table (simple);
++            }
+             return TRUE;
+         }
+     } else {
+@@ -1243,8 +1251,10 @@ ibus_engine_simple_process_key_event (IBusEngine *engine,
+                         priv->lookup_table_visible = FALSE;
+                         update_lookup_table = TRUE;
+                     }
+-                }
+-                else if (check_emoji_table (simple, n_compose, -1)) {
++                } else if (check_emoji_table (simple, n_compose, -1)) {
++                    update_lookup_table = TRUE;
++                } else {
++                    priv->lookup_table_visible = FALSE;
+                     update_lookup_table = TRUE;
+                 }
+             }
+-- 
+2.7.4
+
+From 4d86e59d0245df6d3a6aa1a32cdf7702b6dc7f0d Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Thu, 6 Oct 2016 15:35:03 +0900
+Subject: [PATCH 2/3] src: Enable to type digit to commit emoji on lookup
+ window
+
+Enables to commit an emoji on the lookup window by a digit key.
+Before this patch, Ctrl-Shift-U, "11" shows emojis of 11 clock.
+After this patch, Ctrl-Shift-U, "11" commits an emoji of 1 clock.
+Probably Ctrl-Shift-U, "clock" can be a workaround.
+
+BUG=rhbz#1380690
+R=Shawn.P.Huang@gmail.com
+
+Review URL: https://codereview.appspot.com/309640043
+---
+ src/ibusenginesimple.c | 80 ++++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 78 insertions(+), 2 deletions(-)
+
+diff --git a/src/ibusenginesimple.c b/src/ibusenginesimple.c
+index b22b06f..23e1c9d 100644
+--- a/src/ibusenginesimple.c
++++ b/src/ibusenginesimple.c
+@@ -901,6 +901,66 @@ ibus_engine_simple_update_lookup_and_aux_table (IBusEngineSimple *simple)
+ }
+ 
+ static gboolean
++ibus_engine_simple_if_in_range_of_lookup_table (IBusEngineSimple *simple,
++                                                guint             keyval)
++{
++    IBusEngineSimplePrivate *priv;
++    int index, candidates, cursor_pos, cursor_in_page, page_size;
++
++    priv = simple->priv;
++
++    if (priv->lookup_table == NULL || !priv->lookup_table_visible)
++        return FALSE;
++    if (keyval < IBUS_KEY_0 || keyval > IBUS_KEY_9)
++        return FALSE;
++    if (keyval == IBUS_KEY_0)
++        keyval = IBUS_KEY_9 + 1;
++    index = keyval - IBUS_KEY_1;
++    candidates =
++            ibus_lookup_table_get_number_of_candidates (priv->lookup_table);
++    cursor_pos = ibus_lookup_table_get_cursor_pos (priv->lookup_table);
++    cursor_in_page = ibus_lookup_table_get_cursor_in_page (priv->lookup_table);
++    page_size = ibus_lookup_table_get_page_size (priv->lookup_table);
++    if (index > ((candidates - (cursor_pos - cursor_in_page)) % page_size))
++        return FALSE;
++    return TRUE;
++}
++
++static void
++ibus_engine_simple_set_number_on_lookup_table (IBusEngineSimple *simple,
++                                               guint             keyval,
++                                               int               n_compose)
++{
++    IBusEngineSimplePrivate *priv;
++    int index, cursor_pos, cursor_in_page, real_index;
++
++    priv = simple->priv;
++
++    if (keyval == IBUS_KEY_0)
++        keyval = IBUS_KEY_9 + 1;
++    index = keyval - IBUS_KEY_1;
++    cursor_pos = ibus_lookup_table_get_cursor_pos (priv->lookup_table);
++    cursor_in_page = ibus_lookup_table_get_cursor_in_page (priv->lookup_table);
++    real_index = cursor_pos - cursor_in_page + index;
++
++    ibus_lookup_table_set_cursor_pos (priv->lookup_table, real_index);
++    check_emoji_table (simple, n_compose, real_index);
++    priv->lookup_table_visible = FALSE;
++    ibus_engine_simple_update_lookup_and_aux_table (simple);
++
++    if (priv->tentative_emoji && *priv->tentative_emoji) {
++        ibus_engine_simple_commit_str (simple, priv->tentative_emoji);
++        priv->compose_buffer[0] = 0;
++    } else {
++        g_clear_pointer (&priv->tentative_emoji, g_free);
++        priv->in_emoji_sequence = FALSE;
++        priv->compose_buffer[0] = 0;
++    }
++
++    ibus_engine_simple_update_preedit_text (simple);
++}
++
++static gboolean
+ ibus_engine_simple_process_key_event (IBusEngine *engine,
+                                       guint       keyval,
+                                       guint       keycode,
+@@ -1162,7 +1222,15 @@ ibus_engine_simple_process_key_event (IBusEngine *engine,
+         }
+     } else if (priv->in_emoji_sequence) {
+         if (printable_keyval) {
+-            priv->compose_buffer[n_compose++] = printable_keyval;
++            if (!ibus_engine_simple_if_in_range_of_lookup_table (simple,
++                        printable_keyval)) {
++                /* digit keyval can be an index on the current lookup table
++                 * but it also can be a part of an emoji annotation.
++                 * E.g. "1" and "2" are  indexes of emoji "1".
++                 * "100" is an annotation of the emoji "100".
++                 */
++                priv->compose_buffer[n_compose++] = printable_keyval;
++            }
+         }
+         else if (is_space && (modifiers & IBUS_SHIFT_MASK)) {
+             priv->compose_buffer[n_compose++] = IBUS_KEY_space;
+@@ -1243,7 +1311,15 @@ ibus_engine_simple_process_key_event (IBusEngine *engine,
+             }
+ 
+             if (!update_lookup_table) {
+-                if (is_hex_end && !is_space) {
++                if (ibus_engine_simple_if_in_range_of_lookup_table (simple,
++                            keyval)) {
++                        ibus_engine_simple_set_number_on_lookup_table (
++                                simple,
++                                keyval,
++                                n_compose);
++                        return TRUE;
++                }
++                else if (is_hex_end && !is_space) {
+                     if (priv->lookup_table) {
+                         int index = (int) ibus_lookup_table_get_cursor_pos (
+                                 priv->lookup_table);
+-- 
+2.7.4
+
+From faf5e3c56d746d2f171618d552cff9149bb1d952 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Thu, 6 Oct 2016 15:37:25 +0900
+Subject: [PATCH 3/3] src: Enable PageUp, PageDown, CandidateClick buttons with
+ emoji lookup
+
+BUG=rhbz#1380691
+
+Review URL: https://codereview.appspot.com/312760043
+---
+ src/ibusenginesimple.c | 55 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
+
+diff --git a/src/ibusenginesimple.c b/src/ibusenginesimple.c
+index 23e1c9d..65c33a0 100644
+--- a/src/ibusenginesimple.c
++++ b/src/ibusenginesimple.c
+@@ -107,6 +107,13 @@ static gboolean ibus_engine_simple_process_key_event
+                                                  guint               keyval,
+                                                  guint               keycode,
+                                                  guint               modifiers);
++static void     ibus_engine_simple_page_down   (IBusEngine          *engine);
++static void     ibus_engine_simple_page_up     (IBusEngine          *engine);
++static void     ibus_engine_simple_candidate_clicked
++                                               (IBusEngine          *engine,
++                                                guint                index,
++                                                guint                button,
++                                                guint                state);
+ static void     ibus_engine_simple_commit_char (IBusEngineSimple    *simple,
+                                                 gunichar             ch);
+ static void     ibus_engine_simple_commit_str  (IBusEngineSimple    *simple,
+@@ -128,6 +135,10 @@ ibus_engine_simple_class_init (IBusEngineSimpleClass *class)
+     engine_class->reset     = ibus_engine_simple_reset;
+     engine_class->process_key_event
+                             = ibus_engine_simple_process_key_event;
++    engine_class->page_down = ibus_engine_simple_page_down;
++    engine_class->page_up   = ibus_engine_simple_page_up;
++    engine_class->candidate_clicked
++                            = ibus_engine_simple_candidate_clicked;
+ 
+     g_type_class_add_private (class, sizeof (IBusEngineSimplePrivate));
+ }
+@@ -1395,6 +1406,50 @@ ibus_engine_simple_process_key_event (IBusEngine *engine,
+     return no_sequence_matches (simple, n_compose, keyval, keycode, modifiers);
+ }
+ 
++static void
++ibus_engine_simple_page_down (IBusEngine *engine)
++{
++    IBusEngineSimple *simple = (IBusEngineSimple *)engine;
++    IBusEngineSimplePrivate *priv = simple->priv;
++    if (priv->lookup_table == NULL)
++        return;
++    ibus_lookup_table_page_down (priv->lookup_table);
++    ibus_engine_simple_update_lookup_and_aux_table (simple);
++}
++
++static void
++ibus_engine_simple_page_up (IBusEngine *engine)
++{
++    IBusEngineSimple *simple = (IBusEngineSimple *)engine;
++    IBusEngineSimplePrivate *priv = simple->priv;
++    if (priv->lookup_table == NULL)
++        return;
++    ibus_lookup_table_page_up (priv->lookup_table);
++    ibus_engine_simple_update_lookup_and_aux_table (simple);
++}
++
++static void
++ibus_engine_simple_candidate_clicked (IBusEngine *engine,
++                                      guint       index,
++                                      guint       button,
++                                      guint       state)
++{
++    IBusEngineSimple *simple = (IBusEngineSimple *)engine;
++    IBusEngineSimplePrivate *priv = simple->priv;
++    guint keyval;
++    gint n_compose = 0;
++
++    if (priv->lookup_table == NULL || !priv->lookup_table_visible)
++        return;
++    if (index == 9)
++        keyval = IBUS_KEY_0;
++    else
++        keyval = IBUS_KEY_1 + index;
++    while (priv->compose_buffer[n_compose] != 0)
++        n_compose++;
++    ibus_engine_simple_set_number_on_lookup_table (simple, keyval, n_compose);
++}
++
+ void
+ ibus_engine_simple_add_table (IBusEngineSimple *simple,
+                               const guint16    *data,
+-- 
+2.7.4
+
