@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.14
-Release:        4%{?dist}
+Release:        5%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -424,6 +424,11 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Jan 11 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.14-5
+- support scroll event in candidates panel
+- Fixed Bug 1403985 - Emoji typing is enabled during Unicode typing
+- Fixed Bug 1402494 - Font settings of ibus are ignored on non-Gnome
+
 * Mon Dec 19 2016 Miro Hrončok <mhroncok@redhat.com> - 1.5.14-4
 - Rebuild for Python 3.6
 
