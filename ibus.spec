@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.14
-Release:        5%{?dist}
+Release:        6%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -424,6 +424,9 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Feb 10 2017 Fedora Release Engineering <releng@fedoraproject.org> - 1.5.14-6
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_26_Mass_Rebuild
+
 * Wed Jan 11 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.14-5
 - support scroll event in candidates panel
 - Fixed Bug 1403985 - Emoji typing is enabled during Unicode typing
