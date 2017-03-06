@@ -25,21 +25,23 @@
 %endif
 
 %global dbus_python_version 0.83.0
+%global annotation_name    cldr-emoji-annotation
+%global annotation_version 30.0.3_2
 
 Name:           ibus
-Version:        1.5.14
-Release:        6%{?dist}
+Version:        1.5.15
+Release:        1%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
-URL:            https://github.com/ibus/ibus/wiki
-Source0:        https://github.com/ibus/ibus/releases/download/%{version}/%{name}-%{version}.tar.gz
+URL:            https://github.com/ibus/%name/wiki
+Source0:        https://github.com/ibus/%name/releases/download/%{version}/%{name}-%{version}.tar.gz
 Source1:        %{name}-xinput
 Source2:        %{name}.conf.5
-Source3:        https://fujiwara.fedorapeople.org/ibus/po/%{name}-po-1.5.14-20160909.tar.gz
+# Will remove the annotation tarball once the rpm is available on Fedora
+Source3:        https://github.com/fujiwarat/%annotation_name/releases/download/%{annotation_version}/%{annotation_name}-%{annotation_version}.tar.gz
 # Upstreamed patches.
 # Patch0:         %%{name}-HEAD.patch
-Patch0:         %{name}-HEAD.patch
 
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
@@ -230,8 +232,7 @@ The ibus-devel-docs package contains developer documentation for IBus
 %setup -q
 # %%patch0 -p1
 # cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
-%patch0 -p1
-zcat %SOURCE3 | tar xfv -
+zcat %SOURCE3 | tar xfvp -
 
 %build
 #autoreconf -f -i -v
@@ -255,14 +256,14 @@ zcat %SOURCE3 | tar xfv -
 %ifnarch %{nodejs_arches}
     --disable-emoji-dict \
 %endif
+    --with-emoji-annotation-dir=$PWD/%annotation_name-%annotation_version/annotations \
     %{nil}
 
-make -C ui/gtk3 maintainer-clean-generic
 make %{?_smp_mflags}
 
 %install
 make install DESTDIR=$RPM_BUILD_ROOT INSTALL='install -p'
-rm -f $RPM_BUILD_ROOT%{_libdir}/libibus-%{ibus_api_version}.la
+rm -f $RPM_BUILD_ROOT%{_libdir}/libibus-*%{ibus_api_version}.la
 rm -f $RPM_BUILD_ROOT%{_libdir}/gtk-2.0/%{gtk2_binary_version}/immodules/im-ibus.la
 rm -f $RPM_BUILD_ROOT%{_libdir}/gtk-3.0/%{gtk3_binary_version}/immodules/im-ibus.la
 
@@ -380,8 +381,8 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %config %{_xinputconf}
 
 %files libs
-%{_libdir}/libibus-%{ibus_api_version}.so.*
-%{_libdir}/girepository-1.0/IBus-1.0.typelib
+%{_libdir}/libibus-*%{ibus_api_version}.so.*
+%{_libdir}/girepository-1.0/IBus*-1.0.typelib
 
 %files gtk2
 %{_libdir}/gtk-2.0/%{gtk2_binary_version}/immodules/im-ibus.so
@@ -413,9 +414,9 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_libdir}/lib*.so
 %{_libdir}/pkgconfig/*
 %{_includedir}/*
-%{_datadir}/gir-1.0/IBus-1.0.gir
-%{_datadir}/vala/vapi/ibus-1.0.vapi
-%{_datadir}/vala/vapi/ibus-1.0.deps
+%{_datadir}/gir-1.0/IBus*-1.0.gir
+%{_datadir}/vala/vapi/ibus-*1.0.vapi
+%{_datadir}/vala/vapi/ibus-*1.0.deps
 
 %files devel-docs
 # Own html dir since gtk-doc is heavy.
@@ -424,6 +425,9 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon Mar 06 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.15-1
+- Bumped to 1.5.15
+
 * Fri Feb 10 2017 Fedora Release Engineering <releng@fedoraproject.org> - 1.5.14-6
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_26_Mass_Rebuild
 
