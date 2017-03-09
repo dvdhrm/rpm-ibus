@@ -25,12 +25,10 @@
 %endif
 
 %global dbus_python_version 0.83.0
-%global annotation_name    cldr-emoji-annotation
-%global annotation_version 30.0.3_2
 
 Name:           ibus
 Version:        1.5.15
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -39,9 +37,9 @@ Source0:        https://github.com/ibus/%name/releases/download/%{version}/%{nam
 Source1:        %{name}-xinput
 Source2:        %{name}.conf.5
 # Will remove the annotation tarball once the rpm is available on Fedora
-Source3:        https://github.com/fujiwarat/%annotation_name/releases/download/%{annotation_version}/%{annotation_name}-%{annotation_version}.tar.gz
 # Upstreamed patches.
 # Patch0:         %%{name}-HEAD.patch
+Patch0:         %{name}-HEAD.patch
 
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
@@ -74,6 +72,7 @@ BuildRequires:  qt5-qtbase-devel
 BuildRequires:  nodejs-emojione-json
 BuildRequires:  json-glib-devel
 %endif
+BuildRequires:  cldr-emoji-annotation
 
 Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
 Requires:       %{name}-gtk2%{?_isa}   = %{version}-%{release}
@@ -232,11 +231,12 @@ The ibus-devel-docs package contains developer documentation for IBus
 %setup -q
 # %%patch0 -p1
 # cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
-zcat %SOURCE3 | tar xfvp -
+%patch0 -p1
 
 %build
 #autoreconf -f -i -v
 #make -C ui/gtk3 maintainer-clean-generic
+#make -C tools maintainer-clean-generic
 %configure \
     --disable-static \
     --enable-gtk2 \
@@ -256,9 +256,10 @@ zcat %SOURCE3 | tar xfvp -
 %ifnarch %{nodejs_arches}
     --disable-emoji-dict \
 %endif
-    --with-emoji-annotation-dir=$PWD/%annotation_name-%annotation_version/annotations \
     %{nil}
 
+make -C ui/gtk3 maintainer-clean-generic
+make -C tools maintainer-clean-generic
 make %{?_smp_mflags}
 
 %install
@@ -425,6 +426,11 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Mar 09 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.15-2
+- Added ibus-HEAD.patch to get upstream patches
+  Fixed ibus_emojier_run() SIGABRT with `ibus emoji`
+  Enhanced theme color on emoji candidates
+
 * Mon Mar 06 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.15-1
 - Bumped to 1.5.15
 
