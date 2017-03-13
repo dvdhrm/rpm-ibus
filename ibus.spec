@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.15
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -426,6 +426,14 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon Mar 13 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.15-3
+- Emoji dialog enhancements and bug fixes
+  Fixed ibus_emoji_dict_load() API.
+  Focus on emoji text entry by default
+  Removed internal text buffer and use Gtk.Entry buffer instead.
+  Implemented cursor left, right, home, end on emoji annotation preedit.
+  Show localized emoji description from tts in emoji xml.
+
 * Thu Mar 09 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.15-2
 - Added ibus-HEAD.patch to get upstream patches
   Fixed ibus_emojier_run() SIGABRT with `ibus emoji`

@@ -673,3 +673,553 @@ index 5496c4e..bc1eff4 100644
 -- 
 2.7.4
 
+From 31ed31e5303c3946f53b035a63d76f5c1e3cd84a Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Mon, 13 Mar 2017 11:43:09 +0900
+Subject: [PATCH] src: Fix ibus_emoji_dict_load()
+
+R=Shawn.P.Huang@gmail.com
+
+Review URL: https://codereview.appspot.com/320350043
+---
+ configure.ac       | 3 ++-
+ src/emoji-parser.c | 6 ++++--
+ src/ibusemoji.c    | 6 +++---
+ 3 files changed, 9 insertions(+), 6 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index 027c027..369485c 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -620,7 +620,8 @@ fi
+ 
+ AC_ARG_WITH(emoji-json-file,
+     AS_HELP_STRING([--with-emoji-json-file[=DIR/emoji.json]],
+-        [Set emoji.json. (default: "/usr/lib/node_modules/emojione/emoji.json")]),
++        [Set emoji.json. (default: "/usr/lib/node_modules/emojione/emoji.json")
++         You can get emoji.json with "npm install -g emojione".]),
+     EMOJI_JSON_FILE=$with_emoji_json_file,
+     EMOJI_JSON_FILE="/usr/lib/node_modules/emojione/emoji.json"
+ )
+diff --git a/src/emoji-parser.c b/src/emoji-parser.c
+index c5af42c..5965309 100644
+--- a/src/emoji-parser.c
++++ b/src/emoji-parser.c
+@@ -1,7 +1,7 @@
+ /* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
+ /* vim:set et sts=4: */
+ /* ibus - The Input Bus
+- * Copyright (C) 2016 Takao Fujiwara <takao.fujiwara1@gmail.com>
++ * Copyright (C) 2016-2017 Takao Fujiwara <takao.fujiwara1@gmail.com>
+  * Copyright (C) 2016 Red Hat, Inc.
+  *
+  * This library is free software; you can redistribute it and/or
+@@ -20,9 +20,11 @@
+  * USA
+  */
+ 
+-/* Convert ../data/annotations/en.xml and
++/* Convert /usr/share/unicode/cldr/common/annotations/*.xml and
+  * /usr/lib/node_modules/emojione/emoji.json
+  * to the dictionary file which look up the Emoji from the annotation.
++ * Get *.xml from https://github.com/fujiwarat/cldr-emoji-annotation
++ * or http://www.unicode.org/repos/cldr/trunk/common/annotations .
+  * Get emoji.json with 'npm install -g emojione'.
+  * en.xml is used for the Unicode annotations and emoji.json is used
+  * for the aliases_ascii, e.g. ":)", and category, e.g. "people".
+diff --git a/src/ibusemoji.c b/src/ibusemoji.c
+index 8d88704..996d136 100644
+--- a/src/ibusemoji.c
++++ b/src/ibusemoji.c
+@@ -431,10 +431,10 @@ ibus_emoji_dict_load (const gchar *path)
+     GHashTable *dict = g_hash_table_new_full (g_str_hash,
+                                               g_str_equal,
+                                               g_free,
+-                                              free_dict_words);
++                                              g_object_unref);
+ 
+     for (l = list; l; l = l->next) {
+-        IBusEmojiData *data = list->data;
++        IBusEmojiData *data = l->data;
+         if (!IBUS_IS_EMOJI_DATA (data)) {
+             g_warning ("Your dict format is no longer supported.\n"
+                        "Need to create the dictionaries again.");
+@@ -442,7 +442,7 @@ ibus_emoji_dict_load (const gchar *path)
+         }
+         g_hash_table_insert (dict,
+                              g_strdup (ibus_emoji_data_get_emoji (data)),
+-                             data);
++                             g_object_ref_sink (data));
+     }
+ 
+     g_slist_free (list);
+-- 
+2.9.3
+
+From c580845167b54ccab76d8b72bdc797ef8d64d554 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Mon, 13 Mar 2017 11:58:06 +0900
+Subject: [PATCH] ui/gtk3: Fix emoji text entry cusor position
+
+Focus on emoji text entry by default
+Remove internal text buffer and use Gtk.Entry buffer instead.
+Implement cusor left, right, home, end on emoji annotation preedit.
+
+Review URL: https://codereview.appspot.com/313710043
+---
+ ui/gtk3/emojier.vala | 104 +++++++++++++++++++++++++++++++++------------------
+ 1 file changed, 68 insertions(+), 36 deletions(-)
+
+diff --git a/ui/gtk3/emojier.vala b/ui/gtk3/emojier.vala
+index bc1eff4..8cecea8 100644
+--- a/ui/gtk3/emojier.vala
++++ b/ui/gtk3/emojier.vala
+@@ -75,7 +75,10 @@ class IBusEmojier : Gtk.Window {
+                 row_homogeneous : false,
+                 vexpand : true,
+                 halign : Gtk.Align.FILL,
+-                valign : Gtk.Align.FILL
++                valign : Gtk.Align.FILL,
++                row_spacing : 5,
++                column_spacing : 5,
++                border_width : 2
+             );
+         }
+     }
+@@ -190,7 +193,6 @@ class IBusEmojier : Gtk.Window {
+     private CategoryType m_current_category_type = CategoryType.EMOJI;
+     private bool m_is_running = false;
+     private string m_input_context_path = "";
+-    private GLib.StringBuilder m_buffer_string;
+     private GLib.MainLoop? m_loop;
+     private string? m_result;
+     private GLib.SList<string> m_lang_list;
+@@ -288,11 +290,9 @@ class IBusEmojier : Gtk.Window {
+         m_entry.set_placeholder_text(_("Type annotation or choose emoji"));
+         m_vbox.add(m_entry);
+         m_entry.changed.connect(() => {
+-            m_buffer_string.assign(m_entry.get_text());
+-            update_cadidate_window();
++            update_candidate_window();
+         });
+         m_entry.icon_release.connect((icon_pos, event) => {
+-            m_buffer_string.erase();
+             hide_candidate_panel();
+         });
+ 
+@@ -303,7 +303,6 @@ class IBusEmojier : Gtk.Window {
+         Atk.Object obj = m_entry.get_accessible();
+         obj.set_role (Atk.Role.STATUSBAR);
+ 
+-        m_buffer_string = new StringBuilder();
+         grab_focus();
+ 
+         // The constructor of IBus.LookupTable does not support more than
+@@ -680,11 +679,16 @@ class IBusEmojier : Gtk.Window {
+         buttons_hbox.show_all();
+     }
+ 
+-    private bool check_unicode_point(bool check_xdigit_only) {
+-        m_unicode_point = null;
++    private bool check_unicode_point(string? annotation=null) {
++        bool check_xdigit_only = true;
++        if (annotation == null) {
++            annotation = m_entry.get_text();
++            m_unicode_point = null;
++            check_xdigit_only = false;
++        }
+         GLib.StringBuilder buff = new GLib.StringBuilder();
+-        for (int i = 0; i < m_buffer_string.str.char_count(); i++) {
+-            unichar ch = m_buffer_string.str.get_char(i);
++        for (int i = 0; i < annotation.char_count(); i++) {
++            unichar ch = annotation.get_char(i);
+             if (ch == 0)
+                 return false;
+             if (!ch.isxdigit())
+@@ -704,7 +708,7 @@ class IBusEmojier : Gtk.Window {
+         return true;
+     }
+ 
+-    public void update_cadidate_window() {
++    public void update_candidate_window() {
+         string annotation = m_entry.get_text();
+         if (annotation.length == 0) {
+             hide_candidate_panel();
+@@ -716,7 +720,7 @@ class IBusEmojier : Gtk.Window {
+             return;
+         }
+         // Call check_unicode_point() to get m_unicode_point
+-        check_unicode_point(false);
++        check_unicode_point();
+         unowned GLib.SList<string>? emojis =
+             m_annotation_to_emojis_dict.lookup(annotation);
+         if (emojis == null && m_unicode_point == null) {
+@@ -725,7 +729,7 @@ class IBusEmojier : Gtk.Window {
+         }
+         m_lookup_table.clear();
+         // Call check_unicode_point() to update m_lookup_table
+-        check_unicode_point(false);
++        check_unicode_point();
+         foreach (unowned string emoji in emojis) {
+             IBus.Text text = new IBus.Text.from_string(emoji);
+             m_lookup_table.append_candidate(text);
+@@ -760,9 +764,6 @@ class IBusEmojier : Gtk.Window {
+             });
+         }
+         EGrid grid = new EGrid();
+-        grid.set_row_spacing(5);
+-        grid.set_column_spacing(5);
+-        grid.set_border_width(2);
+         int n = 0;
+         for (uint i = page_start_pos; i < page_end_pos; i++) {
+             IBus.Text candidate = m_lookup_table.get_candidate(i);
+@@ -878,14 +879,11 @@ class IBusEmojier : Gtk.Window {
+     private bool if_in_range_of_lookup(uint keyval) {
+         if (!m_candidate_panel_is_visible)
+             return false;
+-        string backup_annotation = m_buffer_string.str.dup();
++        StringBuilder buffer_string = new StringBuilder(m_entry.get_text());
+         unichar ch = IBus.keyval_to_unicode (keyval);
+-        m_buffer_string.append_unichar(ch);
+-        if (check_unicode_point(true)) {
+-            m_buffer_string.assign(backup_annotation);
++        buffer_string.append_unichar(ch);
++        if (check_unicode_point(buffer_string.str))
+             return false;
+-        }
+-        m_buffer_string.assign(backup_annotation);
+         if (keyval < Gdk.Key.@0 || keyval > Gdk.Key.@9)
+             return false;
+         if (keyval == Gdk.Key.@0)
+@@ -958,6 +956,18 @@ class IBusEmojier : Gtk.Window {
+         show_category_list();
+     }
+ 
++    private void entry_enter_keyval(uint keyval) {
++        unichar ch = IBus.keyval_to_unicode(keyval);
++        if (!ch.isgraph())
++            return;
++        string str = ch.to_string();
++
++        // what gtk_entry_commit_cb() do
++        int pos = m_entry.get_position();
++        m_entry.insert_text(str, -1, ref pos);
++        m_entry.set_position(pos);
++    }
++
+     public string run(Gdk.Event event,
+                       string    input_context_path) {
+         assert (m_loop == null);
+@@ -972,7 +982,7 @@ class IBusEmojier : Gtk.Window {
+         resize(1, 1);
+ 
+         m_entry.set_text("");
+-        m_buffer_string.erase();
++        m_entry.grab_focus();
+ 
+         Gdk.Device device = event.get_device();
+         if (device == null) {
+@@ -1070,12 +1080,12 @@ class IBusEmojier : Gtk.Window {
+                 m_current_category_type = CategoryType.EMOJI;
+                 show_candidate_panel();
+                 return true;
+-            } else if (m_buffer_string.str.length == 0) {
++            } else if (m_entry.get_text().length == 0) {
+                 m_loop.quit();
+                 hide_candidate_panel();
+                 return true;
+             }
+-            m_buffer_string.erase();
++            m_entry.delete_text(0, -1);
+             break;
+         case Gdk.Key.Return:
+             if (m_candidate_panel_is_visible) {
+@@ -1094,14 +1104,14 @@ class IBusEmojier : Gtk.Window {
+             }
+             return true;
+         case Gdk.Key.BackSpace:
+-            if (m_buffer_string.len > 0)
+-                m_buffer_string.erase(m_buffer_string.len - 1);
++            if (m_entry.get_text().len() > 0) {
++                GLib.Signal.emit_by_name(m_entry, "backspace");
++            }
+             break;
+         case Gdk.Key.space:
+         case Gdk.Key.KP_Space:
+             if ((modifiers & Gdk.ModifierType.SHIFT_MASK) != 0) {
+-                unichar ch = IBus.keyval_to_unicode (keyval);
+-                m_buffer_string.append_unichar(ch);
++                entry_enter_keyval(keyval);
+                 break;
+             }
+             if (m_candidate_panel_is_visible) {
+@@ -1120,6 +1130,12 @@ class IBusEmojier : Gtk.Window {
+                 show_candidate_panel();
+                 return true;
+             }
++            if (m_entry.get_text().len() > 0) {
++                GLib.Signal.emit_by_name(m_entry, "move-cursor",
++                                         Gtk.MovementStep.VISUAL_POSITIONS,
++                                         1, false);
++                return true;
++            }
+             break;
+         case Gdk.Key.Left:
+             if (m_candidate_panel_is_visible) {
+@@ -1128,6 +1144,12 @@ class IBusEmojier : Gtk.Window {
+                 show_candidate_panel();
+                 return true;
+             }
++            if (m_entry.get_text().len() > 0) {
++                GLib.Signal.emit_by_name(m_entry, "move-cursor",
++                                         Gtk.MovementStep.VISUAL_POSITIONS,
++                                         -1, false);
++                return true;
++            }
+             break;
+         case Gdk.Key.Down:
+             if (m_candidate_panel_is_visible)
+@@ -1157,17 +1179,27 @@ class IBusEmojier : Gtk.Window {
+                 return true;
+             }
+             break;
+-        default:
+-            unichar ch = IBus.keyval_to_unicode(keyval);
+-            if (!ch.isgraph())
++        case Gdk.Key.Home:
++            if (m_entry.get_text().len() > 0) {
++                GLib.Signal.emit_by_name(m_entry, "move-cursor",
++                                         Gtk.MovementStep.DISPLAY_LINE_ENDS,
++                                         -1, false);
++                return true;
++            }
++            break;
++        case Gdk.Key.End:
++            if (m_entry.get_text().len() > 0) {
++                GLib.Signal.emit_by_name(m_entry, "move-cursor",
++                                         Gtk.MovementStep.DISPLAY_LINE_ENDS,
++                                         1, false);
+                 return true;
+-            m_buffer_string.append_unichar(ch);
++            }
++            break;
++        default:
++            entry_enter_keyval(keyval);
+             break;
+         }
+ 
+-        string annotation = m_buffer_string.str;
+-        m_entry.set_text(annotation);
+-
+         return true;
+     }
+ 
+-- 
+2.9.3
+
+From fbe3de1789c73a8a175a451b2a6b967f5d3c6514 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Mon, 13 Mar 2017 12:08:21 +0900
+Subject: [PATCH] src: Update emoji-parser to treat tts as emoji
+ description
+
+unicode annotation xml files have a 'tts' attribute and seem
+it is used as the emoji descriptions instead of emoji annotations.
+This can show the translated descriptions.
+
+R=Shawn.P.Huang@gmail.com
+
+Review URL: https://codereview.appspot.com/319480043
+---
+ src/emoji-parser.c   | 26 +++++++++++++++++++-------
+ src/ibusemoji.c      | 16 +++++++++++++---
+ src/ibusemoji.h      | 11 +++++++++++
+ ui/gtk3/emojier.vala | 17 ++++++++++++++---
+ 4 files changed, 57 insertions(+), 13 deletions(-)
+
+diff --git a/src/emoji-parser.c b/src/emoji-parser.c
+index 5965309..8ff04f1 100644
+--- a/src/emoji-parser.c
++++ b/src/emoji-parser.c
+@@ -43,6 +43,7 @@ struct _EmojiData {
+     GSList     *annotations;
+     gboolean    is_annotation;
+     gchar      *description;
++    gboolean    is_tts;
+     gchar      *category;
+     GSList     *list;
+ };
+@@ -97,6 +98,8 @@ update_emoji_list (EmojiData *data)
+                                        (GCopyFunc) g_strdup,
+                                        NULL));
+         }
++        if (data->description)
++            ibus_emoji_data_set_description (emoji, data->description);
+     } else {
+         IBusEmojiData *emoji =
+                 ibus_emoji_data_new ("emoji",
+@@ -149,13 +152,12 @@ unicode_annotations_start_element_cb (GMarkupParseContext *context,
+                 data->emoji = g_strdup (value);
+             }
+         }
+-        else if (g_strcmp0 (attribute, "tts") == 0) {
+-            GSList *duplicated = g_slist_find_custom (data->annotations,
+-                                                      value,
+-                                                      (GCompareFunc) g_strcmp0);
+-            if (duplicated == NULL) {
+-                data->annotations = g_slist_prepend (data->annotations,
+-                                                     g_strdup (value));
++        /* tts seems 'text to speach' and it would be a description
++         * instead of annotation.
++         */
++        else if (g_strcmp0 (attribute, "type") == 0) {
++            if (g_strcmp0 (value, "tts") == 0) {
++                data->is_tts = TRUE;
+             }
+         }
+     }
+@@ -177,6 +179,7 @@ unicode_annotations_end_element_cb (GMarkupParseContext *context,
+ 
+     update_emoji_list (data);
+     data->is_annotation = FALSE;
++    data->is_tts = FALSE;
+ }
+ 
+ void
+@@ -194,6 +197,15 @@ unicode_annotations_text_cb (GMarkupParseContext *context,
+     g_assert (data != NULL);
+     if (!data->is_annotation)
+         return;
++    if (data->is_tts) {
++        if (data->description) {
++            g_warning ("Duplicated 'tts' is found: %s: %s",
++                       data->description, text);
++            g_clear_pointer (&data->description, g_free);
++        }
++        data->description = g_strdup (text);
++        return;
++    }
+     annotations = g_strsplit (text, " | ", -1);
+     for (i = 0; (annotation = annotations[i]) != NULL; i++) {
+         GSList *duplicated = g_slist_find_custom (data->annotations,
+diff --git a/src/ibusemoji.c b/src/ibusemoji.c
+index 996d136..c61cd70 100644
+--- a/src/ibusemoji.c
++++ b/src/ibusemoji.c
+@@ -29,7 +29,7 @@
+ #include "ibusinternal.h"
+ 
+ #define IBUS_EMOJI_DATA_MAGIC "IBusEmojiData"
+-#define IBUS_EMOJI_DATA_VERSION (1)
++#define IBUS_EMOJI_DATA_VERSION (2)
+ 
+ enum {
+     PROP_0 = 0,
+@@ -128,7 +128,7 @@ ibus_emoji_data_class_init (IBusEmojiDataClass *class)
+                         "emoji description",
+                         "The emoji description",
+                         "",
+-                        G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
++                        G_PARAM_READWRITE));
+ 
+     /**
+      * IBusEmojiData:category:
+@@ -352,6 +352,16 @@ ibus_emoji_data_get_description (IBusEmojiData *emoji)
+     return emoji->priv->description;
+ }
+ 
++void
++ibus_emoji_data_set_description (IBusEmojiData *emoji,
++                                 const gchar   *description)
++{
++    g_return_if_fail (IBUS_IS_EMOJI_DATA (emoji));
++
++    g_free (emoji->priv->description);
++    emoji->priv->description = g_strdup (description);
++}
++
+ const gchar *
+ ibus_emoji_data_get_category (IBusEmojiData *emoji)
+ {
+@@ -541,7 +551,7 @@ ibus_emoji_data_load (const gchar *path)
+         goto out_load_cache;
+     }
+ 
+-    if (version != IBUS_EMOJI_DATA_VERSION) {
++    if (version > IBUS_EMOJI_DATA_VERSION) {
+         g_warning ("cache version is different: %u != %u",
+                    version, IBUS_EMOJI_DATA_VERSION);
+         goto out_load_cache;
+diff --git a/src/ibusemoji.h b/src/ibusemoji.h
+index 3fd09a9..eb24fdd 100644
+--- a/src/ibusemoji.h
++++ b/src/ibusemoji.h
+@@ -134,6 +134,17 @@ void            ibus_emoji_data_set_annotations (IBusEmojiData *emoji,
+ const gchar *   ibus_emoji_data_get_description (IBusEmojiData *emoji);
+ 
+ /**
++ * ibus_emoji_data_set_description:
++ * @emoji : An #IBusEmojiData
++ * @description: An emoji description
++ *
++ * Sets the description in #IBusEmojiData.
++ */
++void            ibus_emoji_data_set_description (IBusEmojiData *emoji,
++                                                 const gchar   *description);
++
++
++/**
+  * ibus_emoji_data_get_category:
+  * @emoji : An #IBusEmojiData
+  *
+diff --git a/ui/gtk3/emojier.vala b/ui/gtk3/emojier.vala
+index 8cecea8..5e126e9 100644
+--- a/ui/gtk3/emojier.vala
++++ b/ui/gtk3/emojier.vala
+@@ -370,8 +370,14 @@ class IBusEmojier : Gtk.Window {
+     private void reload_emoji_dict() {
+         init_emoji_dict();
+         make_emoji_dict("en");
+-        if (m_current_lang_id != "en")
++        if (m_current_lang_id != "en") {
++            var lang_ids = m_current_lang_id.split("_");
++            if (lang_ids.length > 1) {
++                string sub_id = lang_ids[0];
++                make_emoji_dict(sub_id);
++            }
+             make_emoji_dict(m_current_lang_id);
++        }
+         loaded_emoji_dict();
+     }
+ 
+@@ -393,8 +399,8 @@ class IBusEmojier : Gtk.Window {
+         if (emoji_list == null)
+             return;
+         foreach (IBus.EmojiData data in emoji_list) {
+-            update_annotation_to_emojis_dict(data);
+             update_emoji_to_data_dict(data, lang);
++            update_annotation_to_emojis_dict(data);
+             update_category_to_emojis_dict(data, lang);
+         }
+         GLib.List<unowned string> annotations =
+@@ -434,11 +440,16 @@ class IBusEmojier : Gtk.Window {
+             unowned IBus.EmojiData? en_data =
+                     m_emoji_to_data_dict.lookup(emoji);
+             if (en_data == null) {
+-                warning("No IBusEmojiData for English: %s".printf(emoji));
+                 m_emoji_to_data_dict.insert(emoji, data);
+                 return;
+             }
++            string trans_description = data.get_description();
++            en_data.set_description(trans_description);
+             unowned GLib.SList<string> annotations = data.get_annotations();
++            var words = trans_description.split(" ");
++            // If the description has less than 3 words, add it to annotations
++            if (words.length < 3)
++                annotations.append(trans_description);
+             unowned GLib.SList<string> en_annotations
+                 = en_data.get_annotations();
+             foreach (string annotation in en_annotations) {
+-- 
+2.9.3
+
