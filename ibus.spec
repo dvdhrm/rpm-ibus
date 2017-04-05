@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.15
-Release:        5%{?dist}
+Release:        6%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -427,6 +427,11 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Apr 05 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.15-6
+- Enabled unicode_alt in EmojiOne json file
+- Enabled to type multiple code points on Emojier
+- Fixed IBusEmojiDialog_1_0_gir_LIBS for --as-needed LDFLAGS
+
 * Mon Mar 27 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.15-5
 - Moved language setting on IBusEmojier to ibus-setup.
 - Enabled strcasecmp to match emoji annotations.
