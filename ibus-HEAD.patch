@@ -4397,3 +4397,1633 @@ index 8a2726c..7b6107f 100644
 -- 
 2.9.3
 
+From 648f58a361ea1407f229ed1682486240cc2e5026 Mon Sep 17 00:00:00 2001
+From: Peng Wu <alexepico@gmail.com>
+Date: Mon, 10 Apr 2017 14:54:08 +0900
+Subject: [PATCH] Make ibus emojier dialog as an unique application
+
+Because wayland doesn't support clipboard persistence, just hide the dialog; will show the emojier dialog again, when run it again.
+
+In next patches, ibus emoji command will just spawn the process of ibus-ui-emojier.
+
+BUG=
+R=takao.fujiwara1@gmail.com
+
+Review URL: https://codereview.appspot.com/320450043
+
+Patch from Peng Wu <alexepico@gmail.com>.
+---
+ po/POTFILES.in      |  1 +
+ po/POTFILES.skip    |  1 +
+ ui/gtk3/Makefile.am | 24 ++++++++++++++++++++++++
+ 3 files changed, 26 insertions(+)
+
+diff --git a/po/POTFILES.in b/po/POTFILES.in
+index 469f90b..65a3526 100644
+--- a/po/POTFILES.in
++++ b/po/POTFILES.in
+@@ -65,3 +65,4 @@ ui/gtk3/property.vala
+ ui/gtk3/propertypanel.vala
+ ui/gtk3/separator.vala
+ ui/gtk3/switcher.vala
++ui/gtk3/emojierapp.vala
+diff --git a/po/POTFILES.skip b/po/POTFILES.skip
+index a818c48..891d2cc 100644
+--- a/po/POTFILES.skip
++++ b/po/POTFILES.skip
+@@ -21,3 +21,4 @@ ui/gtk3/property.c
+ ui/gtk3/propertypanel.c
+ ui/gtk3/separator.c
+ ui/gtk3/switcher.c
++ui/gtk3/emojierapp.c
+diff --git a/ui/gtk3/Makefile.am b/ui/gtk3/Makefile.am
+index 7122ff3..96ed3e6 100644
+--- a/ui/gtk3/Makefile.am
++++ b/ui/gtk3/Makefile.am
+@@ -108,6 +108,10 @@ endif
+ 
+ libexec_PROGRAMS = ibus-ui-gtk3
+ 
++if ENABLE_EMOJI_DICT
++libexec_PROGRAMS += ibus-ui-emojier
++endif
++
+ ibus_ui_gtk3_SOURCES = \
+ 	application.vala \
+ 	candidatearea.vala \
+@@ -132,6 +136,26 @@ ibus_ui_gtk3_LDADD = \
+ 	$(AM_LDADD) \
+ 	$(NULL)
+ 
++if ENABLE_EMOJI_DICT
++AM_VALAFLAGS += \
++        --define=EMOJI_DICT \
++        --vapidir=$(top_builddir)/ui/gtk3 \
++        --vapidir=$(top_srcdir)/ui/gtk3 \
++        --pkg=ibus-emoji-dialog-1.0 \
++        --pkg=gtk+-3.0 \
++        $(NULL)
++
++
++ibus_ui_emojier_SOURCES = \
++	emojierapp.vala \
++	$(NULL)
++
++ibus_ui_emojier_LDADD = \
++	$(AM_LDADD) \
++	$(libibus_emoji_dialog) \
++	$(NULL)
++endif
++
+ gen-%.xml.c: %.xml
+ 	echo "Building $@ from $<"
+ 	echo "const char * _$(subst -,_,$(subst .,_,$(basename $(notdir $<)))) = " > $@
+-- 
+2.9.3
+
+From 2f8982a0a4b25f98c969c09b81724e44efc41c27 Mon Sep 17 00:00:00 2001
+From: Peng Wu <alexepico@gmail.com>
+Date: Mon, 10 Apr 2017 15:57:48 +0900
+Subject: [PATCH] Make ibus emojier dialog as an unique application
+
+Forgot to commit ui/gtk3/emojierapp.vala from the previous commit.
+
+BUG=
+R=takao.fujiwara1@gmail.com
+
+Review URL: https://codereview.appspot.com/319650043
+
+Patch from Peng Wu <alexepico@gmail.com>.
+---
+ ui/gtk3/emojierapp.vala | 149 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 149 insertions(+)
+ create mode 100644 ui/gtk3/emojierapp.vala
+
+diff --git a/ui/gtk3/emojierapp.vala b/ui/gtk3/emojierapp.vala
+new file mode 100644
+index 0000000..4287bff
+--- /dev/null
++++ b/ui/gtk3/emojierapp.vala
+@@ -0,0 +1,149 @@
++/* vim:set et sts=4 sw=4:
++ *
++ * ibus - The Input Bus
++ *
++ * Copyright (c) 2017 Peng Wu <alexepico@gmail.com>
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301
++ * USA
++ */
++
++string emoji_font = null;
++string annotation_lang = null;
++
++public class EmojiApplication : Application {
++    private IBus.Emojier emojier = new IBus.Emojier();
++
++    private EmojiApplication() {
++        Object(application_id: "org.freedesktop.ibus.panel.emojier",
++                flags: ApplicationFlags.HANDLES_COMMAND_LINE);
++        set_inactivity_timeout(100000);
++    }
++
++    private void show_dialog(ApplicationCommandLine command_line) {
++        Gdk.Event event = new Gdk.Event(Gdk.EventType.KEY_PRESS);
++        var display = Gdk.Display.get_default();
++        var device_manager = display.get_device_manager();
++        var device = device_manager.list_devices(Gdk.DeviceType.MASTER).data;
++        event.set_device(device);
++        string emoji = emojier.run(event, "");
++        if (emoji == null) {
++            emojier.reset();
++            command_line.print("%s\n", _("Canceled to choose an emoji."));
++            return;
++        }
++        Gtk.Clipboard clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD);
++        clipboard.set_text(emoji, -1);
++        clipboard.store();
++        emojier.reset();
++        command_line.print("%s\n", _("Copied an emoji to your clipboard."));
++    }
++
++    public void activate_dialog(ApplicationCommandLine command_line) {
++        this.hold ();
++
++        // show dialog
++        if (emojier.has_loaded_emoji_dict()) {
++            show_dialog(command_line);
++        } else {
++            emojier.loaded_emoji_dict.connect(() => {
++                    // The signal is called when the language is changed.
++                    if (emojier.is_running())
++                    return;
++
++                    show_dialog(command_line);
++                    });
++        }
++
++        this.release ();
++    }
++
++    private int _command_line (ApplicationCommandLine command_line) {
++        const OptionEntry[] options = {
++            { "font", 0, 0, OptionArg.STRING, out emoji_font,
++                N_("FONT for emoji chracters on emoji dialog."),
++                "FONT" },
++            { "lang", 0, 0, OptionArg.STRING, out annotation_lang,
++                N_("LANG for annotations on emoji dialog. E.g. \"en\""),
++                "LANG" },
++            { null }
++        };
++
++        var option = new OptionContext();
++        option.add_main_entries(options, Config.GETTEXT_PACKAGE);
++
++        // We have to make an extra copy of the array,
++        // since .parse assumes that it can remove strings
++        // from the array without freeing them.
++        string[] args = command_line.get_arguments();
++        string*[] _args = new string[args.length];
++        for (int i = 0; i < args.length; i++) {
++            _args[i] = args[i];
++        }
++
++        try {
++            unowned string[] tmp = _args;
++            option.parse(ref tmp);
++        } catch (OptionError e) {
++            stderr.printf("%s\n", e.message);
++            return Posix.EXIT_FAILURE;
++        }
++
++        if (emoji_font == null) {
++            GLib.Settings settings_emoji =
++                new GLib.Settings("org.freedesktop.ibus.panel.emoji");
++            emoji_font = settings_emoji.get_string("font");
++        }
++
++        if (annotation_lang == null) {
++            GLib.Settings settings_emoji =
++                new GLib.Settings("org.freedesktop.ibus.panel.emoji");
++            annotation_lang = settings_emoji.get_string("lang");
++        }
++
++        if (emoji_font != null && emoji_font != "")
++            emojier.set_emoji_font(emoji_font);
++        if (annotation_lang != null && annotation_lang != "")
++            emojier.set_annotation_lang(annotation_lang);
++
++        activate_dialog(command_line);
++
++        return Posix.EXIT_SUCCESS;
++    }
++
++    public override int command_line (ApplicationCommandLine command_line) {
++        // keep the application running until we are done with this commandline
++        this.hold();
++        int result = _command_line(command_line);
++        this.release();
++        return result;
++    }
++
++    public static int main (string[] args) {
++        GLib.Intl.bindtextdomain(Config.GETTEXT_PACKAGE,
++                Config.GLIB_LOCALE_DIR);
++        GLib.Intl.bind_textdomain_codeset(Config.GETTEXT_PACKAGE, "UTF-8");
++        GLib.Intl.textdomain(Config.GETTEXT_PACKAGE);
++
++        IBus.init();
++
++        Gtk.init(ref args);
++
++        EmojiApplication app = new EmojiApplication();
++        int status = app.run(args);
++        return status;
++    }
++
++}
+-- 
+2.9.3
+
+From da33672bc738889dcd4ebbec51cb3aa67567f70c Mon Sep 17 00:00:00 2001
+From: Peng Wu <alexepico@gmail.com>
+Date: Thu, 13 Apr 2017 12:40:22 +0900
+Subject: [PATCH] tools: spawn the process of ibus-ui-emojier
+
+BUG=
+R=Shawn.P.Huang@gmail.com, takao.fujiwara1@gmail.com
+
+Review URL: https://codereview.appspot.com/324770043
+
+Patch from Peng Wu <alexepico@gmail.com>.
+---
+ bindings/vala/config.vapi |  1 +
+ tools/Makefile.am         |  1 +
+ tools/main.vala           | 72 +++++++++--------------------------------------
+ 3 files changed, 15 insertions(+), 59 deletions(-)
+
+diff --git a/bindings/vala/config.vapi b/bindings/vala/config.vapi
+index f2195da..e3c43df 100644
+--- a/bindings/vala/config.vapi
++++ b/bindings/vala/config.vapi
+@@ -7,6 +7,7 @@ namespace Config
+     public const string BINDIR;
+     public const string DATADIR;
+     public const string PKGDATADIR;
++    public const string LIBEXECDIR;
+     public const string GETTEXT_PACKAGE;
+     public const string GLIB_LOCALE_DIR;
+ }
+diff --git a/tools/Makefile.am b/tools/Makefile.am
+index bd655af..9d542bd 100644
+--- a/tools/Makefile.am
++++ b/tools/Makefile.am
+@@ -39,6 +39,7 @@ AM_CFLAGS = \
+ 	@GIO2_CFLAGS@ \
+ 	@GTHREAD2_CFLAGS@ \
+ 	-DG_LOG_DOMAIN=\"IBUS\" \
++	-DLIBEXECDIR=\"$(libexecdir)\" \
+ 	-DIBUS_DISABLE_DEPRECATED \
+ 	-Wno-unused-variable \
+ 	-Wno-unused-but-set-variable \
+diff --git a/tools/main.vala b/tools/main.vala
+index 2bf1dc7..9aca4b0 100644
+--- a/tools/main.vala
++++ b/tools/main.vala
+@@ -324,73 +324,27 @@ int reset_config(string[] argv) {
+ }
+ 
+ #if EMOJI_DICT
+-private void run_dialog(IBus.Emojier emojier) {
+-    Gdk.Event event = new Gdk.Event(Gdk.EventType.KEY_PRESS);
+-    var display = Gdk.Display.get_default();
+-    var device_manager = display.get_device_manager();
+-    var device = device_manager.list_devices(Gdk.DeviceType.MASTER).data;
+-    event.set_device(device);
+-    string emoji = emojier.run(event, "");
+-    if (emoji == null) {
+-        emojier.reset();
+-        print("%s\n", _("Canceled to choose an emoji."));
+-        return;
+-    }
+-    Gtk.Clipboard clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD);
+-    clipboard.set_text(emoji, -1);
+-    clipboard.store();
+-    emojier.reset();
+-    print("%s\n", _("Copied an emoji to your clipboard."));
+-}
+-
+ int emoji_dialog(string[] argv) {
+-    const OptionEntry[] options = {
+-        { "font", 0, 0, OptionArg.STRING, out emoji_font,
+-          N_("FONT for emoji chracters on emoji dialog."), "FONT" },
+-        { "lang", 0, 0, OptionArg.STRING, out annotation_lang,
+-          N_("LANG for annotations on emoji dialog. E.g. \"en\""), "LANG" },
+-        { null }
+-    };
++    string cmd = Config.LIBEXECDIR + "/ibus-ui-emojier";
+ 
+-    var option = new OptionContext();
+-    option.add_main_entries(options, Config.GETTEXT_PACKAGE);
++    var file = File.new_for_path(cmd);
++    if (!file.query_exists())
++        cmd = "../ui/gtk3/ibus-ui-emojier";
++
++    argv[0] = cmd;
++
++    string[] env = Environ.get();
+ 
+     try {
+-        option.parse(ref argv);
+-    } catch (OptionError e) {
++        // Non-blocking
++        Process.spawn_async(null, argv, env,
++                            SpawnFlags.SEARCH_PATH,
++                            null, null);
++    } catch (SpawnError e) {
+         stderr.printf("%s\n", e.message);
+         return Posix.EXIT_FAILURE;
+     }
+ 
+-    Gtk.init(ref argv);
+-    if (emoji_font == null) {
+-        GLib.Settings settings_emoji =
+-                new GLib.Settings("org.freedesktop.ibus.panel.emoji");
+-        emoji_font = settings_emoji.get_string("font");
+-    }
+-    if (annotation_lang == null) {
+-        GLib.Settings settings_emoji =
+-                new GLib.Settings("org.freedesktop.ibus.panel.emoji");
+-        annotation_lang = settings_emoji.get_string("lang");
+-    }
+-    IBus.Emojier emojier = new IBus.Emojier();
+-    if (emoji_font != null && emoji_font != "")
+-        emojier.set_emoji_font(emoji_font);
+-    if (annotation_lang != null && annotation_lang != "")
+-        emojier.set_annotation_lang(annotation_lang);
+-    if (emojier.has_loaded_emoji_dict()) {
+-        run_dialog(emojier);
+-    } else {
+-        GLib.MainLoop loop = new GLib.MainLoop();
+-        emojier.loaded_emoji_dict.connect(() => {
+-            // The signal is called when the language is changed.
+-            if (emojier.is_running())
+-                return;
+-            run_dialog(emojier);
+-            loop.quit();
+-        });
+-        loop.run();
+-    }
+     return Posix.EXIT_SUCCESS;
+ }
+ #endif
+-- 
+2.9.3
+
+From 290f786b82158e7c087b81946727606cd3424e94 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Mon, 17 Apr 2017 16:00:26 +0900
+Subject: [PATCH] ui/gtk3: Fix build failures
+
+ibus-ui-emoijer needs to be built at last in ui/gtk3
+Also fixed po/POTFILES.in for `make dist`
+Now I moved libibusemojidialog.so and IBusEmojiDialog-1.0.[gir|typelib]
+and ibus-emoji-dialog-1.0.vapi to noinst because now
+ibus-ui-emojier is available and they are private libraries.
+
+R=Shawn.P.Huang@gmail.com
+
+Review URL: https://codereview.appspot.com/312610043
+---
+ po/POTFILES.in          |  1 +
+ tools/Makefile.am       | 19 ++-----------
+ ui/gtk3/Makefile.am     | 72 ++++++++++++++++++++++---------------------------
+ ui/gtk3/emojierapp.vala | 33 +++++++++++++----------
+ 4 files changed, 54 insertions(+), 71 deletions(-)
+
+diff --git a/po/POTFILES.in b/po/POTFILES.in
+index 65a3526..25be4f4 100644
+--- a/po/POTFILES.in
++++ b/po/POTFILES.in
+@@ -31,6 +31,7 @@ ibus/object.py
+ ibus/panel.py
+ ibus/property.py
+ ibus/utility.py
++setup/emojilang.py
+ setup/engineabout.py
+ setup/enginecombobox.py
+ setup/enginedialog.py
+diff --git a/tools/Makefile.am b/tools/Makefile.am
+index 9d542bd..5c18d3d 100644
+--- a/tools/Makefile.am
++++ b/tools/Makefile.am
+@@ -101,24 +101,9 @@ CLEANFILES = \
+ 
+ if ENABLE_EMOJI_DICT
+ if ENABLE_UI
+-AM_CPPFLAGS += \
+-	-I$(top_srcdir)/ui/gtk3 \
+-	-I$(top_builddir)/ui/gtk3 \
+-	$(NULL)
+-AM_CFLAGS += \
+-	@GTK3_CFLAGS@ \
+-	$(NULL)
+-AM_LDADD += \
+-	@GTK3_LIBS@ \
+-	$(libibus_emoji_dialog) \
+-	$(NULL)
+ AM_VALAFLAGS += \
+-	--define=EMOJI_DICT \
+-	--vapidir=$(top_builddir)/ui/gtk3 \
+-	--vapidir=$(top_srcdir)/ui/gtk3 \
+-	--pkg=ibus-emoji-dialog-1.0 \
+-	--pkg=gtk+-3.0 \
+-	$(NULL)
++    --define=EMOJI_DICT \
++    $(NULL)
+ endif
+ endif
+ 
+diff --git a/ui/gtk3/Makefile.am b/ui/gtk3/Makefile.am
+index 96ed3e6..6f0fb62 100644
+--- a/ui/gtk3/Makefile.am
++++ b/ui/gtk3/Makefile.am
+@@ -81,7 +81,9 @@ AM_VALAFLAGS = \
+ 	--target-glib="$(VALA_TARGET_GLIB_VERSION)" \
+ 	$(NULL)
+ 
++MAINTAINERCLEANFILES =
+ CONFIG_CLEAN_FILES =
++noinst_DATA =
+ 
+ if ENABLE_LIBNOTIFY
+ AM_CFLAGS += \
+@@ -108,10 +110,6 @@ endif
+ 
+ libexec_PROGRAMS = ibus-ui-gtk3
+ 
+-if ENABLE_EMOJI_DICT
+-libexec_PROGRAMS += ibus-ui-emojier
+-endif
+-
+ ibus_ui_gtk3_SOURCES = \
+ 	application.vala \
+ 	candidatearea.vala \
+@@ -136,26 +134,6 @@ ibus_ui_gtk3_LDADD = \
+ 	$(AM_LDADD) \
+ 	$(NULL)
+ 
+-if ENABLE_EMOJI_DICT
+-AM_VALAFLAGS += \
+-        --define=EMOJI_DICT \
+-        --vapidir=$(top_builddir)/ui/gtk3 \
+-        --vapidir=$(top_srcdir)/ui/gtk3 \
+-        --pkg=ibus-emoji-dialog-1.0 \
+-        --pkg=gtk+-3.0 \
+-        $(NULL)
+-
+-
+-ibus_ui_emojier_SOURCES = \
+-	emojierapp.vala \
+-	$(NULL)
+-
+-ibus_ui_emojier_LDADD = \
+-	$(AM_LDADD) \
+-	$(libibus_emoji_dialog) \
+-	$(NULL)
+-endif
+-
+ gen-%.xml.c: %.xml
+ 	echo "Building $@ from $<"
+ 	echo "const char * _$(subst -,_,$(subst .,_,$(basename $(notdir $<)))) = " > $@
+@@ -185,11 +163,17 @@ EXTRA_DIST =                            \
+     $(NULL)
+ 
+ if ENABLE_EMOJI_DICT
+-AM_VALAFLAGS += --define=EMOJI_DICT
++AM_VALAFLAGS += \
++    --define=EMOJI_DICT \
++    --vapidir=$(top_builddir)/ui/gtk3 \
++    --vapidir=$(top_srcdir)/ui/gtk3 \
++    --pkg=ibus-emoji-dialog-1.0 \
++    --pkg=gtk+-3.0 \
++    $(NULL)
+ 
+ libibus_emoji_dialog = libibus-emoji-dialog-1.0.la
+ 
+-lib_LTLIBRARIES = $(libibus_emoji_dialog)
++noinst_LTLIBRARIES = $(libibus_emoji_dialog)
+ 
+ libibus_emoji_dialog_1_0_la_CFLAGS = $(AM_CFLAGS)
+ libibus_emoji_dialog_1_0_la_LDFLAGS =   \
+@@ -198,11 +182,22 @@ libibus_emoji_dialog_1_0_la_LDFLAGS =   \
+     -version-info @LT_VERSION_INFO@     \
+     $(NULL)
+ libibus_emoji_dialog_1_0_la_SOURCES =   \
+-    candidatearea.c                     \
+-    emojier.c                           \
+-    iconwidget.c                        \
+-    pango.c                             \
+-    separator.c                         \
++    candidatearea.vala                  \
++    emojier.vala                        \
++    iconwidget.vala                     \
++    pango.vala                          \
++    separator.vala                      \
++    $(NULL)
++
++libexec_PROGRAMS += ibus-ui-emojier
++
++ibus_ui_emojier_SOURCES =                       \
++    $(libibus_emoji_dialog_1_0_la_SOURCES)      \
++    emojierapp.vala                             \
++    $(NULL)
++
++ibus_ui_emojier_LDADD =                         \
++    $(AM_LDADD)                                 \
+     $(NULL)
+ 
+ -include $(INTROSPECTION_MAKEFILE)
+@@ -214,10 +209,6 @@ INTROSPECTION_COMPILER_ARGS =      \
+     $(NULL)
+ 
+ if HAVE_INTROSPECTION
+-ibusincludedir = $(includedir)/ibus-@IBUS_API_VERSION@
+-ibusinclude_HEADERS =                  \
+-    $(emoji_headers)                   \
+-    $(NULL)
+ introspection_sources =                \
+     $(emoji_headers)                   \
+     $(NULL)
+@@ -242,12 +233,13 @@ IBusEmojiDialog_1_0_gir_CFLAGS =       \
+ INTROSPECTION_GIRS = IBusEmojiDialog-1.0.gir
+ 
+ girdir = $(datadir)/gir-1.0
+-dist_gir_DATA = $(INTROSPECTION_GIRS)
++noinst_DATA += $(INTROSPECTION_GIRS)
++CLEANFILES += $(INTROSPECTION_GIRS)
+ 
+ typelibsdir = $(libdir)/girepository-1.0
+-typelibs_DATA = $(INTROSPECTION_GIRS:.gir=.typelib)
++noinst_DATA += $(INTROSPECTION_GIRS:.gir=.typelib)
++CLEANFILES += $(INTROSPECTION_GIRS:.gir=.typelib)
+ 
+-CLEANFILES += $(dist_gir_DATA) $(typelibs_DATA)
+ 
+ if ENABLE_VAPIGEN
+ -include $(VAPIGEN_MAKEFILE)
+@@ -261,9 +253,9 @@ ibus_emoji_dialog_1_0_vapi_METADATADIRS = $(srcdir)
+ ibus_emoji_dialog_1_0_vapi_FILES = $(INTROSPECTION_GIRS)
+ 
+ vapidir = $(datadir)/vala/vapi
+-vapi_DATA = $(VAPIGEN_VAPIS) $(VAPIGEN_VAPIS:.vapi=.deps)
++noinst_DATA += $(VAPIGEN_VAPIS) $(VAPIGEN_VAPIS:.vapi=.deps)
+ 
+-MAINTAINERCLEANFILES = $(VAPIGEN_VAPIS)
++MAINTAINERCLEANFILES += $(VAPIGEN_VAPIS)
+ # for make distclean
+ CONFIG_CLEAN_FILES += $(VAPIGEN_VAPIS)
+ EXTRA_DIST += $(VAPIGEN_VAPIS)
+diff --git a/ui/gtk3/emojierapp.vala b/ui/gtk3/emojierapp.vala
+index 4287bff..6349940 100644
+--- a/ui/gtk3/emojierapp.vala
++++ b/ui/gtk3/emojierapp.vala
+@@ -24,52 +24,55 @@ string emoji_font = null;
+ string annotation_lang = null;
+ 
+ public class EmojiApplication : Application {
+-    private IBus.Emojier emojier = new IBus.Emojier();
++    private IBusEmojier m_emojier = new IBusEmojier();
+ 
+     private EmojiApplication() {
+         Object(application_id: "org.freedesktop.ibus.panel.emojier",
+-                flags: ApplicationFlags.HANDLES_COMMAND_LINE);
++               flags: ApplicationFlags.HANDLES_COMMAND_LINE);
+         set_inactivity_timeout(100000);
+     }
+ 
++
+     private void show_dialog(ApplicationCommandLine command_line) {
+         Gdk.Event event = new Gdk.Event(Gdk.EventType.KEY_PRESS);
+         var display = Gdk.Display.get_default();
+         var device_manager = display.get_device_manager();
+         var device = device_manager.list_devices(Gdk.DeviceType.MASTER).data;
+         event.set_device(device);
+-        string emoji = emojier.run(event, "");
++        string emoji = m_emojier.run(event, "");
+         if (emoji == null) {
+-            emojier.reset();
++            m_emojier.reset();
+             command_line.print("%s\n", _("Canceled to choose an emoji."));
+             return;
+         }
+         Gtk.Clipboard clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD);
+         clipboard.set_text(emoji, -1);
+         clipboard.store();
+-        emojier.reset();
++        m_emojier.reset();
+         command_line.print("%s\n", _("Copied an emoji to your clipboard."));
+     }
+ 
++
+     public void activate_dialog(ApplicationCommandLine command_line) {
+         this.hold ();
+ 
+         // show dialog
+-        if (emojier.has_loaded_emoji_dict()) {
++        if (m_emojier.has_loaded_emoji_dict()) {
+             show_dialog(command_line);
+         } else {
+-            emojier.loaded_emoji_dict.connect(() => {
+-                    // The signal is called when the language is changed.
+-                    if (emojier.is_running())
++            m_emojier.loaded_emoji_dict.connect(() => {
++                // The signal is called when the language is changed.
++                if (m_emojier.is_running())
+                     return;
+ 
+-                    show_dialog(command_line);
+-                    });
++                show_dialog(command_line);
++            });
+         }
+ 
+         this.release ();
+     }
+ 
++
+     private int _command_line (ApplicationCommandLine command_line) {
+         const OptionEntry[] options = {
+             { "font", 0, 0, OptionArg.STRING, out emoji_font,
+@@ -114,15 +117,16 @@ public class EmojiApplication : Application {
+         }
+ 
+         if (emoji_font != null && emoji_font != "")
+-            emojier.set_emoji_font(emoji_font);
++            m_emojier.set_emoji_font(emoji_font);
+         if (annotation_lang != null && annotation_lang != "")
+-            emojier.set_annotation_lang(annotation_lang);
++            m_emojier.set_annotation_lang(annotation_lang);
+ 
+         activate_dialog(command_line);
+ 
+         return Posix.EXIT_SUCCESS;
+     }
+ 
++
+     public override int command_line (ApplicationCommandLine command_line) {
+         // keep the application running until we are done with this commandline
+         this.hold();
+@@ -131,9 +135,10 @@ public class EmojiApplication : Application {
+         return result;
+     }
+ 
++
+     public static int main (string[] args) {
+         GLib.Intl.bindtextdomain(Config.GETTEXT_PACKAGE,
+-                Config.GLIB_LOCALE_DIR);
++                                 Config.GLIB_LOCALE_DIR);
+         GLib.Intl.bind_textdomain_codeset(Config.GETTEXT_PACKAGE, "UTF-8");
+         GLib.Intl.textdomain(Config.GETTEXT_PACKAGE);
+ 
+-- 
+2.9.3
+
+From 4b8d7baf627fb3fc9e4dde74ba33a867091f95b7 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Tue, 18 Apr 2017 11:44:52 +0900
+Subject: [PATCH] ui/gtk3: Mark LANG and FONT as translatable strings
+
+BUG=https://github.com/ibus/ibus/issues/1920
+
+Review URL: https://codereview.appspot.com/322880043
+---
+ ui/gtk3/emojierapp.vala | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/ui/gtk3/emojierapp.vala b/ui/gtk3/emojierapp.vala
+index 6349940..eac8d6a 100644
+--- a/ui/gtk3/emojierapp.vala
++++ b/ui/gtk3/emojierapp.vala
+@@ -76,11 +76,17 @@ public class EmojiApplication : Application {
+     private int _command_line (ApplicationCommandLine command_line) {
+         const OptionEntry[] options = {
+             { "font", 0, 0, OptionArg.STRING, out emoji_font,
+-                N_("FONT for emoji chracters on emoji dialog."),
+-                "FONT" },
++                /* TRANSLATORS: "FONT" should be capital and translatable.
++                 * It's used for an argument command --font=FONT
++                 */
++                N_("\"FONT\" for emoji chracters on emoji dialog"),
++                N_("FONT") },
+             { "lang", 0, 0, OptionArg.STRING, out annotation_lang,
+-                N_("LANG for annotations on emoji dialog. E.g. \"en\""),
+-                "LANG" },
++                /* TRANSLATORS: "LANG" should be capital and translatable.
++                 * It's used for an argument command --lang=LANG
++                 */
++                N_("\"LANG\" for annotations on emoji dialog. E.g. \"en\""),
++                N_("LANG") },
+             { null }
+         };
+ 
+-- 
+2.9.3
+
+From c6cdf21c7364cbb1e848e44cab0bff270e432e82 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Wed, 19 Apr 2017 12:16:37 +0900
+Subject: [PATCH] ui/gtk3: Change modal dialog to focused dialog
+
+There are several problems with the current emoji modal dialog.
+If keyboard is grabbed on the popup window, the focus out/in events
+cannot be detected so the dialog cannot be closed by the focus changes.
+
+If mouse operation is supported on the popup window, need a custom
+GtkHeaderBar with extended handle.vala but the behavior is unclear. [1]
+
+Also current popup window has several extensions for the keyboard grab.
+
+If the closed button is needed on the popup window since the focus events
+cannot be detected, I think there is no merit to use the popup window.
+Now IBusEmojier simply uses the focused window.
+
+[1] https://mail.gnome.org/archives/gtk-app-devel-list/2017-April/msg00017.html
+
+R=Shawn.P.Huang@gmail.com, alexepico@gmail.com
+
+Review URL: https://codereview.appspot.com/316510043
+---
+ ui/gtk3/emojier.vala      | 243 +++++++++++++++++++---------------------------
+ ui/gtk3/emojierapp.vala   |  55 ++++-------
+ ui/gtk3/ibusemojidialog.h |  54 +++++------
+ ui/gtk3/panel.vala        |  73 ++++++++++----
+ 4 files changed, 194 insertions(+), 231 deletions(-)
+
+diff --git a/ui/gtk3/emojier.vala b/ui/gtk3/emojier.vala
+index 7b6107f..5a9bf8f 100644
+--- a/ui/gtk3/emojier.vala
++++ b/ui/gtk3/emojier.vala
+@@ -137,47 +137,27 @@ class IBusEmojier : Gtk.Window {
+             pack_start(label, true, true, 0);
+         }
+     }
+-    private class ETitleLabelBox : Gtk.Box {
+-        EPaddedLabel m_lang_label;
+-        private Gtk.Button m_close_button;
+-        private ulong m_close_handler;
++    private class ETitleLabelBox : Gtk.HeaderBar {
++        private Gtk.Label m_lang_label;
+ 
+-        public ETitleLabelBox(string    text,
+-                              Gtk.Align align) {
++        public ETitleLabelBox(string title) {
+             GLib.Object(
+                 name : "IBusEmojierTitleLabelBox",
+-                orientation : Gtk.Orientation.HORIZONTAL,
+-                spacing : 0
++                show_close_button: true,
++                decoration_layout: ":close",
++                title: title
+             );
+-            EPaddedLabel label = new EPaddedLabel(text, align);
+-            pack_start(label, true, true, 0);
+-            Gtk.Separator separator =
+-                    new Gtk.Separator (Gtk.Orientation.VERTICAL);
+-            pack_start(separator, false, true, 0);
+-            m_lang_label = new EPaddedLabel("", align);
+-            pack_start(m_lang_label, false, true, 0);
+-            IconWidget icon = new IconWidget("window-close", Gtk.IconSize.MENU);
+-            m_close_button = new Gtk.Button();
+-            m_close_button.add(icon);
+-            pack_end(m_close_button, false, true, 0);
+-        }
+-        public void set_loop(GLib.MainLoop? loop) {
+-            if (m_close_handler > 0)
+-                GLib.SignalHandler.disconnect(m_close_button, m_close_handler);
+-            m_close_handler = m_close_button.button_press_event.connect((e) => {
+-                if (loop != null && loop.is_running())
+-                    loop.quit();
+-                return true;
+-            });
+-        }
+-        public void unset_loop() {
+-            if (m_close_handler > 0) {
+-                GLib.SignalHandler.disconnect(m_close_button, m_close_handler);
+-                m_close_handler = 0;
+-            }
++            var vbox = new Gtk.Box(Gtk.Orientation.VERTICAL, 0);
++            set_custom_title(vbox);
++            var label = new Gtk.Label(title);
++            label.get_style_context().add_class("title");
++            vbox.pack_start(label, true, false, 0);
++            m_lang_label = new Gtk.Label(null);
++            m_lang_label.get_style_context().add_class("subtitle");
++            vbox.pack_start(m_lang_label, true, false, 0);
+         }
+         public void set_lang_label(string str) {
+-            m_lang_label.set_label(str);
++            m_lang_label.set_text(str);
+         }
+     }
+ 
+@@ -186,7 +166,22 @@ class IBusEmojier : Gtk.Window {
+         BACKWARD,
+     }
+ 
+-    private const uint EMOJI_GRID_PAGE = 10;
++    private static const uint EMOJI_GRID_PAGE = 10;
++
++    // Set the actual default values in the constructor
++    // because these fields are used for class_init() and static functions,
++    // e.g. set_emoji_font(), can be called before class_init() is called.
++    private static string m_current_lang_id;
++    private static string m_emoji_font;
++    private static string[] m_favorites;
++    private static int m_emoji_max_seq_len;
++    private static GLib.HashTable<string, GLib.SList>?
++            m_annotation_to_emojis_dict;
++    private static GLib.HashTable<string, IBus.EmojiData>?
++            m_emoji_to_data_dict;
++    private static GLib.HashTable<string, GLib.SList>?
++            m_category_to_emojis_dict;
++
+     private ThemedRGBA m_rgba;
+     private Gtk.Box m_vbox;
+     private ETitleLabelBox m_title;
+@@ -198,43 +193,38 @@ class IBusEmojier : Gtk.Window {
+     private string m_input_context_path = "";
+     private GLib.MainLoop? m_loop;
+     private string? m_result;
+-    private string m_current_lang_id = "en";
+     private string? m_unicode_point = null;
+     private bool m_candidate_panel_is_visible;
+-    private GLib.HashTable<string, GLib.SList>?
+-            m_annotation_to_emojis_dict = null;
+-    private GLib.HashTable<string, IBus.EmojiData>?
+-            m_emoji_to_data_dict = null;
+-    private GLib.HashTable<string, GLib.SList>?
+-            m_category_to_emojis_dict = null;
+     int m_category_active_index;
+-    private int m_emoji_max_seq_len = 0;
+     private IBus.LookupTable m_lookup_table;
+     private Gtk.Label[] m_candidates;
+-    private string m_emoji_font = "Monospace 16";
+-    private string[] m_favorites = {};
+     private bool m_enter_notify_enable = true;
+     private uint m_entry_notify_show_id;
+     private uint m_entry_notify_disable_id;
+-    private uint m_reload_emoji_dict_id;
+ 
+     public signal void candidate_clicked(uint index, uint button, uint state);
+-    public signal void loaded_emoji_dict();
+ 
+     public IBusEmojier() {
+         GLib.Object(
+-            type : Gtk.WindowType.POPUP,
++            type : Gtk.WindowType.TOPLEVEL,
+             events : Gdk.EventMask.KEY_PRESS_MASK |
+                      Gdk.EventMask.KEY_RELEASE_MASK |
+-                     Gdk.EventMask.BUTTON_PRESS_MASK,
++                     Gdk.EventMask.BUTTON_PRESS_MASK |
++                     Gdk.EventMask.BUTTON_RELEASE_MASK,
+             window_position : Gtk.WindowPosition.CENTER,
++            icon_name: "ibus-setup",
+             accept_focus : true,
+-            decorated : false,
+-            modal : true,
+             resizable : true,
+             focus_visible : true
+         );
+ 
++        if (m_current_lang_id == null)
++            m_current_lang_id = "en";
++        if (m_emoji_font == null)
++            m_emoji_font = "Monospace 16";
++        if (m_favorites == null)
++            m_favorites = {};
++
+         Gdk.Display display = Gdk.Display.get_default();
+         Gdk.Screen screen = (display != null) ?
+                 display.get_default_screen() : null;
+@@ -283,12 +273,11 @@ class IBusEmojier : Gtk.Window {
+                 css_provider,
+                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+ 
++        m_title = new ETitleLabelBox(_("Emoji Chooser"));
++        set_titlebar(m_title);
+         m_vbox = new Gtk.Box(Gtk.Orientation.VERTICAL, 0);
+         add(m_vbox);
+ 
+-        m_title = new ETitleLabelBox(_("Emoji Dialog"),
+-                                     Gtk.Align.CENTER);
+-        m_vbox.add(m_title);
+         m_entry = new EEntry();
+         m_entry.set_placeholder_text(_("Type annotation or choose emoji"));
+         m_vbox.add(m_entry);
+@@ -306,8 +295,6 @@ class IBusEmojier : Gtk.Window {
+         Atk.Object obj = m_entry.get_accessible();
+         obj.set_role (Atk.Role.STATUSBAR);
+ 
+-        grab_focus();
+-
+         // The constructor of IBus.LookupTable does not support more than
+         // 16 pages.
+         m_lookup_table = new IBus.LookupTable(1, 0, true, true);
+@@ -325,15 +312,13 @@ class IBusEmojier : Gtk.Window {
+             hide_candidate_panel();
+         });
+ 
+-        m_reload_emoji_dict_id = GLib.Idle.add(() => {
++        if (m_annotation_to_emojis_dict == null) {
+             reload_emoji_dict();
+-            m_reload_emoji_dict_id = 0;
+-            return false;
+-        });
++        }
+     }
+ 
+ 
+-    private void reload_emoji_dict() {
++    private static void reload_emoji_dict() {
+         init_emoji_dict();
+         make_emoji_dict("en");
+         if (m_current_lang_id != "en") {
+@@ -344,11 +329,10 @@ class IBusEmojier : Gtk.Window {
+             }
+             make_emoji_dict(m_current_lang_id);
+         }
+-        loaded_emoji_dict();
+     }
+ 
+ 
+-    private void init_emoji_dict() {
++    private static void init_emoji_dict() {
+         m_annotation_to_emojis_dict =
+                 new GLib.HashTable<string, GLib.SList>(GLib.str_hash,
+                                                        GLib.str_equal);
+@@ -361,7 +345,7 @@ class IBusEmojier : Gtk.Window {
+     }
+ 
+ 
+-    private void make_emoji_dict(string lang) {
++    private static void make_emoji_dict(string lang) {
+         GLib.SList<IBus.EmojiData> emoji_list = IBus.EmojiData.load(
+                     Config.PKGDATADIR + "/dicts/emoji-" + lang + ".dict");
+         if (emoji_list == null)
+@@ -380,7 +364,7 @@ class IBusEmojier : Gtk.Window {
+     }
+ 
+ 
+-    private void update_annotation_to_emojis_dict(IBus.EmojiData data) {
++    private static void update_annotation_to_emojis_dict(IBus.EmojiData data) {
+         string emoji = (data.get_emoji_alternates() != "") ?
+                 data.get_emoji_alternates() : data.get_emoji();
+         unowned GLib.SList<string> annotations = data.get_annotations();
+@@ -402,7 +386,7 @@ class IBusEmojier : Gtk.Window {
+     }
+ 
+ 
+-    private string utf8_down(string str) {
++    private static string utf8_down(string str) {
+         GLib.StringBuilder buff = new GLib.StringBuilder();
+         int length = str.char_count();
+         for (int i = 0; i < length; i++) {
+@@ -413,7 +397,7 @@ class IBusEmojier : Gtk.Window {
+     }
+ 
+ 
+-    private string utf8_title(string str) {
++    private static string utf8_title(string str) {
+         StringBuilder buff = new StringBuilder();
+         int length = str.char_count();
+         for (int i = 0; i < length; i++) {
+@@ -428,7 +412,7 @@ class IBusEmojier : Gtk.Window {
+     }
+ 
+ 
+-    private string utf8_code_point(string str) {
++    private static string utf8_code_point(string str) {
+         StringBuilder buff = new StringBuilder();
+         int length = str.char_count();
+         for (int i = 0; i < length; i++) {
+@@ -443,8 +427,8 @@ class IBusEmojier : Gtk.Window {
+     }
+ 
+ 
+-    private void update_emoji_to_data_dict(IBus.EmojiData data,
+-                                           string         lang) {
++    private static void update_emoji_to_data_dict(IBus.EmojiData data,
++                                                  string         lang) {
+         string emoji = (data.get_emoji_alternates() != "") ?
+                 data.get_emoji_alternates() : data.get_emoji();
+         if (lang == "en") {
+@@ -496,8 +480,8 @@ class IBusEmojier : Gtk.Window {
+     }
+ 
+ 
+-    private void update_category_to_emojis_dict(IBus.EmojiData data,
+-                                                string         lang) {
++    private static void update_category_to_emojis_dict(IBus.EmojiData data,
++                                                       string         lang) {
+         string emoji = (data.get_emoji_alternates() != "") ?
+                 data.get_emoji_alternates() : data.get_emoji();
+         string category = data.get_category();
+@@ -937,7 +921,8 @@ class IBusEmojier : Gtk.Window {
+                                              uint modifiers) {
+         assert (keyval == Gdk.Key.Left || keyval == Gdk.Key.Right);
+ 
+-        if (m_candidate_panel_is_visible) {
++        uint ncandidates = m_lookup_table.get_number_of_candidates();
++        if (m_candidate_panel_is_visible && ncandidates > 1) {
+             enter_notify_disable_with_timer();
+             if (keyval == Gdk.Key.Left)
+                 m_lookup_table.cursor_up();
+@@ -971,7 +956,8 @@ class IBusEmojier : Gtk.Window {
+     private bool key_press_cursor_vertical(uint keyval) {
+         assert (keyval == Gdk.Key.Down || keyval == Gdk.Key.Up);
+ 
+-        if (m_candidate_panel_is_visible) {
++        uint ncandidates = m_lookup_table.get_number_of_candidates();
++        if (m_candidate_panel_is_visible && ncandidates > 1) {
+             if (keyval == Gdk.Key.Down)
+                 candidate_panel_cursor_down();
+             else if (keyval == Gdk.Key.Up)
+@@ -987,12 +973,12 @@ class IBusEmojier : Gtk.Window {
+                                            uint modifiers) {
+         assert (keyval == Gdk.Key.Home || keyval == Gdk.Key.End);
+ 
+-        if (m_candidate_panel_is_visible) {
++        uint ncandidates = m_lookup_table.get_number_of_candidates();
++        if (m_candidate_panel_is_visible && ncandidates > 1) {
+             enter_notify_disable_with_timer();
+             if (keyval == Gdk.Key.Home) {
+                 m_lookup_table.set_cursor_pos(0);
+             } else if (keyval == Gdk.Key.End) {
+-                uint ncandidates = m_lookup_table.get_number_of_candidates();
+                 m_lookup_table.set_cursor_pos(ncandidates - 1);
+             }
+             show_candidate_panel();
+@@ -1052,8 +1038,7 @@ class IBusEmojier : Gtk.Window {
+     }
+ 
+ 
+-    public string run(Gdk.Event event,
+-                      string    input_context_path) {
++    public string run(string input_context_path) {
+         assert (m_loop == null);
+ 
+         m_is_running = true;
+@@ -1066,65 +1051,22 @@ class IBusEmojier : Gtk.Window {
+         resize(1, 1);
+ 
+         m_entry.set_text("");
+-        m_entry.grab_focus();
+-
+-        Gdk.Device device = event.get_device();
+-        if (device == null) {
+-            var display = get_display();
+-            var device_manager = display.get_device_manager();
+-            device = device_manager.list_devices(Gdk.DeviceType.MASTER).data;
+-        }
+-
+-        Gdk.Device keyboard;
+-        Gdk.Device pointer;
+-        if (device.get_source() == Gdk.InputSource.KEYBOARD) {
+-            keyboard = device;
+-            pointer = device.get_associated_device();
+-        } else {
+-            pointer = device;
+-            keyboard = device.get_associated_device();
+-        }
++        //m_entry.grab_focus();
+ 
+         show_category_list();
+         m_entry.set_activates_default(true);
+         show_all();
+ 
+-        Gdk.GrabStatus status;
+-        // Grab all keyboard events
+-        status = keyboard.grab(get_window(),
+-                               Gdk.GrabOwnership.NONE,
+-                               true,
+-                               Gdk.EventMask.KEY_PRESS_MASK |
+-                               Gdk.EventMask.KEY_RELEASE_MASK,
+-                               null,
+-                               Gdk.CURRENT_TIME);
+-        if (status != Gdk.GrabStatus.SUCCESS)
+-            warning("Grab keyboard failed! status = %d", status);
+-        // Grab all pointer events
+-        status = pointer.grab(get_window(),
+-                              Gdk.GrabOwnership.NONE,
+-                              true,
+-                              Gdk.EventMask.BUTTON_PRESS_MASK |
+-                              Gdk.EventMask.BUTTON_RELEASE_MASK,
+-                              null,
+-                              Gdk.CURRENT_TIME);
+-        if (status != Gdk.GrabStatus.SUCCESS)
+-            warning("Grab pointer failed! status = %d", status);
+-
+         m_loop = new GLib.MainLoop();
+-        m_title.set_loop(m_loop);
+         m_loop.run();
+-        m_title.unset_loop();
+         m_loop = null;
+ 
+-        keyboard.ungrab(Gdk.CURRENT_TIME);
+-        pointer.ungrab(Gdk.CURRENT_TIME);
+-
+         // Need focus-out on Gtk.Entry to send the emoji to applications.
+         Gdk.Event fevent = new Gdk.Event(Gdk.EventType.FOCUS_CHANGE);
+         fevent.focus_change.in = 0;
+         fevent.focus_change.window  = get_window();
+         m_entry.send_focus_change(fevent);
++        fevent.focus_change.window  = null;
+ 
+         hide();
+         // Make sure the switcher is hidden before returning from this function.
+@@ -1288,20 +1230,23 @@ class IBusEmojier : Gtk.Window {
+     }
+ 
+ 
+-    public void set_emoji_font(string emoji_font) {
+-        m_emoji_font = emoji_font;
+-    }
+-
+-
+-    public void set_favorites(string[]? unowned_favorites) {
+-        m_favorites = {};
+-        foreach (string favorite in unowned_favorites) {
+-            m_favorites += favorite;
+-        }
++    public void present_centralize() {
++        present();
++        m_entry.set_activates_default(true);
++        Gtk.Allocation allocation;
++        get_allocation(out allocation);
++        Gdk.Screen screen = Gdk.Screen.get_default();
++        int monitor_num = screen.get_monitor_at_window(get_window());
++        Gdk.Rectangle monitor_area;
++        screen.get_monitor_geometry(monitor_num, out monitor_area);
++        int x = (monitor_area.x + monitor_area.width - allocation.width)/2;
++        int y = (monitor_area.y + monitor_area.height
++                 - allocation.height)/2;
++        move(x, y);
+     }
+ 
+ 
+-    public bool has_loaded_emoji_dict() {
++    public static bool has_loaded_emoji_dict() {
+         if (m_emoji_to_data_dict == null)
+             return false;
+         GLib.List keys = m_emoji_to_data_dict.get_keys();
+@@ -1311,18 +1256,26 @@ class IBusEmojier : Gtk.Window {
+     }
+ 
+ 
+-    public void set_annotation_lang(string lang) {
++    public static void set_annotation_lang(string? lang) {
++        if (lang == null || lang == "")
++            lang = "en";
+         if (m_current_lang_id == lang)
+             return;
+-        if (m_reload_emoji_dict_id > 0) {
+-            GLib.Source.remove(m_reload_emoji_dict_id);
+-            m_reload_emoji_dict_id = 0;
+-        }
+         m_current_lang_id = lang;
+-        m_reload_emoji_dict_id = GLib.Idle.add(() => {
+-            reload_emoji_dict();
+-            m_reload_emoji_dict_id = 0;
+-            return false;
+-        });
++        reload_emoji_dict();
++    }
++
++
++    public static void set_emoji_font(string? emoji_font) {
++        return_if_fail(emoji_font != null && emoji_font != "");
++        m_emoji_font = emoji_font;
++    }
++
++
++    public static void set_favorites(string[]? unowned_favorites) {
++        m_favorites = {};
++        foreach (string favorite in unowned_favorites) {
++            m_favorites += favorite;
++        }
+     }
+ }
+diff --git a/ui/gtk3/emojierapp.vala b/ui/gtk3/emojierapp.vala
+index eac8d6a..4564a25 100644
+--- a/ui/gtk3/emojierapp.vala
++++ b/ui/gtk3/emojierapp.vala
+@@ -24,7 +24,10 @@ string emoji_font = null;
+ string annotation_lang = null;
+ 
+ public class EmojiApplication : Application {
+-    private IBusEmojier m_emojier = new IBusEmojier();
++    private IBusEmojier? m_emojier;
++    GLib.Settings m_settings_emoji =
++            new GLib.Settings("org.freedesktop.ibus.panel.emoji");
++
+ 
+     private EmojiApplication() {
+         Object(application_id: "org.freedesktop.ibus.panel.emojier",
+@@ -34,41 +37,24 @@ public class EmojiApplication : Application {
+ 
+ 
+     private void show_dialog(ApplicationCommandLine command_line) {
+-        Gdk.Event event = new Gdk.Event(Gdk.EventType.KEY_PRESS);
+-        var display = Gdk.Display.get_default();
+-        var device_manager = display.get_device_manager();
+-        var device = device_manager.list_devices(Gdk.DeviceType.MASTER).data;
+-        event.set_device(device);
+-        string emoji = m_emojier.run(event, "");
++        m_emojier = new IBusEmojier();
++        string emoji = m_emojier.run("");
+         if (emoji == null) {
+-            m_emojier.reset();
++            m_emojier = null;
+             command_line.print("%s\n", _("Canceled to choose an emoji."));
+             return;
+         }
+         Gtk.Clipboard clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD);
+         clipboard.set_text(emoji, -1);
+         clipboard.store();
+-        m_emojier.reset();
++        m_emojier = null;
+         command_line.print("%s\n", _("Copied an emoji to your clipboard."));
+     }
+ 
+ 
+     public void activate_dialog(ApplicationCommandLine command_line) {
+         this.hold ();
+-
+-        // show dialog
+-        if (m_emojier.has_loaded_emoji_dict()) {
+-            show_dialog(command_line);
+-        } else {
+-            m_emojier.loaded_emoji_dict.connect(() => {
+-                // The signal is called when the language is changed.
+-                if (m_emojier.is_running())
+-                    return;
+-
+-                show_dialog(command_line);
+-            });
+-        }
+-
++        show_dialog(command_line);
+         this.release ();
+     }
+ 
+@@ -110,22 +96,18 @@ public class EmojiApplication : Application {
+             return Posix.EXIT_FAILURE;
+         }
+ 
+-        if (emoji_font == null) {
+-            GLib.Settings settings_emoji =
+-                new GLib.Settings("org.freedesktop.ibus.panel.emoji");
+-            emoji_font = settings_emoji.get_string("font");
++        if (m_emojier != null && m_emojier.is_running()) {
++            m_emojier.present_centralize();
++            return Posix.EXIT_SUCCESS;
+         }
+ 
+-        if (annotation_lang == null) {
+-            GLib.Settings settings_emoji =
+-                new GLib.Settings("org.freedesktop.ibus.panel.emoji");
+-            annotation_lang = settings_emoji.get_string("lang");
+-        }
++        if (emoji_font == null)
++            emoji_font = m_settings_emoji.get_string("font");
++        if (annotation_lang == null)
++            annotation_lang = m_settings_emoji.get_string("lang");
+ 
+-        if (emoji_font != null && emoji_font != "")
+-            m_emojier.set_emoji_font(emoji_font);
+-        if (annotation_lang != null && annotation_lang != "")
+-            m_emojier.set_annotation_lang(annotation_lang);
++        IBusEmojier.set_annotation_lang(annotation_lang);
++        IBusEmojier.set_emoji_font(emoji_font);
+ 
+         activate_dialog(command_line);
+ 
+@@ -156,5 +138,4 @@ public class EmojiApplication : Application {
+         int status = app.run(args);
+         return status;
+     }
+-
+ }
+diff --git a/ui/gtk3/ibusemojidialog.h b/ui/gtk3/ibusemojidialog.h
+index 0f84a48..1499a3c 100644
+--- a/ui/gtk3/ibusemojidialog.h
++++ b/ui/gtk3/ibusemojidialog.h
+@@ -69,7 +69,6 @@ IBusEmojier * ibus_emojier_new                    (void);
+ /**
+  * ibus_emojier_run:
+  * @self: An #IBusEmojier
+- * @event: An #GdkEvent
+  * @input_context_path: An input context path of #IBusInputContext
+  *                      of the focused application.
+  *
+@@ -78,7 +77,6 @@ IBusEmojier * ibus_emojier_new                    (void);
+  * Returns: A selected emoji character.
+  */
+ gchar *       ibus_emojier_run                    (IBusEmojier* self,
+-                                                   GdkEvent*    event,
+                                                    const gchar*
+                                                            input_context_path);
+ 
+@@ -116,49 +114,49 @@ gchar *       ibus_emojier_get_selected_string    (IBusEmojier* self);
+ void          ibus_emojier_reset                  (IBusEmojier* self);
+ 
+ /**
+- * ibus_emojier_set_emoji_font:
++ * ibus_emojier_present_centralize:
+  * @self: An #IBusEmojier
+- * @emoji_font: font name for emoji characters
+  *
+- * Set emoji font on the emoji dialog
++ * Move the window to the toplevel on the screen and centralize it.
+  */
+-void          ibus_emojier_set_emoji_font         (IBusEmojier* self,
+-                                                   const gchar* emoji_font);
+-
+-#if 0
+-/* TODO: set customized annotations */
+-/**
+- * ibus_emojier_set_favorites:
+- * @self: An #IBusEmojier
+- * @favorites: (array length=favorites_length): A custom emoji list.
+- * @favorites_length: A length of @favorites
+- *
+- * Set emoji font on the emoji dialog
+- */
+-void          ibus_emojier_set_favorites          (IBusEmojier* self,
+-                                                   gchar**      favorites,
+-                                                   int
+-                                                             favorites_length);
+-#endif
++void          ibus_emojier_present_centralize     (IBusEmojier* self);
+ 
+ /**
+  * ibus_emojier_has_loaded_emoji_dict:
+- * @self: An #IBusEmojier
+  *
+  * Returns: %TRUE if the emoji dict is loaded, otherwise %FALSE.
+  */
+-gboolean      ibus_emojier_has_loaded_emoji_dict  (IBusEmojier* self);
++gboolean      ibus_emojier_has_loaded_emoji_dict  (void);
+ 
+ /**
+  * ibus_emojier_set_annotation_lang:
+- * @self: An #IBusEmojier
+  * @lang: A langauge id for emoji annotations.
+  *
+  * Set a language id for emoji annotations. #IBusEmojier will load
+  * $PKGDATADIR/dicts/emoji-@lang.dict. The default is "en".
+  */
+-void          ibus_emojier_set_annotation_lang    (IBusEmojier* self,
+-                                                   const gchar* lang);
++void          ibus_emojier_set_annotation_lang    (const gchar* lang);
+ 
++/**
++ * ibus_emojier_set_emoji_font:
++ * @emoji_font: font name for emoji characters
++ *
++ * Set emoji font on the emoji dialog
++ */
++void          ibus_emojier_set_emoji_font         (const gchar* emoji_font);
++
++#if 0
++/* TODO: set customized annotations */
++/**
++ * ibus_emojier_set_favorites:
++ * @favorites: (array length=favorites_length): A custom emoji list.
++ * @favorites_length: A length of @favorites
++ *
++ * Set emoji font on the emoji dialog
++ */
++void          ibus_emojier_set_favorites          (gchar**      favorites,
++                                                   int
++                                                             favorites_length);
++#endif
+ G_END_DECLS
+ #endif
+diff --git a/ui/gtk3/panel.vala b/ui/gtk3/panel.vala
+index 7350dcc..2375734 100644
+--- a/ui/gtk3/panel.vala
++++ b/ui/gtk3/panel.vala
+@@ -73,7 +73,8 @@ class Panel : IBus.PanelService {
+     private CandidatePanel m_candidate_panel;
+     private Switcher m_switcher;
+     private uint m_switcher_focus_set_engine_id;
+-    private IBusEmojier m_emojier;
++    private IBusEmojier? m_emojier;
++    private uint m_emojier_set_emoji_lang_id;
+     private uint m_emojier_focus_commit_text_id;
+     private PropertyManager m_property_manager;
+     private PropertyPanel m_property_panel;
+@@ -137,7 +138,6 @@ class Panel : IBus.PanelService {
+             m_switcher.set_popup_delay_time((uint) m_switcher_delay_time);
+         }
+ 
+-        m_emojier = new IBusEmojier();
+         bind_emoji_shortcut();
+ 
+         m_property_manager = new PropertyManager();
+@@ -595,7 +595,7 @@ class Panel : IBus.PanelService {
+             warning("No config emoji:font.");
+             return;
+         }
+-        m_emojier.set_emoji_font(emoji_font);
++        IBusEmojier.set_emoji_font(emoji_font);
+ 
+         bool use_custom_font = m_settings_panel.get_boolean("use-custom-font");
+ 
+@@ -766,11 +766,20 @@ class Panel : IBus.PanelService {
+     }
+ 
+     private void set_emoji_favorites() {
+-        m_emojier.set_favorites(m_settings_emoji.get_strv("favorites"));
++        IBusEmojier.set_favorites(m_settings_emoji.get_strv("favorites"));
+     }
+ 
+     private void set_emoji_lang() {
+-        m_emojier.set_annotation_lang(m_settings_emoji.get_string("lang"));
++        if (m_emojier_set_emoji_lang_id > 0) {
++            GLib.Source.remove(m_emojier_set_emoji_lang_id);
++            m_emojier_set_emoji_lang_id = 0;
++        }
++        m_emojier_set_emoji_lang_id = GLib.Idle.add(() => {
++            IBusEmojier.set_annotation_lang(
++                    m_settings_emoji.get_string("lang"));
++            m_emojier_set_emoji_lang_id = 0;
++            return false;
++        });
+     }
+ 
+     private int compare_versions(string version1, string version2) {
+@@ -984,15 +993,24 @@ class Panel : IBus.PanelService {
+         }
+     }
+ 
+-    private void handle_emoji_typing(Gdk.Event event) {
+-        if (m_emojier.is_running())
+-            return;
+-        string emoji = m_emojier.run(event, m_real_current_context_path);
+-        if (emoji == null)
++    private void show_emojier() {
++        m_emojier = new IBusEmojier();
++        string emoji = m_emojier.run(m_real_current_context_path);
++        if (emoji == null) {
++            m_emojier = null;
+             return;
++        }
+         this.emojier_focus_commit();
+     }
+ 
++    private void handle_emoji_typing(Gdk.Event event) {
++        if (m_emojier != null && m_emojier.is_running()) {
++            m_emojier.present_centralize();
++            return;
++        }
++        show_emojier();
++    }
++
+     private void run_preload_engines(IBus.EngineDesc[] engines, int index) {
+         string[] names = {};
+ 
+@@ -1361,29 +1379,34 @@ class Panel : IBus.PanelService {
+         if (selected_engine == null &&
+             prev_context_path != "" &&
+             m_switcher.is_running()) {
+-            if (m_switcher_focus_set_engine_id > 0) {
++            var context = GLib.MainContext.default();
++            if (m_switcher_focus_set_engine_id > 0 &&
++                context.find_source_by_id(m_switcher_focus_set_engine_id)
++                        != null) {
+                 GLib.Source.remove(m_switcher_focus_set_engine_id);
+             }
+             m_switcher_focus_set_engine_id = GLib.Timeout.add(100, () => {
+                 // focus_in is comming before switcher returns
+                 switcher_focus_set_engine_real();
+-                if (m_switcher_focus_set_engine_id > 0) {
+-                    GLib.Source.remove(m_switcher_focus_set_engine_id);
+-                    m_switcher_focus_set_engine_id = -1;
+-                }
++                m_switcher_focus_set_engine_id = -1;
+                 return false;
+             });
+         } else {
+             if (switcher_focus_set_engine_real()) {
+-                if (m_switcher_focus_set_engine_id > 0) {
++                var context = GLib.MainContext.default();
++                if (m_switcher_focus_set_engine_id > 0 &&
++                    context.find_source_by_id(m_switcher_focus_set_engine_id)
++                            != null) {
+                     GLib.Source.remove(m_switcher_focus_set_engine_id);
+-                    m_switcher_focus_set_engine_id = -1;
+                 }
++                m_switcher_focus_set_engine_id = -1;
+             }
+         }
+     }
+ 
+     private bool emojier_focus_commit_real() {
++        if (m_emojier == null)
++            return true;
+         string selected_string = m_emojier.get_selected_string();
+         string prev_context_path = m_emojier.get_input_context_path();
+         if (selected_string != null &&
+@@ -1391,7 +1414,7 @@ class Panel : IBus.PanelService {
+             prev_context_path == m_current_context_path) {
+             IBus.Text text = new IBus.Text.from_string(selected_string);
+             commit_text(text);
+-            m_emojier.reset();
++            m_emojier = null;
+             return true;
+         }
+ 
+@@ -1399,12 +1422,17 @@ class Panel : IBus.PanelService {
+     }
+ 
+     private void emojier_focus_commit() {
++        if (m_emojier == null)
++            return;
+         string selected_string = m_emojier.get_selected_string();
+         string prev_context_path = m_emojier.get_input_context_path();
+         if (selected_string == null &&
+             prev_context_path != "" &&
+             m_emojier.is_running()) {
+-            if (m_emojier_focus_commit_text_id > 0) {
++            var context = GLib.MainContext.default();
++            if (m_emojier_focus_commit_text_id > 0 &&
++                context.find_source_by_id(m_emojier_focus_commit_text_id)
++                        != null) {
+                 GLib.Source.remove(m_emojier_focus_commit_text_id);
+             }
+             m_emojier_focus_commit_text_id = GLib.Timeout.add(100, () => {
+@@ -1415,10 +1443,13 @@ class Panel : IBus.PanelService {
+             });
+         } else {
+             if (emojier_focus_commit_real()) {
+-                if (m_emojier_focus_commit_text_id > 0) {
++                var context = GLib.MainContext.default();
++                if (m_emojier_focus_commit_text_id > 0 &&
++                    context.find_source_by_id(m_emojier_focus_commit_text_id)
++                            != null) {
+                     GLib.Source.remove(m_emojier_focus_commit_text_id);
+-                    m_emojier_focus_commit_text_id = -1;
+                 }
++                m_emojier_focus_commit_text_id = -1;
+             }
+         }
+     }
+-- 
+2.9.3
+
+From 39744bf98c4d6c2677b1e44cdb40cde7d0029a25 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Wed, 19 Apr 2017 15:47:36 +0900
+Subject: [PATCH] ui/gtk3: Fix build failures
+
+---
+ ui/gtk3/Makefile.am | 8 +-------
+ 1 file changed, 1 insertion(+), 7 deletions(-)
+
+diff --git a/ui/gtk3/Makefile.am b/ui/gtk3/Makefile.am
+index 6f0fb62..d2ae0d6 100644
+--- a/ui/gtk3/Makefile.am
++++ b/ui/gtk3/Makefile.am
+@@ -163,13 +163,7 @@ EXTRA_DIST =                            \
+     $(NULL)
+ 
+ if ENABLE_EMOJI_DICT
+-AM_VALAFLAGS += \
+-    --define=EMOJI_DICT \
+-    --vapidir=$(top_builddir)/ui/gtk3 \
+-    --vapidir=$(top_srcdir)/ui/gtk3 \
+-    --pkg=ibus-emoji-dialog-1.0 \
+-    --pkg=gtk+-3.0 \
+-    $(NULL)
++AM_VALAFLAGS += --define=EMOJI_DICT
+ 
+ libibus_emoji_dialog = libibus-emoji-dialog-1.0.la
+ 
+-- 
+2.9.3
+

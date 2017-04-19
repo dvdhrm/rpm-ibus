@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.15
-Release:        6%{?dist}
+Release:        7%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -370,6 +370,7 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/man/man5/ibus.conf.5.gz
 %{_libexecdir}/ibus-engine-simple
 %{_libexecdir}/ibus-dconf
+%{_libexecdir}/ibus-ui-emojier
 %{_libexecdir}/ibus-ui-gtk3
 %{_libexecdir}/ibus-x11
 %{_sysconfdir}/dconf/db/ibus.d
@@ -427,6 +428,10 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Apr 13 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.15-7
+- Supported ibus emoji command on Wayland
+- Changed modal dialog to modeless dialog
+
 * Wed Apr 05 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.15-6
 - Enabled unicode_alt in EmojiOne json file
 - Enabled to type multiple code points on Emojier
