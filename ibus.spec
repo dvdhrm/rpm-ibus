@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.15
-Release:        7%{?dist}
+Release:        8%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -36,6 +36,8 @@ URL:            https://github.com/ibus/%name/wiki
 Source0:        https://github.com/ibus/%name/releases/download/%{version}/%{name}-%{version}.tar.gz
 Source1:        %{name}-xinput
 Source2:        %{name}.conf.5
+# FIXME: Use unicode-emoji package
+Source3:        http://www.unicode.org/Public/emoji/4.0/emoji-test.txt
 # Will remove the annotation tarball once the rpm is available on Fedora
 # Upstreamed patches.
 # Patch0:         %%{name}-HEAD.patch
@@ -67,10 +69,6 @@ BuildRequires:  libnotify-devel
 BuildRequires:  libwayland-client-devel
 %if %with_kde5
 BuildRequires:  qt5-qtbase-devel
-%endif
-%ifarch %{nodejs_arches}
-BuildRequires:  nodejs-emojione-json
-BuildRequires:  json-glib-devel
 %endif
 BuildRequires:  cldr-emoji-annotation
 
@@ -232,6 +230,7 @@ The ibus-devel-docs package contains developer documentation for IBus
 # %%patch0 -p1
 # cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 %patch0 -p1
+cp %SOURCE3 data/annotations
 
 %build
 #autoreconf -f -i -v
@@ -254,9 +253,7 @@ autoreconf -f -i -v
     --disable-appindicator \
 %endif
     --enable-introspection \
-%ifnarch %{nodejs_arches}
-    --disable-emoji-dict \
-%endif
+    --with-unicode-emoji-dir=$PWD/data/annotations \
     %{nil}
 
 make -C ui/gtk3 maintainer-clean-generic
@@ -359,15 +356,14 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/GConf/gsettings/*
 %{_datadir}/glib-2.0/schemas/*.xml
 %{_datadir}/ibus/component
-%ifarch %{nodejs_arches}
 %{_datadir}/ibus/dicts
-%endif
 %{_datadir}/ibus/engine
 %{_datadir}/ibus/keymaps
 %{_datadir}/icons/hicolor/*/apps/*
 %{_datadir}/man/man1/ibus.1.gz
 %{_datadir}/man/man1/ibus-daemon.1.gz
 %{_datadir}/man/man5/ibus.conf.5.gz
+%{_datadir}/man/man7/ibus-emoji.7.gz
 %{_libexecdir}/ibus-engine-simple
 %{_libexecdir}/ibus-dconf
 %{_libexecdir}/ibus-ui-emojier
@@ -428,6 +424,15 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Tue May 09 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.15-8
+- Dropped nodejs-emojione-json and import unicode-emoji instead
+- Created emoji tab in ibus-setup
+- Set default emoji font size from gsettings in ibus emoji command
+- Added an option of emoji partial match in ibus-setup
+- Hid emoji variants by default
+- Added ibus-emoji man page
+- emoji favorites category is updated by selecting emoji
+
 * Thu Apr 13 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.15-7
 - Supported ibus emoji command on Wayland
 - Changed modal dialog to modeless dialog

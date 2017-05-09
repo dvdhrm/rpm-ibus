@@ -5996,11 +5996,17 @@ index 7350dcc..2375734 100644
 -- 
 2.9.3
 
-From 39744bf98c4d6c2677b1e44cdb40cde7d0029a25 Mon Sep 17 00:00:00 2001
+From aba81ace1487bea57e80406413ae31cbb37ac7d2 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 19 Apr 2017 15:47:36 +0900
+Date: Thu, 20 Apr 2017 12:10:47 +0900
 Subject: [PATCH] ui/gtk3: Fix build failures
 
+Add-on fix to 290f786
+if /usr/share/vala*/vapi/ibus-emoji-dialog*.vapi does not exist.
+
+R=Shawn.P.Huang@gmail.com
+
+Review URL: https://codereview.appspot.com/323780043
 ---
  ui/gtk3/Makefile.am | 8 +-------
  1 file changed, 1 insertion(+), 7 deletions(-)
@@ -6024,6 +6030,3942 @@ index 6f0fb62..d2ae0d6 100644
  
  libibus_emoji_dialog = libibus-emoji-dialog-1.0.la
  
+-- 
+2.9.3
+
+From 61fa8eabd812a75b3cadd883ad4a4e92cf6877d3 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Tue, 25 Apr 2017 12:10:00 +0900
+Subject: [PATCH] ui/gtk3: Get emoji font size from gsettings
+
+If Emojier CLI does not specify the font size likes
+--font 'Noto Emoji Color Regular', get the default size from GSettings.
+
+R=Shawn.P.Huang@gmail.com, alexepico@gmail.com
+
+Review URL: https://codereview.appspot.com/317540043
+---
+ setup/setup.ui          |  2 +-
+ ui/gtk3/emojier.vala    | 41 ++++++++++++++++++++++++++---------------
+ ui/gtk3/emojierapp.vala | 14 ++++++++++----
+ ui/gtk3/panel.vala      |  2 +-
+ 4 files changed, 38 insertions(+), 21 deletions(-)
+
+diff --git a/setup/setup.ui b/setup/setup.ui
+index 4ef3423..54ef916 100644
+--- a/setup/setup.ui
++++ b/setup/setup.ui
+@@ -137,7 +137,7 @@
+                             <property name="can_focus">False</property>
+                             <property name="tooltip_text" translatable="yes">The shortcut keys for showing emoji dialog</property>
+                             <property name="halign">start</property>
+-                            <property name="label" translatable="yes">Emoji dialog:</property>
++                            <property name="label" translatable="yes">Emoji choice:</property>
+                           </object>
+                           <packing>
+                             <property name="top_attach">5</property>
+diff --git a/ui/gtk3/emojier.vala b/ui/gtk3/emojier.vala
+index 5a9bf8f..76dca6c 100644
+--- a/ui/gtk3/emojier.vala
++++ b/ui/gtk3/emojier.vala
+@@ -166,13 +166,14 @@ class IBusEmojier : Gtk.Window {
+         BACKWARD,
+     }
+ 
+-    private static const uint EMOJI_GRID_PAGE = 10;
++    private const uint EMOJI_GRID_PAGE = 10;
+ 
+     // Set the actual default values in the constructor
+     // because these fields are used for class_init() and static functions,
+     // e.g. set_emoji_font(), can be called before class_init() is called.
+     private static string m_current_lang_id;
+-    private static string m_emoji_font;
++    private static string m_emoji_font_family;
++    private static int m_emoji_font_size;
+     private static string[] m_favorites;
+     private static int m_emoji_max_seq_len;
+     private static GLib.HashTable<string, GLib.SList>?
+@@ -220,8 +221,10 @@ class IBusEmojier : Gtk.Window {
+ 
+         if (m_current_lang_id == null)
+             m_current_lang_id = "en";
+-        if (m_emoji_font == null)
+-            m_emoji_font = "Monospace 16";
++        if (m_emoji_font_family == null)
++            m_emoji_font_family = "Monospace";
++        if (m_emoji_font_size == 0)
++            m_emoji_font_size = 16;
+         if (m_favorites == null)
+             m_favorites = {};
+ 
+@@ -242,6 +245,8 @@ class IBusEmojier : Gtk.Window {
+                 "#IBusEmojierWhiteLabel { background-color: " +
+                         "rgba(%u, %u, %u, %lf); ".printf(
+                         bg_red, bg_green, bg_blue, bg_alpha) +
++                "font-family: %s; font-size: %dpt; ".printf(
++                        m_emoji_font_family, m_emoji_font_size) +
+                 "border-width: 4px; border-radius: 3px; } ";
+ 
+         uint fg_red = (uint)(m_rgba.selected_fg.red * 255);
+@@ -255,6 +260,8 @@ class IBusEmojier : Gtk.Window {
+         data += "#IBusEmojierSelectedLabel { color: " +
+                         "rgba(%u, %u, %u, %lf); ".printf(
+                         fg_red, fg_green, fg_blue, fg_alpha) +
++                "font-family: %s; font-size: %dpt; ".printf(
++                        m_emoji_font_family, m_emoji_font_size) +
+                 "background-color: " +
+                         "rgba(%u, %u, %u, %lf); ".printf(
+                         bg_red, bg_green, bg_blue, bg_alpha) +
+@@ -273,7 +280,7 @@ class IBusEmojier : Gtk.Window {
+                 css_provider,
+                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+ 
+-        m_title = new ETitleLabelBox(_("Emoji Chooser"));
++        m_title = new ETitleLabelBox(_("Emoji Choice"));
+         set_titlebar(m_title);
+         m_vbox = new Gtk.Box(Gtk.Orientation.VERTICAL, 0);
+         add(m_vbox);
+@@ -734,17 +741,14 @@ class IBusEmojier : Gtk.Window {
+                 label = new ESelectedLabel(candidate.text) as Gtk.Label;
+             else
+                 label = new EWhiteLabel(candidate.text) as Gtk.Label;
+-            string emoji_font = m_emoji_font;
+             if (candidate.text.char_count() > 2) {
+-                Pango.FontDescription font_desc =
+-                        Pango.FontDescription.from_string(emoji_font);
+-                string font_family = font_desc.get_family();
+-                int font_size = font_desc.get_size() / Pango.SCALE;
+-                emoji_font = "%s %d".printf(font_family, font_size -2);
++                string font_family = m_emoji_font_family;
++                int font_size = m_emoji_font_size - 2;
++                string emoji_font = "%s %d".printf(font_family, font_size);
++                string markup = "<span font=\"%s\">%s</span>".
++                        printf(emoji_font, candidate.get_text());
++                label.set_markup(markup);
+             }
+-            string markup = "<span font=\"%s\">%s</span>".
+-                    printf(emoji_font, candidate.get_text());
+-            label.set_markup(markup);
+             label.set_halign(Gtk.Align.FILL);
+             label.set_valign(Gtk.Align.FILL);
+             Gtk.EventBox candidate_ebox = new Gtk.EventBox();
+@@ -1268,7 +1272,14 @@ class IBusEmojier : Gtk.Window {
+ 
+     public static void set_emoji_font(string? emoji_font) {
+         return_if_fail(emoji_font != null && emoji_font != "");
+-        m_emoji_font = emoji_font;
++        Pango.FontDescription font_desc =
++                Pango.FontDescription.from_string(emoji_font);
++        string font_family = font_desc.get_family();
++        if (font_family != null)
++            m_emoji_font_family = font_family;
++        int font_size = font_desc.get_size() / Pango.SCALE;
++        if (font_size != 0)
++            m_emoji_font_size = font_size;
+     }
+ 
+ 
+diff --git a/ui/gtk3/emojierapp.vala b/ui/gtk3/emojierapp.vala
+index 4564a25..cbdd8ba 100644
+--- a/ui/gtk3/emojierapp.vala
++++ b/ui/gtk3/emojierapp.vala
+@@ -60,6 +60,9 @@ public class EmojiApplication : Application {
+ 
+ 
+     private int _command_line (ApplicationCommandLine command_line) {
++        // Set default font size
++        IBusEmojier.set_emoji_font(m_settings_emoji.get_string("font"));
++
+         const OptionEntry[] options = {
+             { "font", 0, 0, OptionArg.STRING, out emoji_font,
+                 /* TRANSLATORS: "FONT" should be capital and translatable.
+@@ -88,6 +91,10 @@ public class EmojiApplication : Application {
+             _args[i] = args[i];
+         }
+ 
++        // Need to initialize for the second instance.
++        emoji_font = null;
++        annotation_lang = null;
++
+         try {
+             unowned string[] tmp = _args;
+             option.parse(ref tmp);
+@@ -101,13 +108,12 @@ public class EmojiApplication : Application {
+             return Posix.EXIT_SUCCESS;
+         }
+ 
+-        if (emoji_font == null)
+-            emoji_font = m_settings_emoji.get_string("font");
+         if (annotation_lang == null)
+             annotation_lang = m_settings_emoji.get_string("lang");
+-
+         IBusEmojier.set_annotation_lang(annotation_lang);
+-        IBusEmojier.set_emoji_font(emoji_font);
++
++        if (emoji_font != null)
++            IBusEmojier.set_emoji_font(emoji_font);
+ 
+         activate_dialog(command_line);
+ 
+diff --git a/ui/gtk3/panel.vala b/ui/gtk3/panel.vala
+index 2375734..745489b 100644
+--- a/ui/gtk3/panel.vala
++++ b/ui/gtk3/panel.vala
+@@ -1239,7 +1239,7 @@ class Panel : IBus.PanelService {
+             m_sys_menu.append(item);
+ 
+ #if EMOJI_DICT
+-            item = new Gtk.MenuItem.with_label(_("Emoji Dialog"));
++            item = new Gtk.MenuItem.with_label(_("Emoji Choice"));
+             item.activate.connect((i) => {
+                 Gdk.Event event = new Gdk.Event(Gdk.EventType.KEY_PRESS);
+                 handle_emoji_typing(event);
+-- 
+2.9.3
+
+From 2f73064d03481c9f34d278dd19d1a4427d6ecb27 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Fri, 28 Apr 2017 13:10:03 +0900
+Subject: [PATCH] Change to use Unicode Emoji files instead of EmojiOne
+ files
+
+EmojiOne Json file have changed the file format since 3.0 [1]
+Now IBus migrated to use Unicode Emoji files since the EmojiOne file
+had been used for the emoji categories but it can be done with
+Unicode emoji-test.txt [2]
+Use Unicode Emoji 4.0 until 5.0 will be released officially.
+Unicode Emoji 5.0 is available but fonts does not support it yet.
+
+[1] https://github.com/Ranks/emojione/releases/tag/v3.0.0
+[2] http://www.unicode.org/Public/emoji/4.0/
+
+Review URL: https://codereview.appspot.com/321860043
+---
+ bindings/vala/Makefile.am     |   3 +-
+ configure.ac                  |  27 +-
+ data/annotations/Makefile.am  |   3 +-
+ data/annotations/en_ascii.xml |  56 ++++
+ po/POTFILES.in                |   3 +-
+ po/POTFILES.skip              |   2 +-
+ src/Makefile.am               |  17 +-
+ src/emoji-parser.c            | 632 ++++++++++++++++++++++++++++++++++++++----
+ src/ibusemoji.c               |  47 +---
+ src/ibusemoji.h               |  14 -
+ src/ibusemojigen.h            |  39 +++
+ ui/gtk3/Makefile.am           |   5 +-
+ ui/gtk3/emojier.vala          | 106 +++++--
+ 13 files changed, 780 insertions(+), 174 deletions(-)
+ create mode 100644 data/annotations/en_ascii.xml
+ create mode 100644 src/ibusemojigen.h
+
+diff --git a/bindings/vala/Makefile.am b/bindings/vala/Makefile.am
+index f3eb0d4..4e34afc 100644
+--- a/bindings/vala/Makefile.am
++++ b/bindings/vala/Makefile.am
+@@ -43,8 +43,7 @@ vapidir = $(datadir)/vala/vapi
+ vapi_DATA = $(VAPIGEN_VAPIS) $(VAPIGEN_VAPIS:.vapi=.deps)
+ 
+ MAINTAINERCLEANFILES = $(VAPIGEN_VAPIS)
+-# for make distclean
+-CONFIG_CLEAN_FILES = $(VAPIGEN_VAPIS)
++DISTCLEANFILES = $(VAPIGEN_VAPIS)
+ 
+ EXTRA_DIST = \
+ 	$(VAPIGEN_VAPIS) \
+diff --git a/configure.ac b/configure.ac
+index 0a5f2d5..ea568a0 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -612,14 +612,14 @@ AC_ARG_ENABLE(emoji-dict,
+ )
+ AM_CONDITIONAL([ENABLE_EMOJI_DICT], [test x"$enable_emoji_dict" = x"yes"])
+ 
+-AC_ARG_WITH(emoji-json-file,
+-    AS_HELP_STRING([--with-emoji-json-file[=DIR/emoji.json]],
+-        [Set emoji.json. (default: "/usr/lib/node_modules/emojione/emoji.json")
+-        ]),
+-    EMOJI_JSON_FILE=$with_emoji_json_file,
+-    EMOJI_JSON_FILE="/usr/lib/node_modules/emojione/emoji.json"
++AC_ARG_WITH(unicode-emoji-dir,
++    AS_HELP_STRING([--with-unicode-emoji-dir[=DIR]],
++        [Set the directory of Unicode Emoji.
++         (default: "/usr/share/unicode/emoji")]),
++    UNICODE_EMOJI_DIR=$with_unicode_emoji_dir,
++    UNICODE_EMOJI_DIR="/usr/share/unicode/emoji"
+ )
+-AC_SUBST(EMOJI_JSON_FILE)
++AC_SUBST(UNICODE_EMOJI_DIR)
+ 
+ AC_ARG_WITH(emoji-annotation-dir,
+     AS_HELP_STRING([--with-emoji-annotation-dir[=DIR]],
+@@ -631,17 +631,14 @@ AC_ARG_WITH(emoji-annotation-dir,
+ AC_SUBST(EMOJI_ANNOTATION_DIR)
+ 
+ if test x"$enable_emoji_dict" = x"yes"; then
+-    if test ! -f $EMOJI_JSON_FILE ; then
+-        AC_MSG_ERROR(Not found $EMOJI_JSON_FILE. You can get emoji.json \
+-with "npm install -g emojione".)
++    if test ! -f $UNICODE_EMOJI_DIR/emoji-test.txt ; then
++        AC_MSG_ERROR(Not found $UNICODE_EMOJI_DIR/emoji-test.txt. You can get \
++the emoji files from http://www.unicode.org/Public/emoji/4.0/)
+     fi
+     if test ! -f $EMOJI_ANNOTATION_DIR/en.xml ; then
+         AC_MSG_ERROR(Not found $EMOJI_ANNOTATION_DIR/en.xml. You can get \
+ https://github.com/fujiwarat/cldr-emoji-annotation)
+     fi
+-    PKG_CHECK_MODULES(JSON_GLIB1, [
+-        json-glib-1.0
+-    ])
+     enable_emoji_dict="yes (enabled, use --disable-emoji-dict to disable)"
+ fi
+ 
+@@ -730,8 +727,8 @@ Build options:
+   Enable surrounding-text       $enable_surrounding_text
+   Enable libnotify              $enable_libnotify
+   Enable Emoji dict             $enable_emoji_dict
+-  emoji.json path               $EMOJI_JSON_FILE
+-  CLDR annotation dir           $EMOJI_ANNOTATION_DIR
++  Uicode Emoji directory        $UNICODE_EMOJI_DIR
++  CLDR annotation directory     $EMOJI_ANNOTATION_DIR
+   Run test cases                $enable_tests
+ ])
+ 
+diff --git a/data/annotations/Makefile.am b/data/annotations/Makefile.am
+index d87b933..0b7779b 100644
+--- a/data/annotations/Makefile.am
++++ b/data/annotations/Makefile.am
+@@ -2,7 +2,7 @@
+ #
+ # ibus - The Input Bus
+ #
+-# Copyright (c) 2016 Takao Fujiwara <takao.fujiwara1@gmail.com>
++# Copyright (c) 2016-2017 Takao Fujiwara <takao.fujiwara1@gmail.com>
+ # Copyright (c) 2016 Red Hat, Inc.
+ #
+ # This library is free software; you can redistribute it and/or
+@@ -22,6 +22,7 @@
+ 
+ EXTRA_DIST = \
+ 	en.xml \
++	en_ascii.xml \
+ 	$(NULL)
+ 
+ -include $(top_srcdir)/git.mk
+diff --git a/data/annotations/en_ascii.xml b/data/annotations/en_ascii.xml
+new file mode 100644
+index 0000000..f1bdcbb
+--- /dev/null
++++ b/data/annotations/en_ascii.xml
+@@ -0,0 +1,56 @@
++<?xml version='1.0' encoding='UTF-8' ?>
++<!DOCTYPE ldml SYSTEM '../../common/dtd/ldml.dtd'>
++<!-- vim:set et sts=4: -->
++<!--
++    Copyright (C) 2017 Takao Fujiwara <takao.fujiwara1@gmail.com>
++    Copyright (C) 2017 Red Hat, Inc.
++
++    This library is free software; you can redistribute it and/or
++    modify it under the terms of the GNU Lesser General Public
++    License as published by the Free Software Foundation; either
++    version 2.1 of the License, or (at your option) any later version.
++
++    This library is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++    Lesser General Public License for more details.
++
++    You should have received a copy of the GNU Lesser General Public
++    License along with this library; if not, write to the Free Software
++    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301
++    USA
++ -->
++<ldml>
++    <identity>
++        <version number="$Revision: 1 $"/>
++        <language type='en'/>
++    </identity>
++    <annotations>
++        <annotation cp="😂">:') | :'-)</annotation>
++        <annotation cp="😃">:D | :-D | =D</annotation>
++        <annotation cp="😅">':) | ':-) | '=) | ':D | ':-D | '=D</annotation>
++        <annotation cp="😆">&gt;:) | &gt;;) | &gt;:-) | &gt;=)</annotation>
++        <annotation cp="😉">;) | ;-) | *-) | *) | ;-] | ;] | ;D | ;^)</annotation>
++        <annotation cp="😎">B-) | B) | 8) | 8-) | B-D | 8-D</annotation>
++        <annotation cp="😘">:* | :-* | =* | :^*</annotation>
++        <annotation cp="🙂">:) | :-) | =] | =) | :]</annotation>
++        <annotation cp="😑">-_- | -__- | -___-</annotation>
++        <annotation cp="😶">:-X | :X | :-# | :# | =X | =x | :x | :-x | =#</annotation>
++        <annotation cp="😣">&gt;.&lt;</annotation>
++        <annotation cp="😮">:-O | :O | :-o | :o | O_O | &gt;:O</annotation>
++        <annotation cp="😛">:P | :-P | =P | :-p | :p | =p | :-Þ | :Þ | :þ | :-þ | :-b | :b | d:</annotation>
++        <annotation cp="😜">&gt;:P | X-P | x-p</annotation>
++        <annotation cp="😓">':( | ':-( | '=(</annotation>
++        <annotation cp="😕">&gt;:\ | &gt;:/ | :-/ | :-. | :/ | :\ | =/ | =\ | :L | =L</annotation>
++        <annotation cp="😞">&gt;:[ | :-( | :( | :-[ | :[ | =(</annotation>
++        <annotation cp="😢">:'( | :'-( | ;( | ;-(</annotation>
++        <annotation cp="😨">D:</annotation>
++        <annotation cp="😳">:$ | =$</annotation>
++        <annotation cp="😵">#-) | #) | %-) | %) | X) | X-)</annotation>
++        <annotation cp="😠">&gt;:( | &gt;:-( | :@</annotation>
++        <annotation cp="😇">O:-) | 0:-3 | 0:3 | 0:-) | 0:) | 0;^) | O:) | O;-) | O=) | 0;-) | O:-3 | O:3</annotation>
++        <annotation cp="🙆">*\0/* | \0/ | *\O/* | \O/</annotation>
++        <annotation cp="❤">&lt;3</annotation>
++        <annotation cp="💔">&lt;/3</annotation>
++    </annotations>
++</ldml>
+diff --git a/po/POTFILES.in b/po/POTFILES.in
+index 25be4f4..00f7c7f 100644
+--- a/po/POTFILES.in
++++ b/po/POTFILES.in
+@@ -41,6 +41,7 @@ setup/keyboardshortcut.py
+ setup/main.py
+ src/ibusbus.c
+ src/ibusconfig.c
++src/ibusemojigen.h
+ src/ibusengine.c
+ src/ibusfactory.c
+ src/ibushotkey.c
+@@ -57,6 +58,7 @@ ui/gtk3/application.vala
+ ui/gtk3/candidatearea.vala
+ ui/gtk3/candidatepanel.vala
+ ui/gtk3/emojier.vala
++ui/gtk3/emojierapp.vala
+ ui/gtk3/handle.vala
+ ui/gtk3/iconwidget.vala
+ ui/gtk3/keybindingmanager.vala
+@@ -66,4 +68,3 @@ ui/gtk3/property.vala
+ ui/gtk3/propertypanel.vala
+ ui/gtk3/separator.vala
+ ui/gtk3/switcher.vala
+-ui/gtk3/emojierapp.vala
+diff --git a/po/POTFILES.skip b/po/POTFILES.skip
+index 891d2cc..7190221 100644
+--- a/po/POTFILES.skip
++++ b/po/POTFILES.skip
+@@ -12,6 +12,7 @@ ui/gtk3/application.c
+ ui/gtk3/candidatearea.c
+ ui/gtk3/candidatepanel.c
+ ui/gtk3/emojier.c
++ui/gtk3/emojierapp.c
+ ui/gtk3/handle.c
+ ui/gtk3/iconwidget.c
+ ui/gtk3/keybindingmanager.c
+@@ -21,4 +22,3 @@ ui/gtk3/property.c
+ ui/gtk3/propertypanel.c
+ ui/gtk3/separator.c
+ ui/gtk3/switcher.c
+-ui/gtk3/emojierapp.c
+diff --git a/src/Makefile.am b/src/Makefile.am
+index 7053e3e..27cd168 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -166,6 +166,7 @@ ibusinclude_HEADERS =       \
+ ibus_private_headers =          \
+     gtkimcontextsimpleseqs.h    \
+     ibuscomposetable.h          \
++    ibusemojigen.h              \
+     ibusenginesimpleprivate.h   \
+     ibusinternal.h              \
+     keyname-table.h             \
+@@ -247,17 +248,26 @@ dicts/emoji-en.dict: emoji-parser
+ 	    echo "WARNING: Not found $(EMOJI_ANNOTATION_DIR)/en.xml" 1>&2; \
+ 	fi; \
+ 	for f in $(LANG_FILES) ; do \
++	    if test -f \
++	    "$(EMOJI_ANNOTATION_DIR)/../annotationsDerived/$$f.xml" ; then \
++	        xml_derived_option="--xml-derived $(EMOJI_ANNOTATION_DIR)/../annotationsDerived/$$f.xml"; \
++	        plus_comment="derived"; \
++	    fi; \
+ 	    if test x"$$f" = xen ; then \
+ 	        $(builddir)/emoji-parser \
++	            --unicode-emoji-dir $(UNICODE_EMOJI_DIR) \
+ 	            --xml $(EMOJI_ANNOTATION_DIR)/$$f.xml \
+-	            --json $(EMOJI_JSON_FILE) \
++	            $$xml_derived_option \
++	            --xml-ascii $(top_srcdir)/data/annotations/en_ascii.xml \
++	            --out-category ibusemojigen.h \
+ 	            --out $@; \
+ 	    else \
+ 	        $(builddir)/emoji-parser \
+ 	            --xml $(EMOJI_ANNOTATION_DIR)/$$f.xml \
++	            $$xml_derived_option \
+ 	            --out dicts/emoji-$$f.dict; \
+ 	    fi; \
+-	    echo "Generated dicts/emoji-$$f.dict"; \
++	    echo "Generated $$plus_comment dicts/emoji-$$f.dict"; \
+ 	done
+ 
+ install-data-hook: $(dict_DATA)
+@@ -301,11 +311,9 @@ emoji_parser_SOURCES =          \
+     $(NULL)
+ emoji_parser_CFLAGS =           \
+     $(GLIB2_CFLAGS)             \
+-    $(JSON_GLIB1_CFLAGS)        \
+     $(NULL)
+ emoji_parser_LDADD =            \
+     $(GLIB2_LIBS)               \
+-    $(JSON_GLIB1_LIBS)          \
+     $(libibus)                  \
+     $(NULL)
+ 
+@@ -329,6 +337,7 @@ CLEANFILES +=                   \
+     $(NULL)
+ 
+ DISTCLEANFILES =                \
++    ibusemojigen.h              \
+     ibusversion.h               \
+     $(NULL)
+ 
+diff --git a/src/emoji-parser.c b/src/emoji-parser.c
+index e5dce3f..5e6155b 100644
+--- a/src/emoji-parser.c
++++ b/src/emoji-parser.c
+@@ -21,34 +21,52 @@
+  */
+ 
+ /* Convert /usr/share/unicode/cldr/common/annotations/\*.xml and
+- * /usr/lib/node_modules/emojione/emoji.json
++ * /usr/share/unicode/emoji/emoji-test.txt
+  * to the dictionary file which look up the Emoji from the annotation.
+  * Get *.xml from https://github.com/fujiwarat/cldr-emoji-annotation
+  * or http://www.unicode.org/repos/cldr/trunk/common/annotations .
+- * Get emoji.json with 'npm install -g emojione'.
+- * en.xml is used for the Unicode annotations and emoji.json is used
+- * for the aliases_ascii, e.g. ":)", and category, e.g. "people".
++ * Get emoji-test.txt from http://unicode.org/Public/emoji/4.0/ .
++ * en.xml is used for the Unicode annotations and emoji-test.txt is used
++ * for the category, e.g. "Smileys & People".
++ * ASCII emoji annotations are saved in ../data/annotations/en_ascii.xml
+  */
+ 
+ #include <glib.h>
++
++#ifdef HAVE_JSON_GLIB1
+ #include <json-glib/json-glib.h>
++#endif
+ 
+ #include <string.h>
+ 
+ #include "ibusemoji.h"
+ 
++/* This file has 21 lines about the license at the top of the file. */
++#define LICENSE_LINES 21
++
++typedef enum {
++  EMOJI_STRICT,
++  EMOJI_VARIANT,
++  EMOJI_NOVARIANT
++} EmojiDataSearchType;
++
+ typedef struct _EmojiData EmojiData;
+ struct _EmojiData {
+-    gchar      *emoji;
+-    gchar      *emoji_alternates;
+-    GSList     *annotations;
+-    gboolean    is_annotation;
+-    gchar      *description;
+-    gboolean    is_tts;
+-    gchar      *category;
+-    GSList     *list;
++    gchar              *emoji;
++    gchar              *emoji_alternates;
++    GSList             *annotations;
++    gboolean            is_annotation;
++    gchar              *description;
++    gboolean            is_tts;
++    gchar              *category;
++    gchar              *subcategory;
++    gboolean            is_derived;
++    GSList             *list;
++    EmojiDataSearchType search_type;
+ };
+ 
++static gchar *unicode_emoji_version;
++
+ static void
+ reset_emoji_element (EmojiData *data)
+ {
+@@ -59,68 +77,175 @@ reset_emoji_element (EmojiData *data)
+     g_slist_free_full (data->annotations, g_free);
+     data->annotations = NULL;
+     g_clear_pointer (&data->description, g_free);
+-    g_clear_pointer (&data->category, g_free);
++}
++
++gint
++strcmp_novariant (const gchar *a,
++                  const gchar *b,
++                  gunichar     a_variant,
++                  gunichar     b_variant)
++{
++    gint retval;
++    gchar *p = NULL;
++    GString *buff = NULL;;
++    gchar *substr = NULL;
++
++    if (a_variant > 0) {
++        if ((p = g_utf8_strchr (a, -1, a_variant)) != NULL) {
++            buff = g_string_new (NULL);
++            if (a != p) {
++                substr = g_strndup (a, p - a);
++                g_string_append (buff, substr);
++                g_free (substr);
++            }
++            p = g_utf8_next_char (p);
++            if (*p != '\0')
++                g_string_append (buff, p);
++            retval = g_strcmp0 (buff->str, b);
++            g_string_free (buff, TRUE);
++            return retval;
++        } else {
++            return -1;
++        }
++    } else if (b_variant > 0) {
++        if ((p = g_utf8_strchr (b, -1, b_variant)) != NULL) {
++            buff = g_string_new (NULL);
++            if (b != p) {
++                substr = g_strndup (b, p - b);
++                g_string_append (buff, substr);
++                g_free (substr);
++            }
++            p = g_utf8_next_char (p);
++            if (*p != '\0')
++                g_string_append (buff, p);
++            retval = g_strcmp0 (a, buff->str);
++            g_string_free (buff, TRUE);
++            return retval;
++        } else {
++            return -1;
++        }
++    }
++    return g_strcmp0 (a, b);
+ }
+ 
+ gint
+ find_emoji_data_list (IBusEmojiData *a,
+-                      const gchar   *b)
++                      EmojiData     *b)
+ {
+-   g_return_val_if_fail (IBUS_IS_EMOJI_DATA (a), 0);
+-   return g_strcmp0 (ibus_emoji_data_get_emoji (a), b);
++    const gchar *a_str;
++
++    g_return_val_if_fail (IBUS_IS_EMOJI_DATA (a), 0);
++
++    a_str = ibus_emoji_data_get_emoji (a);
++    switch (b->search_type) {
++    case EMOJI_VARIANT:
++        if (strcmp_novariant (a_str, b->emoji, 0xfe0e, 0) == 0)
++            return 0;
++        else if (strcmp_novariant (a_str, b->emoji, 0xfe0f, 0) == 0)
++            return 0;
++        else
++            return g_strcmp0 (a_str, b->emoji);
++        break;
++    case EMOJI_NOVARIANT:
++        if (strcmp_novariant (a_str, b->emoji, 0, 0xfe0e) == 0)
++            return 0;
++        else if (strcmp_novariant (a_str, b->emoji, 0, 0xfe0f) == 0)
++            return 0;
++        else
++            return g_strcmp0 (a_str, b->emoji);
++        break;
++    default:;
++    }
++    return g_strcmp0 (a_str, b->emoji);
+ }
+ 
+ static void
+-update_emoji_list (EmojiData *data)
++emoji_data_update_object (EmojiData     *data,
++                          IBusEmojiData *emoji)
+ {
+-    GSList *list = g_slist_find_custom (
+-            data->list,
+-            data->emoji,
+-            (GCompareFunc) find_emoji_data_list);
+-    if (list) {
+-        IBusEmojiData *emoji = list->data;
+-        GSList *src_annotations = data->annotations;
+-        GSList *dest_annotations = ibus_emoji_data_get_annotations (emoji);
+-        GSList *l;
+-        gboolean updated_annotations = FALSE;
+-        for (l = src_annotations; l; l = l->next) {
+-            GSList *duplicated = g_slist_find_custom (dest_annotations,
+-                                                      l->data,
+-                                                      (GCompareFunc) g_strcmp0);
+-            if (duplicated == NULL) {
+-                dest_annotations = g_slist_append (dest_annotations,
+-                                                   g_strdup (l->data));
+-                updated_annotations = TRUE;
+-            }
++    GSList *src_annotations = data->annotations;
++    GSList *dest_annotations = ibus_emoji_data_get_annotations (emoji);
++    GSList *l;
++    gboolean updated_annotations = FALSE;
++    for (l = src_annotations; l; l = l->next) {
++        GSList *duplicated = g_slist_find_custom (dest_annotations,
++                                                  l->data,
++                                                  (GCompareFunc) g_strcmp0);
++        if (duplicated == NULL) {
++            dest_annotations = g_slist_append (dest_annotations,
++                                               g_strdup (l->data));
++            updated_annotations = TRUE;
+         }
+-        if (updated_annotations) {
+-            ibus_emoji_data_set_annotations (
++    }
++    if (updated_annotations) {
++        ibus_emoji_data_set_annotations (
+                     emoji,
+                     g_slist_copy_deep (dest_annotations,
+                                        (GCopyFunc) g_strdup,
+                                        NULL));
++    }
++    if (data->description)
++        ibus_emoji_data_set_description (emoji, data->description);
++}
++
++static void
++emoji_data_new_object (EmojiData *data)
++{
++    IBusEmojiData *emoji =
++            ibus_emoji_data_new ("emoji",
++                                 data->emoji,
++                                 "annotations",
++                                 data->annotations,
++                                 "description",
++                                 data->description ? data->description
++                                         : g_strdup (""),
++                                 "category",
++                                 data->category ? data->category
++                                         : g_strdup (""),
++                                 NULL);
++    data->list = g_slist_append (data->list, emoji);
++}
++
++static void
++update_emoji_list (EmojiData *data,
++                   gboolean   base_update)
++{
++    GSList *list;
++    data->search_type = EMOJI_STRICT;
++    list = g_slist_find_custom (
++            data->list,
++            data,
++            (GCompareFunc) find_emoji_data_list);
++    if (list) {
++        emoji_data_update_object (data, list->data);
++        return;
++    } else if (base_update) {
++        emoji_data_new_object (data);
++        return;
++    }
++    if (g_utf8_strchr (data->emoji, -1, 0xfe0e) == NULL &&
++        g_utf8_strchr (data->emoji, -1, 0xfe0f) == NULL) {
++        data->search_type = EMOJI_VARIANT;
++        list = g_slist_find_custom (
++                data->list,
++                data,
++                (GCompareFunc) find_emoji_data_list);
++        if (list) {
++            emoji_data_update_object (data, list->data);
++            return;
+         }
+-        if (data->description)
+-            ibus_emoji_data_set_description (emoji, data->description);
+     } else {
+-        IBusEmojiData *emoji =
+-                ibus_emoji_data_new ("emoji",
+-                                     data->emoji,
+-                                     "annotations",
+-                                     data->annotations,
+-                                     "description",
+-                                     data->description ? data->description
+-                                             : g_strdup (""),
+-                                     "category",
+-                                     data->category ? data->category
+-                                             : g_strdup (""),
+-                                     "emoji-alternates",
+-                                     data->emoji_alternates
+-                                             ? data->emoji_alternates
+-                                             : g_strdup (""),
+-                                     NULL);
+-        data->list = g_slist_append (data->list, emoji);
++        data->search_type = EMOJI_NOVARIANT;
++        list = g_slist_find_custom (
++                data->list,
++                data,
++                (GCompareFunc) find_emoji_data_list);
++        if (list) {
++            emoji_data_update_object (data, list->data);
++            return;
++        }
+     }
++    emoji_data_new_object (data);
+ }
+ 
+ static void
+@@ -183,7 +308,7 @@ unicode_annotations_end_element_cb (GMarkupParseContext *context,
+     if (!data->is_annotation)
+         return;
+ 
+-    update_emoji_list (data);
++    update_emoji_list (data, FALSE);
+     data->is_annotation = FALSE;
+     data->is_tts = FALSE;
+ }
+@@ -227,7 +352,8 @@ unicode_annotations_text_cb (GMarkupParseContext *context,
+ 
+ static gboolean
+ unicode_annotations_parse_xml_file (const gchar  *filename,
+-                                    GSList      **list)
++                                    GSList      **list,
++                                    gboolean      is_derived)
+ {
+     gchar *content = NULL;
+     gsize length = 0;
+@@ -251,6 +377,7 @@ unicode_annotations_parse_xml_file (const gchar  *filename,
+     }
+ 
+     data.list = *list;
++    data.is_derived = is_derived;
+ 
+     context = g_markup_parse_context_new (&parser, 0, &data, NULL);
+     if (!g_markup_parse_context_parse (context, content, length, &error)) {
+@@ -276,6 +403,233 @@ failed_to_parse_unicode_annotations:
+ }
+ 
+ static gboolean
++unicode_emoji_test_parse_unicode (const gchar *line,
++                                  EmojiData   *data)
++{
++    GString *emoji = NULL;
++    gchar *endptr = NULL;
++    guint32 uch;
++    static gchar outbuf[8] = { 0, };
++
++    g_return_val_if_fail (line != NULL, FALSE);
++
++    emoji = g_string_new (NULL);
++    while (line && *line) {
++        uch = g_ascii_strtoull (line, &endptr, 16);
++        outbuf[g_unichar_to_utf8 (uch, outbuf)] = '\0';
++        g_string_append (emoji, outbuf);
++        if (*endptr == '\0') {
++            break;
++        }
++        line = endptr + 1;
++        while (*line == ' ')
++            line++;
++        endptr = NULL;
++    }
++
++    data->emoji = g_string_free (emoji, FALSE);
++    return TRUE;
++}
++
++static gboolean
++unicode_emoji_test_parse_description (const gchar *line,
++                                      EmojiData   *data)
++{
++    g_return_val_if_fail (line != NULL, FALSE);
++
++    /* skip spaces */
++    while (*line == ' ')
++        line++;
++    /* skip emoji */
++    while (*line != ' ')
++        line++;
++    /* skip spaces */
++    while (*line == ' ')
++        line++;
++    if (*line == '\0')
++        return FALSE;
++    data->description = g_strdup (line);
++    return TRUE;
++}
++
++#define EMOJI_VERSION_TAG "# Version: "
++#define EMOJI_GROUP_TAG "# group: "
++#define EMOJI_SUBGROUP_TAG "# subgroup: "
++#define EMOJI_NON_FULLY_QUALIFIED_TAG "non-fully-qualified"
++
++static gboolean
++unicode_emoji_test_parse_line (const gchar *line,
++                               EmojiData   *data)
++{
++    int tag_length;
++    gchar **segments = NULL;
++
++    g_return_val_if_fail (line != NULL, FALSE);
++
++    tag_length = strlen (EMOJI_VERSION_TAG);
++    if (strlen (line) > tag_length &&
++        g_ascii_strncasecmp (line, EMOJI_VERSION_TAG, tag_length) == 0) {
++        unicode_emoji_version = g_strdup (line + tag_length);
++        return TRUE;
++    }
++    tag_length = strlen (EMOJI_GROUP_TAG);
++    if (strlen (line) > tag_length &&
++        g_ascii_strncasecmp (line, EMOJI_GROUP_TAG, tag_length) == 0) {
++        g_free (data->category);
++        g_clear_pointer (&data->subcategory, g_free);
++        data->category = g_strdup (line + tag_length);
++        return TRUE;
++    }
++    tag_length = strlen (EMOJI_SUBGROUP_TAG);
++    if (strlen (line) > tag_length &&
++        g_ascii_strncasecmp (line, EMOJI_SUBGROUP_TAG, tag_length) == 0) {
++        g_free (data->subcategory);
++        data->subcategory = g_strdup (line + tag_length);
++        return TRUE;
++    }
++    if (*line == '#')
++        return TRUE;
++    segments = g_strsplit (line, "; ", 2);
++    if (segments[1] == NULL) {
++        g_warning ("No qualified line\n");
++        goto failed_to_parse_unicode_emoji_test_line;
++        return FALSE;
++    }
++    tag_length = strlen (EMOJI_NON_FULLY_QUALIFIED_TAG);
++    /* Ignore the non-fully-qualified emoji */
++    if (g_ascii_strncasecmp (segments[1], EMOJI_NON_FULLY_QUALIFIED_TAG,
++                             tag_length) == 0) {
++        g_strfreev (segments);
++        return TRUE;
++    }
++    unicode_emoji_test_parse_unicode (segments[0], data);
++    g_strfreev (segments);
++    segments = g_strsplit (line, "# ", 2);
++    if (segments[1] == NULL) {
++        g_warning ("No description line\n");
++        goto failed_to_parse_unicode_emoji_test_line;
++        return FALSE;
++    }
++    unicode_emoji_test_parse_description (segments[1], data);
++    g_strfreev (segments);
++    if (data->annotations == NULL) {
++        if (data->subcategory) {
++            int i;
++            gchar *amp;
++            segments = g_strsplit(data->subcategory, "-", -1);
++            for (i = 0; segments[i]; i++) {
++                if ((amp = strchr (segments[i], '&')) != NULL) {
++                    if (amp - segments[i] <= 1) {
++                        g_warning ("Wrong ampersand");
++                        goto failed_to_parse_unicode_emoji_test_line;
++                    }
++                    data->annotations = g_slist_append (
++                            data->annotations,
++                            g_strndup (segments[i], amp - segments[i] - 1));
++                    data->annotations = g_slist_append (
++                            data->annotations,
++                            g_strdup (amp + 1));
++                    continue;
++                }
++                data->annotations = g_slist_append (data->annotations,
++                                                    g_strdup (segments[i]));
++            }
++            g_strfreev (segments);
++        } else {
++            g_warning ("No subcategory line\n");
++            goto failed_to_parse_unicode_emoji_test_line;
++        }
++    }
++    update_emoji_list (data, TRUE);
++    reset_emoji_element (data);
++    return TRUE;
++
++failed_to_parse_unicode_emoji_test_line:
++    if (segments)
++        g_strfreev (segments);
++    reset_emoji_element (data);
++    return FALSE;
++}
++
++#undef EMOJI_VERSION_TAG
++#undef EMOJI_GROUP_TAG
++#undef EMOJI_SUBGROUP_TAG
++#undef EMOJI_NON_FULLY_QUALIFIED_TAG
++
++static gboolean
++unicode_emoji_test_parse_file (const gchar *filename,
++                               GSList      **list)
++{
++    gchar *content = NULL;
++    gsize length = 0;
++    GError *error = NULL;
++    gchar *head, *end, *line;
++    int n = 1;
++    EmojiData data = { 0, };
++
++    g_return_val_if_fail (filename != NULL, FALSE);
++    g_return_val_if_fail (list != NULL, FALSE);
++
++    if (!g_file_get_contents (filename, &content, &length, &error)) {
++        g_warning ("Failed to load %s: %s", filename, error->message);
++        goto failed_to_parse_unicode_emoji_test;
++    }
++    head = end = content;
++    while (*end == '\n' && end - content < length) {
++        end++;
++        n++;
++    }
++    head = end;
++    data.list = *list;
++    while (end - content < length) {
++        while (*end != '\n' && end - content < length)
++            end++;
++        if (end - content >= length)
++            break;
++        line = g_strndup (head, end - head);
++        if (!unicode_emoji_test_parse_line (line, &data))
++            g_warning ("parse error #%d in %s version %s: %s",
++                       n, filename,
++                       unicode_emoji_version ? unicode_emoji_version : "(null)",
++                       line);
++        while (*end == '\n' && end - content < length) {
++            end++;
++            n++;
++        }
++        g_free (line);
++        head = end;
++    }
++    g_free (content);
++    g_free (unicode_emoji_version);
++    *list = data.list;
++    return TRUE;
++
++failed_to_parse_unicode_emoji_test:
++    if (error)
++        g_error_free (error);
++    g_clear_pointer (&content, g_free);
++    return FALSE;
++}
++
++static gboolean 
++unicode_emoji_parse_dir (const gchar *dirname,
++                         GSList      **list)
++{
++    gchar *filename = NULL;
++    g_return_val_if_fail (dirname != NULL, FALSE);
++    g_return_val_if_fail (list != NULL, FALSE);
++
++    filename = g_build_path ("/", dirname, "emoji-test.txt", NULL);
++    if (!unicode_emoji_test_parse_file (filename, list)) {
++        g_free (filename);
++        return FALSE;
++    }
++    g_free (filename);
++    return TRUE;
++}
++
++#ifdef HAVE_JSON_GLIB1
++static gboolean
+ parse_emojione_unicode (JsonNode  *node,
+                         EmojiData *data,
+                         gboolean   is_alternates)
+@@ -426,6 +780,31 @@ parse_emojione_category (JsonNode  *node,
+     return TRUE;
+ }
+ 
++#ifdef EMOJIONE_ALIASES_ASCII_PRINT
++static gchar *
++text_to_entity (const gchar *text)
++{
++    gchar *p;
++    GString *buff = g_string_new (NULL);
++    for (p = text; *p; p++) {
++        switch (*p) {
++        case '<':
++            g_string_append (buff, "&lt;");
++            break;
++        case '>':
++            g_string_append (buff, "&gt;");
++            break;
++        case '&':
++            g_string_append (buff, "&amp;");
++            break;
++        default:
++            g_string_append_c (buff, *p);
++        }
++    }
++    g_string_free (buff, FALSE);
++}
++#endif
++
+ static gboolean
+ parse_emojione_aliases_ascii (JsonNode  *node,
+                               EmojiData *data)
+@@ -441,11 +820,23 @@ parse_emojione_aliases_ascii (JsonNode  *node,
+     aliases_ascii = json_node_get_array (node);
+     length = json_array_get_length (aliases_ascii);
+     for (i = 0; i < length; i++) {
++#ifdef EMOJIONE_ALIASES_ASCII_PRINT
++        if (i == 0)
++            printf ("        <annotation cp=\"%s\">", data->emoji);
++#endif
+         const gchar *alias = json_array_get_string_element (aliases_ascii, i);
+         GSList *duplicated = g_slist_find_custom (data->annotations,
+                                                   alias,
+                                                   (GCompareFunc) g_strcmp0);
+         if (duplicated == NULL) {
++#ifdef EMOJIONE_ALIASES_ASCII_PRINT
++            gchar *entity = text_to_entity (alias);
++            if (i != length - 1)
++                printf ("%s | ", entity);
++            else
++                printf ("%s</annotation>\n", entity);
++            g_free (entity);
++#endif
+             data->annotations = g_slist_prepend (data->annotations,
+                                                  g_strdup (alias));
+         }
+@@ -535,7 +926,7 @@ parse_emojione_element (JsonNode  *node,
+     }
+     g_list_free (members);
+ 
+-    update_emoji_list (data);
++    update_emoji_list (data, TRUE);
+ 
+     return TRUE;
+ }
+@@ -591,27 +982,136 @@ fail_to_json_file:
+     g_object_unref (parser);
+     return FALSE;
+ }
++#endif /* HAVE_JSON_GLIB1 */
++
++static void
++emoji_data_list_unify_categories (IBusEmojiData  *data,
++                                  GSList        **list)
++{
++    g_return_if_fail (IBUS_IS_EMOJI_DATA (data));
++    g_return_if_fail (list != NULL);
++
++    const gchar *category = ibus_emoji_data_get_category (data);
++    if (*category == '\0')
++        return;
++    if (g_slist_find_custom (*list, category, (GCompareFunc)g_strcmp0) == NULL)
++        *list = g_slist_append (*list, g_strdup (category));
++}
++
++static void
++category_list_dump (const gchar *category,
++                    GString     *buff)
++{
++    g_return_if_fail (buff != NULL);
++
++    const gchar *line = g_strdup_printf ("    N_(\"%s\"),\n", category);
++    g_string_append (buff, line);
++}
++
++static void
++category_file_save (const gchar *filename,
++                    GSList      *list)
++{
++    gchar *content = NULL;
++    gsize length = 0;
++    GError *error = NULL;
++    gchar *p;
++    GString *buff = NULL;
++    int i;
++    GSList *list_categories = NULL;
++
++    g_return_if_fail (filename != NULL);
++    g_return_if_fail (list != NULL);
++
++    g_slist_foreach (list, (GFunc)emoji_data_list_unify_categories, &list_categories);
++    if (list_categories == NULL) {
++        g_warning ("Not found categories in IBusEmojiData list");
++        return;
++    }
++
++    if (!g_file_get_contents (__FILE__, &content, &length, &error)) {
++        g_warning ("Failed to load %s: %s", __FILE__, error->message);
++        g_clear_pointer (&error, g_error_free);
++    }
++    buff = g_string_new (NULL);
++    p = content;
++    for (i = 0; i < LICENSE_LINES; i++, p++) {
++        if ((p = strchr (p, '\n')) == NULL)
++            break;
++    }
++    if (p != NULL) {
++        g_string_append (buff, g_strndup (content, p - content));
++        g_string_append_c (buff, '\n');
++    }
++    g_clear_pointer (&content, g_free);
++
++    g_string_append (buff, g_strdup ("\n"));
++    g_string_append (buff, g_strdup_printf ("/* This file is generated by %s. */", __FILE__));
++    g_string_append (buff, g_strdup ("\n"));
++    g_string_append (buff, g_strdup ("include <glib/gi18n.h>\n"));
++    g_string_append (buff, g_strdup ("\n"));
++    g_string_append (buff, g_strdup ("#ifndef __IBUS_EMOJI_GEN_H_\n"));
++    g_string_append (buff, g_strdup ("#define __IBUS_EMOJI_GEN_H_\n"));
++    g_string_append (buff, g_strdup ("const static char *unicode_emoji_categories[] = {\n"));
++    list_categories = g_slist_sort (list_categories, (GCompareFunc)g_strcmp0);
++    g_slist_foreach (list_categories, (GFunc)category_list_dump, buff);
++    g_slist_free (list_categories);
++    g_string_append (buff, g_strdup ("};\n"));
++    g_string_append (buff, g_strdup ("#endif\n"));
++
++    if (!g_file_set_contents (filename, buff->str, -1, &error)) {
++        g_warning ("Failed to save emoji category file %s: %s", filename, error->message);
++        g_error_free (error);
++    }
++
++    g_string_free (buff, TRUE);
++}
+ 
+ int
+ main (int argc, char *argv[])
+ {
+     gchar *prgname;
++#ifdef HAVE_JSON_GLIB1
+     gchar *json_file = NULL;
++#endif
++    gchar *emoji_dir = NULL;
+     gchar *xml_file = NULL;
++    gchar *xml_derived_file = NULL;
++    gchar *xml_ascii_file = NULL;
+     gchar *output = NULL;
++    gchar *output_category = NULL;
+     GOptionEntry     entries[] = {
++#ifdef HAVE_JSON_GLIB1
+         { "json", 'j', 0, G_OPTION_ARG_STRING, &json_file,
+           "Parse Emoji One JSON file",
+           "JSON"
+         },
++#endif
++        { "unicode-emoji-dir", 'd', 0, G_OPTION_ARG_STRING, &emoji_dir,
++          "Parse Emoji files in DIRECTORY which includes emoji-test.txt " \
++          "emoji-sequences.txt emoji-zwj-sequences.txt in unicode.org",
++          "DIRECTORY"
++        },
+         { "out", 'o', 0, G_OPTION_ARG_STRING, &output,
+           "Save the emoji data as FILE",
+           "FILE"
+         },
++        { "out-category", 'C', 0, G_OPTION_ARG_STRING, &output_category,
++          "Save the translatable categories as FILE",
++          "FILE"
++        },
+         { "xml", 'x', 0, G_OPTION_ARG_STRING, &xml_file,
+           "Parse Unocode.org ANNOTATIONS file",
+           "ANNOTATIONS"
+         },
++        { "xml-derived", 'X', 0, G_OPTION_ARG_STRING, &xml_derived_file,
++          "Parse Unocode.org derived ANNOTATIONS file",
++          "ANNOTATIONS"
++        },
++        { "xml-ascii", 'A', 0, G_OPTION_ARG_STRING, &xml_ascii_file,
++          "Parse ASCII ANNOTATIONS file",
++          "ANNOTATIONS"
++        },
+         { NULL }
+     };
+     GOptionContext *context;
+@@ -638,12 +1138,22 @@ main (int argc, char *argv[])
+     }
+     g_option_context_free (context);
+ 
++#ifdef HAVE_JSON_GLIB1
+     if (json_file)
+         emojione_parse_json_file (json_file, &list);
++#endif
++    if (emoji_dir)
++        unicode_emoji_parse_dir (emoji_dir, &list);
+     if (xml_file)
+-        unicode_annotations_parse_xml_file (xml_file, &list);
++        unicode_annotations_parse_xml_file (xml_file, &list, FALSE);
++    if (xml_derived_file)
++        unicode_annotations_parse_xml_file (xml_derived_file, &list, TRUE);
++    if (xml_ascii_file)
++        unicode_annotations_parse_xml_file (xml_ascii_file, &list, FALSE);
+     if (list != NULL && output)
+         ibus_emoji_data_save (output, list);
++    if (list != NULL && output_category)
++        category_file_save (output_category, list);
+     if (list)
+         g_slist_free (list);
+ 
+diff --git a/src/ibusemoji.c b/src/ibusemoji.c
+index 4be092a..d2e16c5 100644
+--- a/src/ibusemoji.c
++++ b/src/ibusemoji.c
+@@ -29,7 +29,7 @@
+ #include "ibusinternal.h"
+ 
+ #define IBUS_EMOJI_DATA_MAGIC "IBusEmojiData"
+-#define IBUS_EMOJI_DATA_VERSION (3)
++#define IBUS_EMOJI_DATA_VERSION (4)
+ 
+ enum {
+     PROP_0 = 0,
+@@ -37,7 +37,6 @@ enum {
+     PROP_ANNOTATIONS,
+     PROP_DESCRIPTION,
+     PROP_CATEGORY,
+-    PROP_EMOJI_ALTERNATES
+ };
+ 
+ struct _IBusEmojiDataPrivate {
+@@ -45,7 +44,6 @@ struct _IBusEmojiDataPrivate {
+     GSList     *annotations;
+     gchar      *description;
+     gchar      *category;
+-    gchar      *emoji_alternates;
+ };
+ 
+ #define IBUS_EMOJI_DATA_GET_PRIVATE(o)  \
+@@ -108,7 +106,7 @@ ibus_emoji_data_class_init (IBusEmojiDataClass *class)
+                         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+ 
+     /**
+-     * IBusEmojiData:annotations:
++     * IBusEmojiData:annotations: (transfer container) (element-type utf8):
+      *
+      * The emoji annotations
+      */
+@@ -117,7 +115,7 @@ ibus_emoji_data_class_init (IBusEmojiDataClass *class)
+                     g_param_spec_pointer ("annotations",
+                         "emoji annotations",
+                         "The emoji annotation list",
+-                        G_PARAM_READWRITE));
++                        G_PARAM_READWRITE | G_PARAM_CONSTRUCT));
+ 
+     /**
+      * IBusEmojiData:description:
+@@ -130,7 +128,7 @@ ibus_emoji_data_class_init (IBusEmojiDataClass *class)
+                         "emoji description",
+                         "The emoji description",
+                         "",
+-                        G_PARAM_READWRITE));
++                        G_PARAM_READWRITE | G_PARAM_CONSTRUCT));
+ 
+     /**
+      * IBusEmojiData:category:
+@@ -144,19 +142,6 @@ ibus_emoji_data_class_init (IBusEmojiDataClass *class)
+                         "The emoji category",
+                         "",
+                         G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+-
+-    /**
+-     * IBusEmojiData:emoji_alternates:
+-     *
+-     * The emoji alternate characters
+-     */
+-    g_object_class_install_property (gobject_class,
+-                    PROP_EMOJI_ALTERNATES,
+-                    g_param_spec_string ("emoji-alternates",
+-                        "emoji alternate charasters",
+-                        "The emoji alternate characters UTF-8",
+-                        "",
+-                        G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+ }
+ 
+ static void
+@@ -209,10 +194,6 @@ ibus_emoji_data_set_property (IBusEmojiData *emoji,
+         g_assert (emoji->priv->category == NULL);
+         emoji->priv->category = g_value_dup_string (value);
+         break;
+-    case PROP_EMOJI_ALTERNATES:
+-        g_assert (emoji->priv->emoji_alternates == NULL);
+-        emoji->priv->emoji_alternates = g_value_dup_string (value);
+-        break;
+     default:
+         G_OBJECT_WARN_INVALID_PROPERTY_ID (emoji, prop_id, pspec);
+     }
+@@ -240,9 +221,6 @@ ibus_emoji_data_get_property (IBusEmojiData *emoji,
+     case PROP_CATEGORY:
+         g_value_set_string (value, ibus_emoji_data_get_category (emoji));
+         break;
+-    case PROP_EMOJI_ALTERNATES:
+-        g_value_set_string (value, ibus_emoji_data_get_emoji_alternates(emoji));
+-        break;
+     default:
+         G_OBJECT_WARN_INVALID_PROPERTY_ID (emoji, prop_id, pspec);
+     }
+@@ -270,8 +248,6 @@ ibus_emoji_data_serialize (IBusEmojiData   *emoji,
+     }
+     g_variant_builder_add (builder, "s", NOTNULL (emoji->priv->description));
+     g_variant_builder_add (builder, "s", NOTNULL (emoji->priv->category));
+-    g_variant_builder_add (builder, "s",
+-                           NOTNULL (emoji->priv->emoji_alternates));
+ #undef NOTNULL
+     return TRUE;
+ }
+@@ -303,10 +279,6 @@ ibus_emoji_data_deserialize (IBusEmojiData *emoji,
+                                      &emoji->priv->description);
+     ibus_g_variant_get_child_string (variant, retval++,
+                                      &emoji->priv->category);
+-    if (g_variant_n_children (variant) < retval + 1)
+-        return retval;
+-    ibus_g_variant_get_child_string (variant, retval++,
+-                                     &emoji->priv->emoji_alternates);
+     return retval;
+ }
+ 
+@@ -325,7 +297,6 @@ ibus_emoji_data_copy (IBusEmojiData       *dest,
+                                                       NULL);
+     dest->priv->description      = g_strdup (src->priv->description);
+     dest->priv->category         = g_strdup (src->priv->category);
+-    dest->priv->emoji_alternates = g_strdup (src->priv->emoji_alternates);
+     return TRUE;
+ }
+ 
+@@ -345,7 +316,6 @@ ibus_emoji_data_new (const gchar *first_property_name, ...)
+     g_assert (emoji->priv->emoji != NULL);
+     g_assert (emoji->priv->description != NULL);
+     g_assert (emoji->priv->category != NULL);
+-    g_assert (emoji->priv->emoji_alternates != NULL);
+     return emoji;
+ }
+ 
+@@ -402,15 +372,6 @@ ibus_emoji_data_get_category (IBusEmojiData *emoji)
+     return emoji->priv->category;
+ }
+ 
+-const gchar *
+-ibus_emoji_data_get_emoji_alternates (IBusEmojiData *emoji)
+-{
+-    g_return_val_if_fail (IBUS_IS_EMOJI_DATA (emoji), NULL);
+-
+-    return emoji->priv->emoji_alternates;
+-}
+-
+-
+ static void
+ variant_foreach_add_emoji (IBusEmojiData   *emoji,
+                            GVariantBuilder *builder)
+diff --git a/src/ibusemoji.h b/src/ibusemoji.h
+index 233cadd..eb24fdd 100644
+--- a/src/ibusemoji.h
++++ b/src/ibusemoji.h
+@@ -156,20 +156,6 @@ const gchar *   ibus_emoji_data_get_category    (IBusEmojiData *emoji);
+ 
+ 
+ /**
+- * ibus_emoji_data_get_emoji_alternates:
+- * @emoji : An #IBusEmojiData
+- *
+- * Gets the emoji alternate characters in #IBusEmojiData. It should not be
+- * freed. The alternates are defined in "unicode_alt" in EmojiOne json.
+- *
+- * Returns: emoji alternates property in #IBusEmojiData
+- *
+- */
+-const gchar *   ibus_emoji_data_get_emoji_alternates
+-                                                (IBusEmojiData *emoji);
+-
+-
+-/**
+  * ibus_emoji_dict_save:
+  * @path: A path of the saved dictionary file.
+  * @dict: (element-type utf8 gpointer) (transfer none): An Emoji dictionary
+diff --git a/src/ibusemojigen.h b/src/ibusemojigen.h
+new file mode 100644
+index 0000000..74a6015
+--- /dev/null
++++ b/src/ibusemojigen.h
+@@ -0,0 +1,39 @@
++/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
++/* vim:set et sts=4: */
++/* ibus - The Input Bus
++ * Copyright (C) 2016-2017 Takao Fujiwara <takao.fujiwara1@gmail.com>
++ * Copyright (C) 2016 Red Hat, Inc.
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301
++ * USA
++ */
++
++
++/* This file is generated by emoji-parser.c. */
++include <glib/gi18n.h>
++
++#ifndef __IBUS_EMOJI_GEN_H_
++#define __IBUS_EMOJI_GEN_H_
++const static char *unicode_emoji_categories[] = {
++    N_("Activities"),
++    N_("Animals & Nature"),
++    N_("Flags"),
++    N_("Food & Drink"),
++    N_("Objects"),
++    N_("Smileys & People"),
++    N_("Symbols"),
++    N_("Travel & Places"),
++};
++#endif
+diff --git a/ui/gtk3/Makefile.am b/ui/gtk3/Makefile.am
+index d2ae0d6..c557474 100644
+--- a/ui/gtk3/Makefile.am
++++ b/ui/gtk3/Makefile.am
+@@ -82,7 +82,7 @@ AM_VALAFLAGS = \
+ 	$(NULL)
+ 
+ MAINTAINERCLEANFILES =
+-CONFIG_CLEAN_FILES =
++DISTCLEANFILES =
+ noinst_DATA =
+ 
+ if ENABLE_LIBNOTIFY
+@@ -250,8 +250,7 @@ vapidir = $(datadir)/vala/vapi
+ noinst_DATA += $(VAPIGEN_VAPIS) $(VAPIGEN_VAPIS:.vapi=.deps)
+ 
+ MAINTAINERCLEANFILES += $(VAPIGEN_VAPIS)
+-# for make distclean
+-CONFIG_CLEAN_FILES += $(VAPIGEN_VAPIS)
++DISTCLEANFILES += $(VAPIGEN_VAPIS)
+ EXTRA_DIST += $(VAPIGEN_VAPIS)
+ 
+ endif
+diff --git a/ui/gtk3/emojier.vala b/ui/gtk3/emojier.vala
+index 76dca6c..8f55bd4 100644
+--- a/ui/gtk3/emojier.vala
++++ b/ui/gtk3/emojier.vala
+@@ -167,6 +167,7 @@ class IBusEmojier : Gtk.Window {
+     }
+ 
+     private const uint EMOJI_GRID_PAGE = 10;
++    private const string EMOJI_CATEGORY_OTHERS = N_("Others");
+ 
+     // Set the actual default values in the constructor
+     // because these fields are used for class_init() and static functions,
+@@ -372,8 +373,7 @@ class IBusEmojier : Gtk.Window {
+ 
+ 
+     private static void update_annotation_to_emojis_dict(IBus.EmojiData data) {
+-        string emoji = (data.get_emoji_alternates() != "") ?
+-                data.get_emoji_alternates() : data.get_emoji();
++        string emoji = data.get_emoji();
+         unowned GLib.SList<string> annotations = data.get_annotations();
+         foreach (string annotation in annotations) {
+             bool has_emoji = false;
+@@ -434,23 +434,70 @@ class IBusEmojier : Gtk.Window {
+     }
+ 
+ 
++    private static string utf8_entity(string str) {
++        GLib.StringBuilder buff = new GLib.StringBuilder();
++        int length = str.char_count();
++        for (int i = 0; i < length; i++) {
++            unichar ch = str.get_char(0);
++            switch(ch) {
++            case '<':
++                buff.append("&lt;");
++                break;
++            case '>':
++                buff.append("&gt;");
++                break;
++            case '&':
++                buff.append("&amp;");
++                break;
++            default:
++                buff.append_unichar(ch);
++                break;
++            }
++            str = str.next_char();
++        }
++        return buff.str;
++    }
++
++
++    private static void
++    update_annotations_with_description (IBus.EmojiData data,
++                                         string         description) {
++        unowned GLib.SList<string> annotations = data.get_annotations();
++        bool update_annotations = false;
++        string former = null;
++        string later = null;
++        int index = description.index_of(": ");
++        if (index > 0) {
++            former = description.substring(0, index);
++            if (annotations.find_custom(former, GLib.strcmp) == null) {
++                annotations.append(former);
++                update_annotations = true;
++            }
++            later = description.substring(index + 2);
++        } else {
++            later = description.dup();
++        }
++        var words = later.split(" ");
++        // If the description has less than 3 words, add it to annotations
++        // FIXME: How to cast GLib.CompareFunc<string> to strcmp?
++        if (words.length < 3 &&
++            annotations.find_custom(
++                    later,
++                    GLib.strcmp) == null) {
++            annotations.append(later);
++            update_annotations = true;
++        }
++        if (update_annotations)
++            data.set_annotations(annotations.copy_deep(GLib.strdup));
++    }
++
++
+     private static void update_emoji_to_data_dict(IBus.EmojiData data,
+                                                   string         lang) {
+-        string emoji = (data.get_emoji_alternates() != "") ?
+-                data.get_emoji_alternates() : data.get_emoji();
++        string emoji = data.get_emoji();
+         if (lang == "en") {
+             string description = utf8_down(data.get_description());
+-            unowned GLib.SList<string> annotations = data.get_annotations();
+-            var words = description.split(" ");
+-            // If the description has less than 3 words, add it to annotations
+-            // FIXME: How to cast GLib.CompareFunc<string> to strcmp?
+-            if (words.length < 3 &&
+-                annotations.find_custom(
+-                        description,
+-                        GLib.strcmp) == null) {
+-                annotations.append(description);
+-                data.set_annotations(annotations.copy_deep(GLib.strdup));
+-            }
++            update_annotations_with_description (data, description);
+             m_emoji_to_data_dict.replace(emoji, data);
+         } else {
+             unowned IBus.EmojiData? en_data =
+@@ -462,16 +509,8 @@ class IBusEmojier : Gtk.Window {
+             string trans_description = data.get_description();
+             en_data.set_description(trans_description);
+             trans_description = utf8_down(trans_description);
++            update_annotations_with_description (data, trans_description);
+             unowned GLib.SList<string> annotations = data.get_annotations();
+-            var words = trans_description.split(" ");
+-            // If the description has less than 3 words, add it to annotations
+-            // FIXME: How to cast GLib.CompareFunc<string> to strcmp?
+-            if (words.length < 3 &&
+-                annotations.find_custom(
+-                        trans_description,
+-                        GLib.strcmp) == null) {
+-                annotations.append(trans_description);
+-            }
+             unowned GLib.SList<string> en_annotations
+                 = en_data.get_annotations();
+             foreach (string annotation in en_annotations) {
+@@ -489,10 +528,11 @@ class IBusEmojier : Gtk.Window {
+ 
+     private static void update_category_to_emojis_dict(IBus.EmojiData data,
+                                                        string         lang) {
+-        string emoji = (data.get_emoji_alternates() != "") ?
+-                data.get_emoji_alternates() : data.get_emoji();
++        string emoji = data.get_emoji();
+         string category = data.get_category();
+-        if (lang == "en" && category != "") {
++        if (category == "")
++            category = EMOJI_CATEGORY_OTHERS;
++        if (lang == "en") {
+             bool has_emoji = false;
+             unowned GLib.SList<string> hits =
+                     m_category_to_emojis_dict.lookup(category);
+@@ -562,9 +602,17 @@ class IBusEmojier : Gtk.Window {
+                 m_category_to_emojis_dict.get_keys();
+         // FIXME: How to cast GLib.CompareFunc<string> to strcmp?
+         categories.sort((a, b) => {
++            if (a == EMOJI_CATEGORY_OTHERS && b != EMOJI_CATEGORY_OTHERS)
++                return 1;
++            else if (a != EMOJI_CATEGORY_OTHERS && b == EMOJI_CATEGORY_OTHERS)
++                return -1;
+             return GLib.strcmp(_(a), _(b));
+         });
+         foreach (unowned string category in categories) {
++            // "Others" category includes next unicode chars and fonts do not support
++            // the base and varints yet.
++            if (category == EMOJI_CATEGORY_OTHERS)
++               continue;
+             EBoxRow row = new EBoxRow(category);
+             string locale_category = _(category);
+             EPaddedLabelBox widget =
+@@ -718,7 +766,7 @@ class IBusEmojier : Gtk.Window {
+         uint page_end_pos = uint.min(page_start_pos + page_size, ncandidates);
+         if (m_backward != null) {
+             string backward_desc =
+-                    "%s (%u / %u)".printf(m_backward, cursor, ncandidates - 1);
++                    "%s (%u / %u)".printf(_(m_backward), cursor, ncandidates - 1);
+             EPaddedLabelBox label =
+                     new EPaddedLabelBox(backward_desc,
+                                         Gtk.Align.CENTER,
+@@ -746,7 +794,7 @@ class IBusEmojier : Gtk.Window {
+                 int font_size = m_emoji_font_size - 2;
+                 string emoji_font = "%s %d".printf(font_family, font_size);
+                 string markup = "<span font=\"%s\">%s</span>".
+-                        printf(emoji_font, candidate.get_text());
++                        printf(emoji_font, utf8_entity(candidate.get_text()));
+                 label.set_markup(markup);
+             }
+             label.set_halign(Gtk.Align.FILL);
+-- 
+2.9.3
+
+From 0836c3ffd6764969dfaa9953f52a24c1cbf2c983 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Sat, 6 May 2017 00:22:50 +0900
+Subject: [PATCH] Support to match emoji annotations with partial string
+
+Now ibus-setup has a new tab of "Emoji" and it provides
+the options to choose a condtion and length to match
+emoji annotations partically.
+
+R=alexepico@gmail.com, penghuang@google.com
+
+Review URL: https://codereview.appspot.com/319700043
+---
+ data/ibus.schemas.in    |  39 ++++
+ setup/main.py           | 121 ++++++++++--
+ setup/setup.ui          | 491 ++++++++++++++++++++++++++++++------------------
+ ui/gtk3/emojier.vala    |  64 ++++++-
+ ui/gtk3/emojierapp.vala |  52 ++++-
+ ui/gtk3/panel.vala      |  22 +++
+ 6 files changed, 582 insertions(+), 207 deletions(-)
+
+diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
+index 096dd71..0647004 100644
+--- a/data/ibus.schemas.in
++++ b/data/ibus.schemas.in
+@@ -404,6 +404,45 @@
+       </locale>
+     </schema>
+     <schema>
++      <key>/schemas/desktop/ibus/panel/emoji/has-partial-match</key>
++      <applyto>/desktop/ibus/panel/emoji/has-partial-match</applyto>
++      <owner>ibus</owner>
++      <type>bool</type>
++      <default>false</default>
++      <locale name="C">
++        <short>Whether emoji annotaions can be match partially or not</short>
++	    <long>Whether emoji annotations can be matched with a partial
++                  string instead of the exact match or not.</long>
++      </locale>
++    </schema>
++    <schema>
++      <key>/schemas/desktop/ibus/panel/emoji/partial-match-length</key>
++      <applyto>/desktop/ibus/panel/emoji/partial-match-length</applyto>
++      <owner>ibus</owner>
++      <type>int</type>
++      <default>3</default>
++      <locale name="C">
++        <short>Match emoji annotaions with the specified length</short>
++	    <long>Match emoji annotations partially with more than
++                  the specified number of characters instead of
++                  the exact match.</long>
++      </locale>
++    </schema>
++    <schema>
++      <key>/schemas/desktop/ibus/panel/emoji/partial-match-condition</key>
++      <applyto>/desktop/ibus/panel/emoji/partial-match-condition</applyto>
++      <owner>ibus</owner>
++      <type>int</type>
++      <default>0</default>
++      <locale name="C">
++        <short>Choose a condition to match emoji annotations partially</short>
++	    <long>Choose one of the following conditions to match emoji
++	          annotations partially:
++                  0 == Prefix match, 1 == Suffix match, 2 == Containing match
++                  </long>
++      </locale>
++    </schema>
++    <schema>
+       <key>/schemas/desktop/ibus/general/embed_preedit_text</key>
+       <applyto>/desktop/ibus/general/embed_preedit_text</applyto>
+       <owner>ibus</owner>
+diff --git a/setup/main.py b/setup/main.py
+index 7839cea..f0eee99 100644
+--- a/setup/main.py
++++ b/setup/main.py
+@@ -187,19 +187,6 @@ class Setup(object):
+                                     self.__fontbutton_custom_font,
+                                    'sensitive',
+                                    Gio.SettingsBindFlags.GET)
+-        self.__fontbutton_emoji_font = self.__builder.get_object(
+-                'fontbutton_emoji_font')
+-        self.__fontbutton_emoji_font.set_preview_text('🙂🍎🚃💓📧⚽🐳');
+-        self.__settings_emoji.bind('font',
+-                                    self.__fontbutton_emoji_font,
+-                                   'font-name',
+-                                   Gio.SettingsBindFlags.DEFAULT)
+-        self.__button_emoji_lang = self.__builder.get_object(
+-                'button_emoji_lang')
+-        self.__settings_emoji.bind('lang',
+-                                    self.__button_emoji_lang,
+-                                   'lang',
+-                                   Gio.SettingsBindFlags.DEFAULT)
+ 
+         # show icon on system tray
+         self.__checkbutton_show_icon_on_systray = self.__builder.get_object(
+@@ -287,6 +274,113 @@ class Setup(object):
+         self.__treeview.connect("notify::active-engine", self.__treeview_notify_cb)
+         self.__treeview.connect("notify::engines", self.__treeview_notify_cb)
+ 
++    def __init_emoji(self):
++        self.__fontbutton_emoji_font = self.__builder.get_object(
++                'fontbutton_emoji_font')
++        self.__fontbutton_emoji_font.set_preview_text('🙂🍎🚃💓📧⚽🐳');
++        self.__settings_emoji.bind('font',
++                                    self.__fontbutton_emoji_font,
++                                   'font-name',
++                                   Gio.SettingsBindFlags.DEFAULT)
++        self.__button_emoji_lang = self.__builder.get_object(
++                'button_emoji_lang')
++        self.__settings_emoji.bind('lang',
++                                    self.__button_emoji_lang,
++                                   'lang',
++                                   Gio.SettingsBindFlags.DEFAULT)
++        self.__checkbutton_emoji_partial_match = self.__builder.get_object(
++                'checkbutton_emoji_partial_match')
++        checkbutton_label = self.__checkbutton_emoji_partial_match.get_child()
++        if type(checkbutton_label) == Gtk.Label:
++            checkbutton_label.set_property('wrap', True)
++            checkbutton_label.set_property('max-width-chars', 74)
++        self.__spinbutton_emoji_partial_match = self.__builder.get_object(
++                'spinbutton_emoji_partial_match')
++        self.__settings_emoji.bind('has-partial-match',
++                                   self.__checkbutton_emoji_partial_match,
++                                   'active',
++                                   Gio.SettingsBindFlags.DEFAULT)
++        self.__settings_emoji.bind('has-partial-match',
++                                   self.__spinbutton_emoji_partial_match,
++                                   'sensitive',
++                                   Gio.SettingsBindFlags.GET)
++
++        def adjustment_value_changed_cb(obj):
++            key = 'partial-match-length'
++            value = int(adjustment.get_value())
++            if value == self.__settings_emoji.get_int(key):
++                return
++            self.__settings_emoji.set_int(key, value)
++        def settings_emoji_partial_match_length_cb(settings, key):
++            value = self.__settings_emoji.get_int(key)
++            old_value = int(self.__spinbutton_emoji_partial_match.get_value())
++            if value == old_value:
++                return
++            self.__spinbutton_emoji_partial_match.set_value(value)
++        settings_emoji_partial_match_length_cb(None, 'partial-match-length')
++        adjustment = self.__spinbutton_emoji_partial_match.get_adjustment()
++        adjustment.connect('value-changed', adjustment_value_changed_cb)
++        self.__settings_emoji.connect('changed::partial-match-length',
++                                      settings_emoji_partial_match_length_cb)
++
++        self.__hbox_emoji_partial_match = self.__builder.get_object(
++                'hbox_emoji_partial_match')
++        self.__settings_emoji.bind('has-partial-match',
++                                   self.__hbox_emoji_partial_match,
++                                   'sensitive',
++                                   Gio.SettingsBindFlags.GET)
++        self.__radiobutton_emoji_prefix_match = self.__builder.get_object(
++                'radiobutton_emoji_prefix_match')
++        self.__radiobutton_emoji_suffix_match = self.__builder.get_object(
++                'radiobutton_emoji_suffix_match')
++        self.__radiobutton_emoji_contain_match = self.__builder.get_object(
++                'radiobutton_emoji_contain_match')
++
++        def radiobuton_emoji_partial_match_cb(obj):
++            key = 'partial-match-condition'
++            condition = 0
++            if not obj.get_active():
++                return
++            if obj == self.__radiobutton_emoji_prefix_match:
++                condition = 0
++            elif obj == self.__radiobutton_emoji_suffix_match:
++                condition = 1
++            elif obj == self.__radiobutton_emoji_contain_match:
++                condition = 2
++            else:
++                print('Wrong emoji partial match object')
++                return
++            self.__settings_emoji.set_int(key, condition)
++        def settings_emoji_partial_match_condition_cb(settings, key):
++            value = self.__settings_emoji.get_int(key)
++            obj = None
++            if value == 0:
++                obj = self.__radiobutton_emoji_prefix_match
++            elif value == 1:
++                obj = self.__radiobutton_emoji_suffix_match
++            elif value == 2:
++                obj = self.__radiobutton_emoji_contain_match
++            else:
++                print('Wrong emoji partial match condition')
++                return
++            if obj.get_active():
++                return
++            obj.set_active(True)
++
++        settings_emoji_partial_match_condition_cb(None,
++                                                  'partial-match-condition')
++        self.__radiobutton_emoji_prefix_match.connect(
++                'toggled',
++                radiobuton_emoji_partial_match_cb)
++        self.__radiobutton_emoji_suffix_match.connect(
++                'toggled',
++                radiobuton_emoji_partial_match_cb)
++        self.__radiobutton_emoji_contain_match.connect(
++                'toggled',
++                radiobuton_emoji_partial_match_cb)
++        self.__settings_emoji.connect('changed::partial-match-condition',
++                                      settings_emoji_partial_match_condition_cb)
++
+     def __init_ui(self):
+         # add icon search path
+         self.__window = self.__builder.get_object("window_preferences")
+@@ -306,6 +400,7 @@ class Setup(object):
+         self.__init_hotkeys()
+         self.__init_panel()
+         self.__init_general()
++        self.__init_emoji()
+ 
+     def __gdk_window_set_cb(self, object, pspec):
+         window = object.get_window()
+diff --git a/setup/setup.ui b/setup/setup.ui
+index 54ef916..322f514 100644
+--- a/setup/setup.ui
++++ b/setup/setup.ui
+@@ -55,6 +55,14 @@
+       </row>
+     </data>
+   </object>
++  <object class="GtkAdjustment" id="adjustment_emoji_partial_match">
++    <property name="value">3.0</property>
++    <property name="lower">1.0</property>
++    <property name="upper">255.0</property>
++    <property name="step-increment">1.0</property>
++    <property name="page-increment">10.0</property>
++    <property name="page-size">10.0</property>
++  </object>
+   <object class="GtkWindow" id="window_preferences">
+     <property name="can_focus">False</property>
+     <property name="border_width">12</property>
+@@ -109,8 +117,6 @@
+                             <property name="label" translatable="yes">Next input method:</property>
+                           </object>
+                           <packing>
+-                            <property name="top_attach">3</property>
+-                            <property name="bottom_attach">4</property>
+                             <property name="x_options">GTK_FILL</property>
+                             <property name="y_options">GTK_FILL</property>
+                           </packing>
+@@ -125,69 +131,13 @@
+                             <property name="label" translatable="yes">Previous input method:</property>
+                           </object>
+                           <packing>
+-                            <property name="top_attach">4</property>
+-                            <property name="bottom_attach">5</property>
+-                            <property name="x_options">GTK_FILL</property>
+-                            <property name="y_options">GTK_FILL</property>
+-                          </packing>
+-                        </child>
+-                        <child>
+-                          <object class="GtkLabel" id="emoji_label">
+-                            <property name="visible">True</property>
+-                            <property name="can_focus">False</property>
+-                            <property name="tooltip_text" translatable="yes">The shortcut keys for showing emoji dialog</property>
+-                            <property name="halign">start</property>
+-                            <property name="label" translatable="yes">Emoji choice:</property>
+-                          </object>
+-                          <packing>
+-                            <property name="top_attach">5</property>
+-                            <property name="bottom_attach">6</property>
++                            <property name="top_attach">1</property>
++                            <property name="bottom_attach">2</property>
+                             <property name="x_options">GTK_FILL</property>
+                             <property name="y_options">GTK_FILL</property>
+                           </packing>
+                         </child>
+                         <child>
+-                          <object class="GtkBox" id="hbox4">
+-                            <property name="orientation">horizontal</property>
+-                            <property name="no_show_all">True</property>
+-                            <property name="can_focus">False</property>
+-                            <property name="spacing">6</property>
+-                            <child>
+-                              <object class="GtkEntry" id="entry_trigger">
+-                                <property name="visible">True</property>
+-                                <property name="can_focus">True</property>
+-                                <property name="editable">False</property>
+-                              </object>
+-                              <packing>
+-                                <property name="expand">True</property>
+-                                <property name="fill">True</property>
+-                                <property name="position">0</property>
+-                              </packing>
+-                            </child>
+-                            <child>
+-                              <object class="GtkButton" id="button_trigger">
+-                                <property name="label" translatable="yes">...</property>
+-                                <property name="use_action_appearance">False</property>
+-                                <property name="visible">True</property>
+-                                <property name="can_focus">True</property>
+-                                <property name="receives_default">False</property>
+-                                <property name="use_action_appearance">False</property>
+-                                <property name="use_underline">True</property>
+-                              </object>
+-                              <packing>
+-                                <property name="expand">False</property>
+-                                <property name="fill">True</property>
+-                                <property name="position">1</property>
+-                              </packing>
+-                            </child>
+-                          </object>
+-                          <packing>
+-                            <property name="left_attach">1</property>
+-                            <property name="right_attach">2</property>
+-                            <property name="y_options">GTK_FILL</property>
+-                          </packing>
+-                        </child>
+-                        <child>
+                           <object class="GtkBox" id="hbox5">
+                             <property name="orientation">horizontal</property>
+                             <property name="visible">True</property>
+@@ -225,8 +175,6 @@
+                           <packing>
+                             <property name="left_attach">1</property>
+                             <property name="right_attach">2</property>
+-                            <property name="top_attach">3</property>
+-                            <property name="bottom_attach">4</property>
+                             <property name="y_options">GTK_FILL</property>
+                           </packing>
+                         </child>
+@@ -270,51 +218,8 @@
+                           <packing>
+                             <property name="left_attach">1</property>
+                             <property name="right_attach">2</property>
+-                            <property name="top_attach">4</property>
+-                            <property name="bottom_attach">5</property>
+-                            <property name="y_options">GTK_FILL</property>
+-                          </packing>
+-                        </child>
+-                        <child>
+-                          <object class="GtkBox" id="emoji_hbox">
+-                            <property name="orientation">horizontal</property>
+-                            <property name="visible">True</property>
+-                            <property name="can_focus">False</property>
+-                            <property name="spacing">6</property>
+-                            <child>
+-                              <object class="GtkEntry" id="entry_emoji_dialog">
+-                                <property name="visible">True</property>
+-                                <property name="can_focus">True</property>
+-                                <property name="editable">False</property>
+-                              </object>
+-                              <packing>
+-                                <property name="expand">True</property>
+-                                <property name="fill">True</property>
+-                                <property name="position">0</property>
+-                              </packing>
+-                            </child>
+-                            <child>
+-                              <object class="GtkButton" id="button_emoji_dialog">
+-                                <property name="label" translatable="yes">...</property>
+-                                <property name="use_action_appearance">False</property>
+-                                <property name="visible">True</property>
+-                                <property name="can_focus">True</property>
+-                                <property name="receives_default">False</property>
+-                                <property name="use_action_appearance">False</property>
+-                                <property name="use_underline">True</property>
+-                              </object>
+-                              <packing>
+-                                <property name="expand">False</property>
+-                                <property name="fill">True</property>
+-                                <property name="position">1</property>
+-                              </packing>
+-                            </child>
+-                          </object>
+-                          <packing>
+-                            <property name="left_attach">1</property>
+-                            <property name="right_attach">2</property>
+-                            <property name="top_attach">5</property>
+-                            <property name="bottom_attach">6</property>
++                            <property name="top_attach">1</property>
++                            <property name="bottom_attach">2</property>
+                             <property name="y_options">GTK_FILL</property>
+                           </packing>
+                         </child>
+@@ -327,6 +232,8 @@
+                             <property name="label" translatable="yes">Enable or disable:</property>
+                           </object>
+                           <packing>
++                            <property name="top_attach">2</property>
++                            <property name="bottom_attach">3</property>
+                             <property name="x_options">GTK_FILL</property>
+                             <property name="y_options">GTK_FILL</property>
+                           </packing>
+@@ -339,8 +246,8 @@
+                             <property name="label" translatable="yes">Enable:</property>
+                           </object>
+                           <packing>
+-                            <property name="top_attach">1</property>
+-                            <property name="bottom_attach">2</property>
++                            <property name="top_attach">3</property>
++                            <property name="bottom_attach">4</property>
+                             <property name="x_options">GTK_FILL</property>
+                             <property name="y_options">GTK_FILL</property>
+                           </packing>
+@@ -383,8 +290,8 @@
+                           <packing>
+                             <property name="left_attach">1</property>
+                             <property name="right_attach">2</property>
+-                            <property name="top_attach">1</property>
+-                            <property name="bottom_attach">2</property>
++                            <property name="top_attach">3</property>
++                            <property name="bottom_attach">4</property>
+                             <property name="y_options">GTK_FILL</property>
+                           </packing>
+                         </child>
+@@ -396,8 +303,8 @@
+                             <property name="label" translatable="yes">Disable:</property>
+                           </object>
+                           <packing>
+-                            <property name="top_attach">2</property>
+-                            <property name="bottom_attach">3</property>
++                            <property name="top_attach">4</property>
++                            <property name="bottom_attach">5</property>
+                             <property name="x_options">GTK_FILL</property>
+                             <property name="y_options">GTK_FILL</property>
+                           </packing>
+@@ -440,8 +347,8 @@
+                           <packing>
+                             <property name="left_attach">1</property>
+                             <property name="right_attach">2</property>
+-                            <property name="top_attach">2</property>
+-                            <property name="bottom_attach">3</property>
++                            <property name="top_attach">4</property>
++                            <property name="bottom_attach">5</property>
+                             <property name="y_options">GTK_FILL</property>
+                           </packing>
+                         </child>
+@@ -675,68 +582,6 @@
+                             <property name="y_options">GTK_FILL</property>
+                           </packing>
+                         </child>
+-                        <child>
+-                          <object class="GtkLabel" id="label_emoji_font">
+-                            <property name="visible">True</property>
+-                            <property name="can_focus">False</property>
+-                            <property name="tooltip_text" translatable="yes">Set a font of emoji candidates on the emoji dialog</property>
+-                            <property name="halign">start</property>
+-                            <property name="label" translatable="yes">Emoji font:</property>
+-                            <property name="justify">right</property>
+-                          </object>
+-                          <packing>
+-                            <property name="top_attach">7</property>
+-                            <property name="bottom_attach">8</property>
+-                            <property name="x_options">GTK_FILL</property>
+-                            <property name="y_options">GTK_FILL</property>
+-                          </packing>
+-                        </child>
+-                        <child>
+-                          <object class="GtkFontButton" id="fontbutton_emoji_font">
+-                            <property name="visible">True</property>
+-                            <property name="can_focus">True</property>
+-                            <property name="receives_default">True</property>
+-                            <property name="use_action_appearance">False</property>
+-                          </object>
+-                          <packing>
+-                            <property name="left_attach">1</property>
+-                            <property name="right_attach">2</property>
+-                            <property name="top_attach">7</property>
+-                            <property name="bottom_attach">8</property>
+-                            <property name="y_options">GTK_FILL</property>
+-                          </packing>
+-                        </child>
+-                        <child>
+-                          <object class="GtkLabel" id="label_emoji_lang">
+-                            <property name="visible">True</property>
+-                            <property name="can_focus">False</property>
+-                            <property name="tooltip_text" translatable="yes">Set a language of emoji annotations on the emoji dialog</property>
+-                            <property name="halign">start</property>
+-                            <property name="label" translatable="yes">Emoji annotation language:</property>
+-                            <property name="justify">right</property>
+-                          </object>
+-                          <packing>
+-                            <property name="top_attach">8</property>
+-                            <property name="bottom_attach">9</property>
+-                            <property name="x_options">GTK_FILL</property>
+-                            <property name="y_options">GTK_FILL</property>
+-                          </packing>
+-                        </child>
+-                        <child>
+-                          <object class="EmojiLangButton" id="button_emoji_lang">
+-                            <property name="visible">True</property>
+-                            <property name="can_focus">True</property>
+-                            <property name="receives_default">True</property>
+-                            <property name="use_action_appearance">False</property>
+-                          </object>
+-                          <packing>
+-                            <property name="left_attach">1</property>
+-                            <property name="right_attach">2</property>
+-                            <property name="top_attach">8</property>
+-                            <property name="bottom_attach">9</property>
+-                            <property name="y_options">GTK_FILL</property>
+-                          </packing>
+-                        </child>
+                       </object>
+                     </child>
+                     <child type="label">
+@@ -1027,6 +872,292 @@
+               </packing>
+             </child>
+             <child>
++              <object class="GtkBox" id="vbox_emoji1">
++                <property name="orientation">vertical</property>
++                <property name="visible">True</property>
++                <property name="can_focus">False</property>
++                <property name="spacing">18</property>
++                <property name="margin_top">12</property>
++                <property name="margin_bottom">12</property>
++                <property name="margin_left">12</property>
++                <property name="margin_right">12</property>
++                <child>
++                  <object class="GtkFrame" id="frame_emoji1">
++                    <property name="visible">True</property>
++                    <property name="can_focus">False</property>
++                    <property name="label_xalign">0</property>
++                    <property name="shadow_type">none</property>
++                    <child>
++                      <object class="GtkTable" id="table_emoji1">
++                        <property name="visible">True</property>
++                        <property name="can_focus">False</property>
++                        <property name="n_rows">5</property>
++                        <property name="n_columns">2</property>
++                        <property name="column_spacing">12</property>
++                        <property name="row_spacing">6</property>
++                        <property name="margin_top">6</property>
++                        <property name="margin_left">12</property>
++                        <child>
++                          <object class="GtkLabel" id="label_emoji1">
++                            <property name="visible">True</property>
++                            <property name="can_focus">False</property>
++                            <property name="tooltip_text" translatable="yes">The shortcut keys for showing emoji dialog</property>
++                            <property name="halign">start</property>
++                            <property name="label" translatable="yes">Emoji choice:</property>
++                          </object>
++                          <packing>
++                            <property name="x_options">GTK_FILL</property>
++                            <property name="y_options">GTK_FILL</property>
++                          </packing>
++                        </child>
++                        <child>
++                          <object class="GtkBox" id="hbox_emoji1">
++                            <property name="orientation">horizontal</property>
++                            <property name="visible">True</property>
++                            <property name="can_focus">False</property>
++                            <property name="spacing">6</property>
++                            <child>
++                              <object class="GtkEntry" id="entry_emoji_dialog">
++                                <property name="visible">True</property>
++                                <property name="can_focus">True</property>
++                                <property name="editable">False</property>
++                              </object>
++                              <packing>
++                                <property name="expand">True</property>
++                                <property name="fill">True</property>
++                                <property name="position">0</property>
++                              </packing>
++                            </child>
++                            <child>
++                              <object class="GtkButton" id="button_emoji_dialog">
++                                <property name="label" translatable="yes">...</property>
++                                <property name="use_action_appearance">False</property>
++                                <property name="visible">True</property>
++                                <property name="can_focus">True</property>
++                                <property name="receives_default">False</property>
++                                <property name="use_action_appearance">False</property>
++                                <property name="use_underline">True</property>
++                              </object>
++                              <packing>
++                                <property name="expand">False</property>
++                                <property name="fill">True</property>
++                                <property name="position">1</property>
++                              </packing>
++                            </child>
++                          </object>
++                          <packing>
++                            <property name="left_attach">1</property>
++                            <property name="right_attach">2</property>
++                            <property name="y_options">GTK_FILL</property>
++                          </packing>
++                        </child>
++                      </object>
++                    </child>
++                    <child type="label">
++                      <object class="GtkLabel" id="label_emoji2">
++                        <property name="visible">True</property>
++                        <property name="can_focus">False</property>
++                        <property name="label" translatable="yes">&lt;b&gt;Keyboard Shortcuts&lt;/b&gt;</property>
++                        <property name="use_markup">True</property>
++                      </object>
++                    </child>
++                  </object>
++                  <packing>
++                    <property name="expand">False</property>
++                    <property name="fill">True</property>
++                    <property name="position">0</property>
++                  </packing>
++                </child>
++                <child>
++                  <object class="GtkFrame" id="frame_emoji2">
++                    <property name="visible">True</property>
++                    <property name="can_focus">False</property>
++                    <property name="label_xalign">0</property>
++                    <property name="shadow_type">none</property>
++                    <child>
++                      <object class="GtkGrid" id="table_emoji2">
++                        <property name="visible">True</property>
++                        <property name="can_focus">False</property>
++                        <property name="column_spacing">12</property>
++                        <property name="row_spacing">6</property>
++                        <property name="margin_top">6</property>
++                        <property name="margin_left">12</property>
++                        <property name="row_homogeneous">false</property>
++                        <child>
++                          <object class="GtkLabel" id="label_emoji_font">
++                            <property name="visible">True</property>
++                            <property name="can_focus">False</property>
++                            <property name="tooltip_text" translatable="yes">Set a font of emoji candidates on the emoji dialog</property>
++                            <property name="halign">start</property>
++                            <property name="label" translatable="yes">Emoji font:</property>
++                            <property name="justify">right</property>
++                          </object>
++                          <packing>
++                            <property name="left_attach">0</property>
++                          </packing>
++                        </child>
++                        <child>
++                          <object class="GtkFontButton" id="fontbutton_emoji_font">
++                            <property name="visible">True</property>
++                            <property name="can_focus">True</property>
++                            <property name="receives_default">True</property>
++                            <property name="use_action_appearance">False</property>
++                          </object>
++                          <packing>
++                            <property name="left_attach">1</property>
++                            <!-- property name="right_attach">2</property -->
++                          </packing>
++                        </child>
++                        <child>
++                          <object class="GtkLabel" id="label_emoji_lang">
++                            <property name="visible">True</property>
++                            <property name="can_focus">False</property>
++                            <property name="tooltip_text" translatable="yes">Set a language of emoji annotations on the emoji dialog</property>
++                            <property name="halign">start</property>
++                            <property name="label" translatable="yes">Emoji annotation language:</property>
++                            <property name="justify">right</property>
++                          </object>
++                          <packing>
++                            <property name="left_attach">0</property>
++                            <property name="top_attach">1</property>
++                          </packing>
++                        </child>
++                        <child>
++                          <object class="EmojiLangButton" id="button_emoji_lang">
++                            <property name="visible">True</property>
++                            <property name="can_focus">True</property>
++                            <property name="receives_default">True</property>
++                            <property name="use_action_appearance">False</property>
++                          </object>
++                          <packing>
++                            <property name="left_attach">1</property>
++                            <property name="top_attach">1</property>
++                          </packing>
++                        </child>
++                        <child>
++                          <object class="GtkCheckButton" id="checkbutton_emoji_partial_match">
++                            <property name="label" translatable="yes">Match emoji annotations partially with the following condition and more than the number of characters:</property>
++                            <property name="use_action_appearance">False</property>
++                            <property name="visible">True</property>
++                            <property name="can_focus">True</property>
++                            <property name="receives_default">False</property>
++                            <property name="tooltip_text" translatable="yes">If emoji annotations can be matched with a partial string instead of the exact match</property>
++                            <property name="use_action_appearance">False</property>
++                            <property name="valign">start</property>
++                            <property name="draw_indicator">True</property>
++                          </object>
++                          <packing>
++                            <property name="left_attach">0</property>
++                            <property name="width">2</property>
++                            <property name="top_attach">2</property>
++                          </packing>
++                        </child>
++                        <child>
++                          <object class="GtkSpinButton" id="spinbutton_emoji_partial_match">
++                            <property name="adjustment">adjustment_emoji_partial_match</property>
++                            <property name="value">3.0</property>
++                            <property name="visible">True</property>
++                            <property name="can_focus">True</property>
++                            <property name="receives_default">False</property>
++                            <property name="halign">start</property>
++                          </object>
++                          <packing>
++                            <property name="left_attach">0</property>
++                            <property name="width">2</property>
++                            <property name="top_attach">3</property>
++                          </packing>
++                        </child>
++                        <child>
++                          <object class="GtkBox" id="hbox_emoji_partial_match">
++                            <property name="orientation">horizontal</property>
++                            <property name="visible">True</property>
++                            <property name="can_focus">False</property>
++                            <property name="spacing">6</property>
++                            <child>
++                              <object class="GtkRadioButton" id="radiobutton_emoji_prefix_match">
++                                <property name="label" translatable="yes">Prefix match</property>
++                                <property name="visible">True</property>
++                                <property name="can_focus">True</property>
++                                <property name="receives_default">False</property>
++                                <property name="halign">start</property>
++                              </object>
++                              <packing>
++                                <property name="expand">False</property>
++                                <property name="fill">True</property>
++                                <property name="position">0</property>
++                              </packing>
++                            </child>
++                            <child>
++                              <object class="GtkRadioButton" id="radiobutton_emoji_suffix_match">
++                                <property name="label" translatable="yes">Suffix match</property>
++                                <property name="group">radiobutton_emoji_prefix_match</property>
++                                <property name="visible">True</property>
++                                <property name="can_focus">True</property>
++                                <property name="receives_default">False</property>
++                                <property name="halign">start</property>
++                              </object>
++                              <packing>
++                                <property name="expand">False</property>
++                                <property name="fill">True</property>
++                                <property name="position">1</property>
++                              </packing>
++                            </child>
++                            <child>
++                              <object class="GtkRadioButton" id="radiobutton_emoji_contain_match">
++                                <property name="label" translatable="yes">Containing match</property>
++                                <property name="group">radiobutton_emoji_prefix_match</property>
++                                <property name="visible">True</property>
++                                <property name="can_focus">True</property>
++                                <property name="receives_default">False</property>
++                                <property name="halign">start</property>
++                              </object>
++                              <packing>
++                                <property name="expand">False</property>
++                                <property name="fill">True</property>
++                                <property name="position">2</property>
++                              </packing>
++                            </child>
++                          </object>
++                          <packing>
++                            <property name="left_attach">0</property>
++                            <property name="width">2</property>
++                            <property name="top_attach">4</property>
++                          </packing>
++                        </child>
++                      </object>
++                    </child>
++                    <child type="label">
++                      <object class="GtkLabel" id="label_emoji3">
++                        <property name="visible">True</property>
++                        <property name="can_focus">False</property>
++                        <property name="label" translatable="yes">&lt;b&gt;Font and Style&lt;/b&gt;</property>
++                        <property name="use_markup">True</property>
++                      </object>
++                    </child>
++                  </object>
++                  <packing>
++                    <property name="expand">False</property>
++                    <property name="fill">True</property>
++                    <property name="position">1</property>
++                  </packing>
++                </child>
++              </object>
++              <packing>
++                <property name="position">2</property>
++              </packing>
++            </child>
++            <child type="tab">
++              <object class="GtkLabel" id="emoji_tab">
++                <property name="visible">True</property>
++                <property name="can_focus">False</property>
++                <property name="label" translatable="yes">Emoji</property>
++              </object>
++              <packing>
++                <property name="position">2</property>
++                <property name="tab_fill">False</property>
++              </packing>
++            </child>
++            <child>
+               <object class="GtkBox" id="vbox7">
+                 <property name="orientation">vertical</property>
+                 <property name="visible">True</property>
+@@ -1134,7 +1265,7 @@
+                 </child>
+               </object>
+               <packing>
+-                <property name="position">2</property>
++                <property name="position">3</property>
+               </packing>
+             </child>
+             <child type="tab">
+@@ -1214,7 +1345,7 @@ Homepage: https://github.com/ibus/ibus/wiki
+                 </child>
+               </object>
+               <packing>
+-                <property name="position">3</property>
++                <property name="position">4</property>
+               </packing>
+             </child>
+             <child type="tab">
+@@ -1224,7 +1355,7 @@ Homepage: https://github.com/ibus/ibus/wiki
+                 <property name="label" translatable="yes">About</property>
+               </object>
+               <packing>
+-                <property name="position">3</property>
++                <property name="position">4</property>
+                 <property name="tab_fill">False</property>
+               </packing>
+             </child>
+diff --git a/ui/gtk3/emojier.vala b/ui/gtk3/emojier.vala
+index 8f55bd4..76d5fed 100644
+--- a/ui/gtk3/emojier.vala
++++ b/ui/gtk3/emojier.vala
+@@ -177,6 +177,9 @@ class IBusEmojier : Gtk.Window {
+     private static int m_emoji_font_size;
+     private static string[] m_favorites;
+     private static int m_emoji_max_seq_len;
++    private static bool m_has_partial_match;
++    private static uint m_partial_match_length;
++    private static uint m_partial_match_condition;
+     private static GLib.HashTable<string, GLib.SList>?
+             m_annotation_to_emojis_dict;
+     private static GLib.HashTable<string, IBus.EmojiData>?
+@@ -738,16 +741,53 @@ class IBusEmojier : Gtk.Window {
+         }
+         // Call check_unicode_point() to get m_unicode_point
+         check_unicode_point();
+-        unowned GLib.SList<string>? emojis =
+-            m_annotation_to_emojis_dict.lookup(annotation);
+-        if (emojis == null && m_unicode_point == null) {
++        GLib.SList<string>? total_emojis = null;
++        unowned GLib.SList<string>? sub_emojis = null;
++        int length = annotation.length;
++        if (m_has_partial_match && length >= m_partial_match_length) {
++            foreach (unowned string key in
++                     m_annotation_to_emojis_dict.get_keys()) {
++                if (key.length < length)
++                    continue;
++                bool matched = false;
++                switch(m_partial_match_condition) {
++                case 0:
++                    if (key.has_prefix(annotation))
++                        matched = true;
++                    break;
++                case 1:
++                    if (key.has_suffix(annotation))
++                        matched = true;
++                    break;
++                case 2:
++                    if (key.str(annotation) != null)
++                        matched = true;
++                    break;
++                default:
++                    break;
++                }
++                if (!matched)
++                    continue;
++                sub_emojis = m_annotation_to_emojis_dict.lookup(key);
++                foreach (unowned string emoji in sub_emojis) {
++                    if (total_emojis.find_custom(emoji, GLib.strcmp) == null) {
++                        total_emojis.append(emoji);
++                    }
++                }
++            }
++        } else {
++            sub_emojis = m_annotation_to_emojis_dict.lookup(annotation);
++            foreach (unowned string emoji in sub_emojis)
++                total_emojis.append(emoji);
++        }
++        if (total_emojis == null && m_unicode_point == null) {
+             hide_candidate_panel();
+             return;
+         }
+         m_lookup_table.clear();
+         // Call check_unicode_point() to update m_lookup_table
+         check_unicode_point();
+-        foreach (unowned string emoji in emojis) {
++        foreach (unowned string emoji in total_emojis) {
+             IBus.Text text = new IBus.Text.from_string(emoji);
+             m_lookup_table.append_candidate(text);
+         }
+@@ -1331,6 +1371,22 @@ class IBusEmojier : Gtk.Window {
+     }
+ 
+ 
++    public static void set_partial_match(bool has_partial_match) {
++        m_has_partial_match = has_partial_match;
++    }
++
++    public static void set_partial_match_length(int length) {
++        if (length < 1)
++            return;
++        m_partial_match_length = length;
++    }
++
++    public static void set_partial_match_condition(int condition) {
++        if (condition < 0)
++            return;
++        m_partial_match_condition = condition;
++    }
++
+     public static void set_favorites(string[]? unowned_favorites) {
+         m_favorites = {};
+         foreach (string favorite in unowned_favorites) {
+diff --git a/ui/gtk3/emojierapp.vala b/ui/gtk3/emojierapp.vala
+index cbdd8ba..dbdbc27 100644
+--- a/ui/gtk3/emojierapp.vala
++++ b/ui/gtk3/emojierapp.vala
+@@ -22,6 +22,9 @@
+ 
+ string emoji_font = null;
+ string annotation_lang = null;
++bool partial_match = false;
++int partial_match_length = -1;
++int partial_match_condition = -1;
+ 
+ public class EmojiApplication : Application {
+     private IBusEmojier? m_emojier;
+@@ -65,17 +68,28 @@ public class EmojiApplication : Application {
+ 
+         const OptionEntry[] options = {
+             { "font", 0, 0, OptionArg.STRING, out emoji_font,
+-                /* TRANSLATORS: "FONT" should be capital and translatable.
+-                 * It's used for an argument command --font=FONT
+-                 */
+-                N_("\"FONT\" for emoji chracters on emoji dialog"),
+-                N_("FONT") },
++              /* TRANSLATORS: "FONT" should be capital and translatable.
++               * It's used for an argument command --font=FONT
++               */
++              N_("\"FONT\" for emoji chracters on emoji dialog"),
++              N_("FONT") },
+             { "lang", 0, 0, OptionArg.STRING, out annotation_lang,
+-                /* TRANSLATORS: "LANG" should be capital and translatable.
+-                 * It's used for an argument command --lang=LANG
+-                 */
+-                N_("\"LANG\" for annotations on emoji dialog. E.g. \"en\""),
+-                N_("LANG") },
++              /* TRANSLATORS: "LANG" should be capital and translatable.
++               * It's used for an argument command --lang=LANG
++               */
++              N_("\"LANG\" for annotations on emoji dialog. E.g. \"en\""),
++              N_("LANG") },
++            { "partial-match", 0, 0, OptionArg.NONE, out partial_match,
++              N_("Emoji annotaions can be match partially"),
++              null },
++            { "partial-match-length", 0, 0, OptionArg.INT,
++              out partial_match_length,
++              N_("Match with the length of the specified integer"),
++              null },
++            { "partial-match-condition", 0, 0, OptionArg.INT,
++              out partial_match_condition,
++              N_("Match with the condition of the specified integer"),
++              null },
+             { null }
+         };
+ 
+@@ -111,6 +125,24 @@ public class EmojiApplication : Application {
+         if (annotation_lang == null)
+             annotation_lang = m_settings_emoji.get_string("lang");
+         IBusEmojier.set_annotation_lang(annotation_lang);
++        IBusEmojier.set_partial_match(partial_match);
++        if (partial_match_length > 0) {
++            IBusEmojier.set_partial_match_length(partial_match_length);
++        } else {
++            IBusEmojier.set_partial_match_length(
++                    m_settings_emoji.get_int("partial-match-length"));
++        }
++        if (partial_match_condition > 2) {
++            warning("Need condition between 0 and 2.");
++            IBusEmojier.set_partial_match_condition(
++                    m_settings_emoji.get_int("partial-match-condition"));
++        }
++        else if (partial_match_condition >= 0) {
++            IBusEmojier.set_partial_match_condition(partial_match_condition);
++        } else {
++            IBusEmojier.set_partial_match_condition(
++                    m_settings_emoji.get_int("partial-match-condition"));
++        }
+ 
+         if (emoji_font != null)
+             IBusEmojier.set_emoji_font(emoji_font);
+diff --git a/ui/gtk3/panel.vala b/ui/gtk3/panel.vala
+index 745489b..5f0009e 100644
+--- a/ui/gtk3/panel.vala
++++ b/ui/gtk3/panel.vala
+@@ -248,6 +248,18 @@ class Panel : IBus.PanelService {
+         m_settings_emoji.changed["lang"].connect((key) => {
+                 set_emoji_lang();
+         });
++
++        m_settings_emoji.changed["has-partial-match"].connect((key) => {
++                set_emoji_partial_match();
++        });
++
++        m_settings_emoji.changed["partial-match-length"].connect((key) => {
++                set_emoji_partial_match();
++        });
++
++        m_settings_emoji.changed["partial-match-condition"].connect((key) => {
++                set_emoji_partial_match();
++        });
+     }
+ 
+ #if INDICATOR
+@@ -782,6 +794,15 @@ class Panel : IBus.PanelService {
+         });
+     }
+ 
++    private void set_emoji_partial_match() {
++        IBusEmojier.set_partial_match(
++                m_settings_emoji.get_boolean("has-partial-match"));
++        IBusEmojier.set_partial_match_length(
++                m_settings_emoji.get_int("partial-match-length"));
++        IBusEmojier.set_partial_match_condition(
++                m_settings_emoji.get_int("partial-match-condition"));
++    }
++
+     private int compare_versions(string version1, string version2) {
+         string[] version1_list = version1.split(".");
+         string[] version2_list = version2.split(".");
+@@ -897,6 +918,7 @@ class Panel : IBus.PanelService {
+         set_property_icon_delay_time();
+         set_emoji_favorites();
+         set_emoji_lang();
++        set_emoji_partial_match();
+     }
+ 
+     private void engine_contexts_insert(IBus.EngineDesc engine) {
+-- 
+2.9.3
+
+From edcb4a0259d2833904e7d1aac7c74e1aa49cea5b Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Mon, 8 May 2017 12:25:54 +0900
+Subject: [PATCH] ui/gtk3: Hide emoji variants by default
+
+The emoji variants, i.e. skin colors and additional items, would not
+be used in most cases and it is nice to hide it by default.
+Now added GtkMenu and changed GtkWindow to GtkApplicationWindow
+for the menu.
+
+R=penghuang@google.com
+
+Review URL: https://codereview.appspot.com/322970043
+---
+ ui/gtk3/emojier.vala | 299 ++++++++++++++++++++++++++++++++++++---------------
+ 1 file changed, 211 insertions(+), 88 deletions(-)
+
+diff --git a/ui/gtk3/emojier.vala b/ui/gtk3/emojier.vala
+index 76d5fed..db7520a 100644
+--- a/ui/gtk3/emojier.vala
++++ b/ui/gtk3/emojier.vala
+@@ -20,7 +20,7 @@
+  * USA
+  */
+ 
+-class IBusEmojier : Gtk.Window {
++class IBusEmojier : Gtk.ApplicationWindow {
+     private class EEntry : Gtk.SearchEntry {
+         public EEntry() {
+             GLib.Object(
+@@ -97,6 +97,15 @@ class IBusEmojier : Gtk.Window {
+                 set_label(text);
+         }
+     }
++    private class EGoldLabel : Gtk.Label {
++        public EGoldLabel(string text) {
++            GLib.Object(
++                name : "IBusEmojierGoldLabel"
++            );
++            if (text != "")
++                set_label(text);
++        }
++    }
+     private class EPaddedLabel : Gtk.Label {
+         public EPaddedLabel(string          text,
+                             Gtk.Align       align) {
+@@ -150,11 +159,21 @@ class IBusEmojier : Gtk.Window {
+             var vbox = new Gtk.Box(Gtk.Orientation.VERTICAL, 0);
+             set_custom_title(vbox);
+             var label = new Gtk.Label(title);
+-            label.get_style_context().add_class("title");
++            label.get_style_context().add_class(Gtk.STYLE_CLASS_TITLE);
+             vbox.pack_start(label, true, false, 0);
+             m_lang_label = new Gtk.Label(null);
+-            m_lang_label.get_style_context().add_class("subtitle");
++            m_lang_label.get_style_context().add_class(
++                    Gtk.STYLE_CLASS_SUBTITLE);
+             vbox.pack_start(m_lang_label, true, false, 0);
++
++            var menu = new GLib.Menu();
++            menu.append(_("Show emoji variants"), "win.variant");
++            var menu_button = new Gtk.MenuButton();
++            menu_button.set_direction(Gtk.ArrowType.NONE);
++            menu_button.set_valign(Gtk.Align.CENTER);
++            menu_button.set_menu_model(menu);
++            menu_button.set_tooltip_text(_("Menu"));
++            pack_end(menu_button);
+         }
+         public void set_lang_label(string str) {
+             m_lang_label.set_text(str);
+@@ -167,7 +186,13 @@ class IBusEmojier : Gtk.Window {
+     }
+ 
+     private const uint EMOJI_GRID_PAGE = 10;
++    private const string EMOJI_CATEGORY_FAVORITES = N_("Favorites");
+     private const string EMOJI_CATEGORY_OTHERS = N_("Others");
++    private const unichar[] EMOJI_VARIANT_LIST = {
++            0x1f3fb, 0x1f3fc, 0x1f3fd, 0x1f3fe, 0x1f3ff, 0x200d };
++    private const GLib.ActionEntry[] m_action_entries = {
++        { "variant", check_action_variant_cb, null, "false", null }
++    };
+ 
+     // Set the actual default values in the constructor
+     // because these fields are used for class_init() and static functions,
+@@ -180,18 +205,22 @@ class IBusEmojier : Gtk.Window {
+     private static bool m_has_partial_match;
+     private static uint m_partial_match_length;
+     private static uint m_partial_match_condition;
+-    private static GLib.HashTable<string, GLib.SList>?
++    private static bool m_show_emoji_variant = false;
++    private static GLib.HashTable<string, GLib.SList<string>>?
+             m_annotation_to_emojis_dict;
+     private static GLib.HashTable<string, IBus.EmojiData>?
+             m_emoji_to_data_dict;
+-    private static GLib.HashTable<string, GLib.SList>?
++    private static GLib.HashTable<string, GLib.SList<string>>?
+             m_category_to_emojis_dict;
++    private static GLib.HashTable<string, GLib.SList<string>>?
++            m_emoji_to_emoji_variants_dict;
+ 
+     private ThemedRGBA m_rgba;
+     private Gtk.Box m_vbox;
+     private ETitleLabelBox m_title;
+     private EEntry m_entry;
+     private string? m_backward;
++    private int m_backward_index = -1;
+     private EScrolledWindow? m_scrolled_window = null;
+     private EListBox m_list_box;
+     private bool m_is_running = false;
+@@ -200,7 +229,7 @@ class IBusEmojier : Gtk.Window {
+     private string? m_result;
+     private string? m_unicode_point = null;
+     private bool m_candidate_panel_is_visible;
+-    int m_category_active_index;
++    private int m_category_active_index;
+     private IBus.LookupTable m_lookup_table;
+     private Gtk.Label[] m_candidates;
+     private bool m_enter_notify_enable = true;
+@@ -223,6 +252,7 @@ class IBusEmojier : Gtk.Window {
+             focus_visible : true
+         );
+ 
++        add_action_entries(m_action_entries, this);
+         if (m_current_lang_id == null)
+             m_current_lang_id = "en";
+         if (m_emoji_font_family == null)
+@@ -270,6 +300,13 @@ class IBusEmojier : Gtk.Window {
+                         "rgba(%u, %u, %u, %lf); ".printf(
+                         bg_red, bg_green, bg_blue, bg_alpha) +
+                 "border-width: 4px; border-radius: 3px; }";
++        data += "#IBusEmojierGoldLabel { color: " +
++                        "rgba(%u, %u, %u, %lf); ".printf(
++                        fg_red, fg_green, fg_blue, fg_alpha) +
++                "font-family: %s; font-size: %dpt; ".printf(
++                        m_emoji_font_family, m_emoji_font_size) +
++                "background-color: #b09c5f; " +
++                "border-width: 4px; border-radius: 3px; }";
+ 
+         Gtk.CssProvider css_provider = new Gtk.CssProvider();
+         try {
+@@ -317,10 +354,7 @@ class IBusEmojier : Gtk.Window {
+         });
+ 
+         candidate_clicked.connect((i, b, s) => {
+-            IBus.Text candidate = m_lookup_table.get_candidate(i);
+-            m_result = candidate.text;
+-            m_loop.quit();
+-            hide_candidate_panel();
++            candidate_panel_select_index(i);
+         });
+ 
+         if (m_annotation_to_emojis_dict == null) {
+@@ -345,14 +379,17 @@ class IBusEmojier : Gtk.Window {
+ 
+     private static void init_emoji_dict() {
+         m_annotation_to_emojis_dict =
+-                new GLib.HashTable<string, GLib.SList>(GLib.str_hash,
+-                                                       GLib.str_equal);
++                new GLib.HashTable<string, GLib.SList<string>>(GLib.str_hash,
++                                                               GLib.str_equal);
+         m_emoji_to_data_dict =
+                 new GLib.HashTable<string, IBus.EmojiData>(GLib.str_hash,
+                                                            GLib.str_equal);
+         m_category_to_emojis_dict =
+-                new GLib.HashTable<string, GLib.SList>(GLib.str_hash,
+-                                                       GLib.str_equal);
++                new GLib.HashTable<string, GLib.SList<string>>(GLib.str_hash,
++                                                               GLib.str_equal);
++        m_emoji_to_emoji_variants_dict =
++                new GLib.HashTable<string, GLib.SList<string>>(GLib.str_hash,
++                                                               GLib.str_equal);
+     }
+ 
+ 
+@@ -390,14 +427,16 @@ class IBusEmojier : Gtk.Window {
+             }
+             if (!has_emoji) {
+                 hits.append(emoji);
+-                m_annotation_to_emojis_dict.replace(annotation, hits.copy());
++                m_annotation_to_emojis_dict.replace(
++                        annotation,
++                        hits.copy_deep(GLib.strdup));
+             }
+         }
+     }
+ 
+ 
+     private static string utf8_down(string str) {
+-        GLib.StringBuilder buff = new GLib.StringBuilder();
++        var buff = new GLib.StringBuilder();
+         int length = str.char_count();
+         for (int i = 0; i < length; i++) {
+             buff.append_unichar(str.get_char(0).tolower());
+@@ -407,23 +446,8 @@ class IBusEmojier : Gtk.Window {
+     }
+ 
+ 
+-    private static string utf8_title(string str) {
+-        StringBuilder buff = new StringBuilder();
+-        int length = str.char_count();
+-        for (int i = 0; i < length; i++) {
+-            unichar ch = str.get_char(0);
+-            if (i == 0)
+-                buff.append_unichar(ch.toupper());
+-            else
+-                buff.append_unichar(ch);
+-            str = str.next_char();
+-        }
+-        return buff.str;
+-    }
+-
+-
+     private static string utf8_code_point(string str) {
+-        StringBuilder buff = new StringBuilder();
++        var buff = new GLib.StringBuilder();
+         int length = str.char_count();
+         for (int i = 0; i < length; i++) {
+             unichar ch = str.get_char(0);
+@@ -438,7 +462,7 @@ class IBusEmojier : Gtk.Window {
+ 
+ 
+     private static string utf8_entity(string str) {
+-        GLib.StringBuilder buff = new GLib.StringBuilder();
++        var buff = new GLib.StringBuilder();
+         int length = str.char_count();
+         for (int i = 0; i < length; i++) {
+             unichar ch = str.get_char(0);
+@@ -503,8 +527,19 @@ class IBusEmojier : Gtk.Window {
+             update_annotations_with_description (data, description);
+             m_emoji_to_data_dict.replace(emoji, data);
+         } else {
+-            unowned IBus.EmojiData? en_data =
+-                    m_emoji_to_data_dict.lookup(emoji);
++            unowned IBus.EmojiData? en_data = null;
++            // If emoji presentation (+= 0xfe0f) is already saved in dict,
++            // update it instead of no presentation.
++            // emoji-test.txt has all emoji presentations but $lang.xml has
++            // some no emoji presentations.
++            if (emoji.chr(-1, 0xfe0f) == null) {
++                var buff = new GLib.StringBuilder();
++                buff.append(emoji);
++                buff.append_unichar(0xfe0f);
++                en_data = m_emoji_to_data_dict.lookup(buff.str);
++            }
++            if (en_data == null)
++                en_data = m_emoji_to_data_dict.lookup(emoji);
+             if (en_data == null) {
+                 m_emoji_to_data_dict.insert(emoji, data);
+                 return;
+@@ -536,6 +571,36 @@ class IBusEmojier : Gtk.Window {
+         if (category == "")
+             category = EMOJI_CATEGORY_OTHERS;
+         if (lang == "en") {
++            bool has_variant = false;
++            foreach (unichar ch in EMOJI_VARIANT_LIST) {
++                if (emoji.chr(-1, ch) != null) {
++                    has_variant = true;
++                    break;
++                }
++            }
++            // If emoji includes variants (skin colors and items),
++            // it's escaped in m_emoji_to_emoji_variants_dict and
++            // not shown by default.
++            if (has_variant) {
++                unichar base_ch = emoji.get_char();
++                string base_emoji  = base_ch.to_string();
++                var buff = new GLib.StringBuilder();
++                buff.append_unichar(base_ch);
++                buff.append_unichar(0xfe0f);
++                if (m_emoji_to_data_dict.lookup(buff.str) != null)
++                    base_emoji = buff.str;
++                unowned GLib.SList<string>? variants =
++                    m_emoji_to_emoji_variants_dict.lookup(base_emoji);
++                if (variants.find_custom(emoji, GLib.strcmp) == null) {
++                    if (variants == null)
++                        variants.append(base_emoji);
++                    variants.append(emoji);
++                    m_emoji_to_emoji_variants_dict.replace(
++                            base_emoji,
++                            variants.copy_deep(GLib.strdup));
++                }
++                return;
++            }
+             bool has_emoji = false;
+             unowned GLib.SList<string> hits =
+                     m_category_to_emojis_dict.lookup(category);
+@@ -547,7 +612,8 @@ class IBusEmojier : Gtk.Window {
+             }
+             if (!has_emoji) {
+                 hits.append(emoji);
+-                m_category_to_emojis_dict.replace(category, hits.copy());
++                m_category_to_emojis_dict.replace(category,
++                                                  hits.copy_deep(GLib.strdup));
+             }
+         }
+     }
+@@ -588,14 +654,15 @@ class IBusEmojier : Gtk.Window {
+         m_list_box.row_activated.connect((box, gtkrow) => {
+             m_category_active_index = 0;
+             EBoxRow row = gtkrow as EBoxRow;
+-            show_emoji_for_category(row);
++            show_emoji_for_category(row.text);
+         });
+ 
+         uint n = 1;
+         if (m_favorites.length > 0) {
+-            EBoxRow row = new EBoxRow("@favorites");
++            EBoxRow row = new EBoxRow(EMOJI_CATEGORY_FAVORITES);
+             EPaddedLabelBox widget =
+-                    new EPaddedLabelBox(_("Favorites"), Gtk.Align.CENTER);
++                    new EPaddedLabelBox(_(EMOJI_CATEGORY_FAVORITES),
++                                        Gtk.Align.CENTER);
+             row.add(widget);
+             m_list_box.add(row);
+             if (n++ == m_category_active_index)
+@@ -617,10 +684,8 @@ class IBusEmojier : Gtk.Window {
+             if (category == EMOJI_CATEGORY_OTHERS)
+                continue;
+             EBoxRow row = new EBoxRow(category);
+-            string locale_category = _(category);
+             EPaddedLabelBox widget =
+-                    new EPaddedLabelBox(utf8_title(locale_category),
+-                                        Gtk.Align.CENTER);
++                    new EPaddedLabelBox(_(category), Gtk.Align.CENTER);
+             row.add(widget);
+             m_list_box.add(row);
+             if (n++ == m_category_active_index)
+@@ -635,23 +700,40 @@ class IBusEmojier : Gtk.Window {
+     }
+ 
+ 
+-    private void show_emoji_for_category(EBoxRow row) {
+-        if (row.text == "@favorites") {
++    private void show_emoji_for_category(string category) {
++        if (category == EMOJI_CATEGORY_FAVORITES) {
+             m_lookup_table.clear();
+             foreach (unowned string favorate in m_favorites) {
+                 IBus.Text text = new IBus.Text.from_string(favorate);
+                 m_lookup_table.append_candidate(text);
+             }
+-            m_backward = _("Favorites");
++            m_backward = category;
+         } else {
+             unowned GLib.SList<unowned string> emojis =
+-                    m_category_to_emojis_dict.lookup(row.text);
++                    m_category_to_emojis_dict.lookup(category);
+             m_lookup_table.clear();
+             foreach (unowned string emoji in emojis) {
+                 IBus.Text text = new IBus.Text.from_string(emoji);
+                 m_lookup_table.append_candidate(text);
+             }
+-            m_backward = utf8_title(row.text);
++            m_backward = category;
++        }
++        // Restore the cursor position before the special table of
++        // emoji variants is shown.
++        if (m_backward_index >= 0) {
++            m_lookup_table.set_cursor_pos((uint)m_backward_index);
++            m_backward_index = -1;
++        }
++        show_candidate_panel();
++    }
++
++
++    private void show_emoji_variants(GLib.SList<string>? emojis) {
++        m_backward_index = (int)m_lookup_table.get_cursor_pos();
++        m_lookup_table.clear();
++        foreach (unowned string emoji in emojis) {
++            IBus.Text text = new IBus.Text.from_string(emoji);
++            m_lookup_table.append_candidate(text);
+         }
+         show_candidate_panel();
+     }
+@@ -696,8 +778,8 @@ class IBusEmojier : Gtk.Window {
+     private bool check_unicode_point() {
+         string annotation = m_entry.get_text();
+         m_unicode_point = null;
+-        GLib.StringBuilder buff = new GLib.StringBuilder();
+-        GLib.StringBuilder retval = new GLib.StringBuilder();
++        var buff = new GLib.StringBuilder();
++        var retval = new GLib.StringBuilder();
+         for (int i = 0; i < annotation.char_count(); i++) {
+             unichar ch = annotation.get_char(i);
+             if (ch == 0)
+@@ -727,7 +809,7 @@ class IBusEmojier : Gtk.Window {
+     }
+ 
+ 
+-    public void update_candidate_window() {
++    private void update_candidate_window() {
+         string annotation = m_entry.get_text();
+         if (annotation.length == 0) {
+             hide_candidate_panel();
+@@ -795,6 +877,22 @@ class IBusEmojier : Gtk.Window {
+     }
+ 
+ 
++    private void show_code_point_description(string text) {
++        EPaddedLabelBox widget_code = new EPaddedLabelBox(
++                    _("Code point: %s").printf(utf8_code_point(text)),
++                    Gtk.Align.START);
++        m_vbox.add(widget_code);
++        widget_code.show_all();
++        if (m_emoji_to_emoji_variants_dict.lookup(text) != null) {
++            EPaddedLabelBox widget_has_variant = new EPaddedLabelBox(
++                    _("Has emoji variants"),
++                    Gtk.Align.START);
++            m_vbox.add(widget_has_variant);
++            widget_has_variant.show_all();
++        }
++    }
++
++
+     private void show_candidate_panel() {
+         remove_all_children();
+         set_fixed_size();
+@@ -823,18 +921,27 @@ class IBusEmojier : Gtk.Window {
+         EGrid grid = new EGrid();
+         int n = 0;
+         for (uint i = page_start_pos; i < page_end_pos; i++) {
+-            IBus.Text candidate = m_lookup_table.get_candidate(i);
++            string text = m_lookup_table.get_candidate(i).text;
++            bool has_variant =
++                    (m_emoji_to_emoji_variants_dict.lookup(text) != null);
+             Gtk.Label label;
+-            if (i == cursor)
+-                label = new ESelectedLabel(candidate.text) as Gtk.Label;
+-            else
+-                label = new EWhiteLabel(candidate.text) as Gtk.Label;
+-            if (candidate.text.char_count() > 2) {
++            // If 'i' is the cursor position, use the selected color.
++            // If the emoji has emoji variants, use the gold color.
++            // Otherwise the white color.
++            if (i == cursor) {
++                label = new ESelectedLabel(text) as Gtk.Label;
++            } else if (m_show_emoji_variant && has_variant &&
++                       m_backward_index < 0) {
++                label = new EGoldLabel(text) as Gtk.Label;
++            } else {
++                label = new EWhiteLabel(text) as Gtk.Label;
++            }
++            if (text.char_count() > 2) {
+                 string font_family = m_emoji_font_family;
+                 int font_size = m_emoji_font_size - 2;
+                 string emoji_font = "%s %d".printf(font_family, font_size);
+                 string markup = "<span font=\"%s\">%s</span>".
+-                        printf(emoji_font, utf8_entity(candidate.get_text()));
++                        printf(emoji_font, utf8_entity(text));
+                 label.set_markup(markup);
+             }
+             label.set_halign(Gtk.Align.FILL);
+@@ -879,9 +986,8 @@ class IBusEmojier : Gtk.Window {
+             show_arrow_buttons();
+             m_vbox.add(grid);
+             grid.show_all();
+-            IBus.Text candidate = m_lookup_table.get_candidate(cursor);
+-            unowned IBus.EmojiData? data =
+-                    m_emoji_to_data_dict.lookup(candidate.text);
++            string text = m_lookup_table.get_candidate(cursor).text;
++            unowned IBus.EmojiData? data = m_emoji_to_data_dict.lookup(text);
+             if (data == null) {
+                 // TODO: Provide a custom description and annotation for
+                 // the favorite emojis.
+@@ -890,12 +996,7 @@ class IBusEmojier : Gtk.Window {
+                         Gtk.Align.START);
+                 m_vbox.add(widget);
+                 widget.show_all();
+-                EPaddedLabelBox widget_code = new EPaddedLabelBox(
+-                        _("Code point: %s").printf(
+-                                utf8_code_point(candidate.text)),
+-                        Gtk.Align.START);
+-                m_vbox.add(widget_code);
+-                widget_code.show_all();
++                show_code_point_description(text);
+                 return;
+             } else {
+                 unowned string description = data.get_description();
+@@ -907,7 +1008,7 @@ class IBusEmojier : Gtk.Window {
+             }
+             unowned GLib.SList<unowned string>? annotations =
+                     data.get_annotations();
+-            GLib.StringBuilder buff = new GLib.StringBuilder();
++            var buff = new GLib.StringBuilder();
+             int i = 0;
+             foreach (unowned string annotation in annotations) {
+                 if (i++ == 0)
+@@ -929,12 +1030,7 @@ class IBusEmojier : Gtk.Window {
+                 m_vbox.add(widget);
+                 widget.show_all();
+             }
+-            EPaddedLabelBox widget_code = new EPaddedLabelBox(
+-                    _("Code point: %s").printf(
+-                            utf8_code_point(candidate.text)),
+-                    Gtk.Align.START);
+-            m_vbox.add(widget_code);
+-            widget_code.show_all();
++            show_code_point_description(text);
+         }
+     }
+ 
+@@ -961,6 +1057,20 @@ class IBusEmojier : Gtk.Window {
+     }
+ 
+ 
++    private void candidate_panel_select_index(uint index) {
++        string text = m_lookup_table.get_candidate(index).text;
++        unowned GLib.SList<string>? emojis =
++                m_emoji_to_emoji_variants_dict.lookup(text);
++        if (m_show_emoji_variant && emojis != null &&
++            m_backward_index < 0) {
++            show_emoji_variants(emojis);
++        } else {
++            m_result = text;
++            m_loop.quit();
++            hide_candidate_panel();
++        }
++    }
++
+     private void candidate_panel_cursor_down() {
+         enter_notify_disable_with_timer();
+         uint ncandidates = m_lookup_table.get_number_of_candidates();
+@@ -1094,8 +1204,11 @@ class IBusEmojier : Gtk.Window {
+     }
+ 
+ 
+-    private bool key_press_cursor_escape() {
+-        if (m_candidate_panel_is_visible) {
++    private bool key_press_escape() {
++        if (m_backward_index >= 0 && m_backward != null) {
++            show_emoji_for_category(m_backward);
++            return true;
++        } else if (m_candidate_panel_is_visible) {
+             hide_candidate_panel();
+             return true;
+         } else if (m_entry.get_text().length == 0) {
+@@ -1108,6 +1221,19 @@ class IBusEmojier : Gtk.Window {
+     }
+ 
+ 
++    private bool key_press_enter() {
++        if (m_candidate_panel_is_visible) {
++            uint index = m_lookup_table.get_cursor_pos();
++            candidate_panel_select_index(index);
++        } else if (m_category_active_index > 0) {
++            Gtk.ListBoxRow gtkrow = m_list_box.get_selected_row();
++            EBoxRow row = gtkrow as EBoxRow;
++            show_emoji_for_category(row.text);
++        }
++        return true;
++    }
++
++
+     private void entry_enter_keyval(uint keyval) {
+         unichar ch = IBus.keyval_to_unicode(keyval);
+         if (ch.iscntrl())
+@@ -1130,6 +1256,13 @@ class IBusEmojier : Gtk.Window {
+     }
+ 
+ 
++    private void check_action_variant_cb(GLib.SimpleAction action,
++                                         GLib.Variant?     parameter) {
++        m_show_emoji_variant = !action.get_state().get_boolean();
++        action.set_state(new GLib.Variant.boolean(m_show_emoji_variant));
++    }
++
++
+     public string run(string input_context_path) {
+         assert (m_loop == null);
+ 
+@@ -1187,21 +1320,11 @@ class IBusEmojier : Gtk.Window {
+          */
+         switch (keyval) {
+         case Gdk.Key.Escape:
+-            if (key_press_cursor_escape())
++            if (key_press_escape())
+                 return true;
+             break;
+         case Gdk.Key.Return:
+-            if (m_candidate_panel_is_visible) {
+-                uint index = m_lookup_table.get_cursor_pos();
+-                IBus.Text text = m_lookup_table.get_candidate(index);
+-                m_result = text.text;
+-                m_loop.quit();
+-                hide_candidate_panel();
+-            } else if (m_category_active_index > 0) {
+-                Gtk.ListBoxRow gtkrow = m_list_box.get_selected_row();
+-                EBoxRow row = gtkrow as EBoxRow;
+-                show_emoji_for_category(row);
+-            }
++            key_press_enter();
+             return true;
+         case Gdk.Key.BackSpace:
+             if (m_entry.get_text().len() > 0) {
+@@ -1283,7 +1406,7 @@ class IBusEmojier : Gtk.Window {
+                     return true;
+                 break;
+             case Gdk.Key.u:
+-                if (key_press_cursor_escape())
++                if (key_press_escape())
+                     return true;
+                 break;
+             case Gdk.Key.a:
+-- 
+2.9.3
+
+From 5f653d3102ada9139a2bc7504d6beaee1bc9984b Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Tue, 9 May 2017 13:54:01 +0900
+Subject: [PATCH] ui/gtk3: Add ibus-emoji man mapge
+
+R=Shawn.P.Huang@gmail.com
+
+Review URL: https://codereview.appspot.com/323810043
+---
+ setup/ibus-setup.1.in   | 21 +++++++++++--
+ tools/ibus.1.in         | 20 ++++++++++--
+ ui/gtk3/Makefile.am     | 22 ++++++++++++++
+ ui/gtk3/ibus-emoji.1.in | 81 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 140 insertions(+), 4 deletions(-)
+ create mode 100644 ui/gtk3/ibus-emoji.1.in
+
+diff --git a/setup/ibus-setup.1.in b/setup/ibus-setup.1.in
+index dab032e..f9b5f71 100644
+--- a/setup/ibus-setup.1.in
++++ b/setup/ibus-setup.1.in
+@@ -1,10 +1,10 @@
+ .\" This file is distributed under the same license as the ibus
+ .\" package.
+ .\" Copyright (C) LI Daobing <lidaobing@gmail.com>, 2008.
+-.\" Copyright (C) Takao Fujiwara <takao.fujiwara1@gmail.com>, 2013-2015.
++.\" Copyright (C) Takao Fujiwara <takao.fujiwara1@gmail.com>, 2013-2017.
+ .\" Copyright (c) Peng Huang <shawn.p.huang@gmail.com>, 2013.
+ .\"
+-.TH "IBUS-SETUP" 1 "November 2008" "@VERSION@" "User Commands"
++.TH "IBUS-SETUP" 1 "November 2017" "@VERSION@" "User Commands"
+ .SH NAME
+ .B ibus-setup
+ \- configuration program for ibus
+@@ -26,6 +26,23 @@ is the configuration program for IBus.
+ .PP
+ Homepage: https://github.com/ibus/ibus/wiki
+ 
++.SH "ADVANCED"
++.TP
++\fBUse system keyboard layout\fR
++If this option is enabled, use your system keymap instead and IBus
++does not change it with any input method engines. The system keymap is
++decided by your desktop session. IBus calls
++.B setxkbmap (1)
++command internally to set the selected keymap and override the
++system keymap if this options is disabled.
++You can check the current keymap with
++.B setxkbmap -query
++command.
++.TP
++\fBShare the same input method among all applications\fR
++If this option is disabled, You can choose an input metod engine
++by input context.
++
+ .SH BUGS
+ If you find a bug, please report it at http://code.google.com/p/ibus/issues/list
+ 
+diff --git a/tools/ibus.1.in b/tools/ibus.1.in
+index a420567..d34a77a 100644
+--- a/tools/ibus.1.in
++++ b/tools/ibus.1.in
+@@ -1,9 +1,9 @@
+ .\" This file is distributed under the same license as the ibus
+ .\" package.
+-.\" Copyright (C) Takao Fujiwara <takao.fujiwara1@gmail.com>, 2013.
++.\" Copyright (C) Takao Fujiwara <takao.fujiwara1@gmail.com>, 2013-2017.
+ .\" Copyright (c) Peng Huang <shawn.p.huang@gmail.com>, 2013.
+ .\"
+-.TH "IBUS" 1 "May 2013" "@VERSION@" "User Commands"
++.TH "IBUS" 1 "May 2017" "@VERSION@" "User Commands"
+ .SH NAME
+ .B ibus
+ \- command line utility for ibus
+@@ -95,6 +95,22 @@ configuration file.
+ \fBwatch\fR
+ Under construction.
+ .TP
++\fBemoji\fR [\fB\-\-font=FONT|\-\-lang=LANG|\-\-help|\-\-partial\-match\fR]
++Launch IBus Emojier (
++.B ibus\-emoji (1)
++) and save the selected emoji to your clipboard. Can choose an emoji font with
++.B \-\-font
++option. Can choose a language of emoji annotations with
++.B \-\-lang
++option. If LANG="en", IBus Emojier loads /usr/share/ibus/dicts/emoji-en.dict .
++.B \-\-partial\-match
++option enables to match annotations with a partial string. These settings
++are avaiable with
++.B ibus\-setup (1)
++utility.
+ 
+ .SH BUGS
+ If you find a bug, please report it at https://github.com/ibus/ibus/issues
++
++.SH "SEE ALSO"
++.BR ibus-emoji (1)
+diff --git a/ui/gtk3/Makefile.am b/ui/gtk3/Makefile.am
+index c557474..270ad1c 100644
+--- a/ui/gtk3/Makefile.am
++++ b/ui/gtk3/Makefile.am
+@@ -148,6 +148,8 @@ emoji_headers =         \
+     ibusemojidialog.h   \
+     $(NULL)
+ 
++man_one_in_files = ibus-emoji.1.in
++
+ # References:
+ # libappindicator/src/notification-item.xml
+ # libappindicator/src/notification-watcher.xml
+@@ -155,6 +157,7 @@ emoji_headers =         \
+ # kdelibs/kdeui/knotifications/src/org.kde.StatusNotifierWatcher.xml
+ EXTRA_DIST =                            \
+     $(emoji_headers)                    \
++    $(man_one_in_files)                 \
+     IBusEmojiDialog-1.0.metadata        \
+     gtkpanel.xml.in                     \
+     ibus-emoji-dialog-1.0.deps          \
+@@ -253,8 +256,27 @@ MAINTAINERCLEANFILES += $(VAPIGEN_VAPIS)
+ DISTCLEANFILES += $(VAPIGEN_VAPIS)
+ EXTRA_DIST += $(VAPIGEN_VAPIS)
+ 
++# end of ENABLE_VAPIGEN
+ endif
++# end of HAVE_INTROSPECTION
+ endif
++
++man_one_files = $(man_one_in_files:.1.in=.1)
++man_one_DATA =$(man_one_files:.1=.1.gz)
++man_onedir = $(mandir)/man1
++%.1: %.1.in
++	$(AM_V_GEN) sed \
++	    -e 's|@VERSION[@]|$(VERSION)|g' $< > $@.tmp && \
++	    mv $@.tmp $@
++%.1.gz: %.1
++	$(AM_V_GEN) gzip -c $< > $@.tmp && mv $@.tmp $@
++
++CLEANFILES += \
++    $(man_one_DATA) \
++    $(man_one_files) \
++    $(NULL)
++
++# end of ENABLE_EMOJI_DICT
+ endif
+ 
+ -include $(top_srcdir)/git.mk
+diff --git a/ui/gtk3/ibus-emoji.1.in b/ui/gtk3/ibus-emoji.1.in
+new file mode 100644
+index 0000000..3523271
+--- /dev/null
++++ b/ui/gtk3/ibus-emoji.1.in
+@@ -0,0 +1,81 @@
++.\" This file is distributed under the same license as the ibus
++.\" package.
++.\" Copyright (C) Takao Fujiwara <takao.fujiwara1@gmail.com>, 2017.
++.\"
++.TH "IBUS EMOJI" 1 "May 2017" "@VERSION@" "User Commands"
++.SH NAME
++.B ibus emoji utility
++\- Call the IBus emoji utility by
++.B IBus Emojier
++
++.SH "SYNOPSIS"
++.B /usr/libexec/ibus\-ui\-emojier
++[\fIOPTION\fR]...
++
++.SH "DESCRIPTION"
++
++.PP
++IBus Emojier provides a GUI to select an emoji by typing an emoji annotaion
++or choosing a character with mouse click and it's designed to work as
++an extended IBus lookup window using Space, Enter, and Arrow keys.
++The text entry accepts an emoji annotation or Unicode points.
++If IBus panel is launched, IBus panel calls IBus Emojier with a
++shortcut key or the right click menu and output the selected emoji
++on the previous focused text on an application.
++If IBus panel is not available likes GNOME desktop, You can still use
++.B ibus emoji
++command to launch IBus Emojier and it saves the selected emoji in
++your clipboard and you can paste the emoji by a paste key likes
++Control\-v.
++
++.PP
++Refer
++.B emoji
++section in
++.B ibus (1)
++for the command line options.
++
++.PP
++Homepage: https://github.com/ibus/ibus/wiki
++
++.SH "SETTINGS"
++.TP
++\fBANNOTATION LANGUAGE\fR
++You can choose a language of emoji annotations with
++.B ibus\-setup (1).
++.TP
++\fBFONT\fR
++You can choose an emoji font with
++.B ibus\-setup (1).
++E.g. "Noto Color Emoji", "Android Emoji" font.
++
++.SH "KEYBOARD OPERATIONS"
++.TP
++\fBControl-Shift-e\fR
++Launch IBus Emojier. The shortcut key can be customized by
++.B ibus\-setup (1).
++.TP
++\fBLeft or right arrow\fR
++Move the selected category or emoji if an annotation is not typed.
++Otherwise move the cursor in typed annotation.
++.TP
++\fBDown or up arrow\fR
++Move the selected category or emoji.
++.TP
++\fBEnter\fR
++Commit the selected emoji.
++.TP
++\fBEscape\fR
++Go back to the category list from emoji list, erase a typed annotation,
++and close IBus Emojier.
++.TP
++\fBSpace\fR
++Move the selected category or emoji. If Shift\-Space is typed,
++a space chararacter can be inserted between words in an annotation or
++Unicode points. E.g. 1f466 Shift\-Space 1f3fb
++.TP
++\fBPageDown or PageUp\fR
++Move to the next or previous page in emoji list.
++
++.SH BUGS
++If you find a bug, please report it at https://github.com/ibus/ibus/issues
+-- 
+2.9.3
+
+From 1159093dea3fdb8ceb62157f06b3560f8fc28378 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Tue, 9 May 2017 13:58:02 +0900
+Subject: [PATCH] Update favorites category automatically by selecting
+ emoji
+
+When you commit an emoji with Emojier, Favorite category
+will be shown on GUI.
+Now a custom annotation also can be assigned to a favorite emoji
+by gsetting command.
+
+R=penghuang@google.com
+
+Review URL: https://codereview.appspot.com/312660043
+---
+ data/ibus.schemas.in      | 13 ++++++++++
+ src/ibusemoji.h           |  2 +-
+ ui/gtk3/emojier.vala      | 63 +++++++++++++++++++++++++++++++++++++++++++++--
+ ui/gtk3/emojierapp.vala   | 18 ++++++++++++++
+ ui/gtk3/ibusemojidialog.h | 20 ++++++++++-----
+ ui/gtk3/panel.vala        | 21 +++++++++++++++-
+ 6 files changed, 127 insertions(+), 10 deletions(-)
+
+diff --git a/data/ibus.schemas.in b/data/ibus.schemas.in
+index 0647004..09b6b2c 100644
+--- a/data/ibus.schemas.in
++++ b/data/ibus.schemas.in
+@@ -404,6 +404,19 @@
+       </locale>
+     </schema>
+     <schema>
++      <key>/schemas/desktop/ibus/panel/emoji/favorite-annotations</key>
++      <applyto>/desktop/ibus/panel/emoji/favorite-annotations</applyto>
++      <owner>ibus</owner>
++      <type>list</type>
++      <default>[]</default>
++      <list_type>string</list_type>
++      <locale name="C">
++        <short>favorite emoji annotation list on emoji dialog</short>
++	    <long>You can assign an annotation for a favorite emoji
++                  in this list.</long>
++      </locale>
++    </schema>
++    <schema>
+       <key>/schemas/desktop/ibus/panel/emoji/has-partial-match</key>
+       <applyto>/desktop/ibus/panel/emoji/has-partial-match</applyto>
+       <owner>ibus</owner>
+diff --git a/src/ibusemoji.h b/src/ibusemoji.h
+index eb24fdd..4edee72 100644
+--- a/src/ibusemoji.h
++++ b/src/ibusemoji.h
+@@ -188,7 +188,7 @@ GHashTable *    ibus_emoji_dict_load            (const gchar    *path);
+  * @dict: (element-type utf8 IBusEmojiData) (transfer full): An Emoji dictionary
+  * @emoji: an emoji character
+  *
+- * Returns: An #IBusEmojiData of @emoji.
++ * Returns: (transfer none): An #IBusEmojiData of @emoji.
+  * This API was prepared for the old dict foramat with Gir and Vala
+  * but no longer needed.
+  * Use ibus_emoji_data_load() instead.
+diff --git a/ui/gtk3/emojier.vala b/ui/gtk3/emojier.vala
+index db7520a..4169550 100644
+--- a/ui/gtk3/emojier.vala
++++ b/ui/gtk3/emojier.vala
+@@ -201,6 +201,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
+     private static string m_emoji_font_family;
+     private static int m_emoji_font_size;
+     private static string[] m_favorites;
++    private static string[] m_favorite_annotations;
+     private static int m_emoji_max_seq_len;
+     private static bool m_has_partial_match;
+     private static uint m_partial_match_length;
+@@ -261,6 +262,8 @@ class IBusEmojier : Gtk.ApplicationWindow {
+             m_emoji_font_size = 16;
+         if (m_favorites == null)
+             m_favorites = {};
++        if (m_favorite_annotations == null)
++            m_favorite_annotations = {};
+ 
+         Gdk.Display display = Gdk.Display.get_default();
+         Gdk.Screen screen = (display != null) ?
+@@ -374,6 +377,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
+             }
+             make_emoji_dict(m_current_lang_id);
+         }
++        update_favorite_emoji_dict();
+     }
+ 
+ 
+@@ -1263,6 +1267,49 @@ class IBusEmojier : Gtk.ApplicationWindow {
+     }
+ 
+ 
++    public static void update_favorite_emoji_dict() {
++        if (m_emoji_to_data_dict == null ||
++            m_annotation_to_emojis_dict == null)
++            return;
++
++        for(int i = 0; i < m_favorites.length; i++) {
++            var favorite = m_favorites[i];
++
++            string? annotation = "";
++            if (i < m_favorite_annotations.length) {
++                annotation = m_favorite_annotations[i];
++            }
++            if (annotation == "")
++                continue;
++            unowned IBus.EmojiData? data =
++                    m_emoji_to_data_dict.lookup(favorite);
++            if (data == null) {
++                GLib.SList<string> new_annotations = new GLib.SList<string>();
++                new_annotations.append(annotation);
++                IBus.EmojiData new_data = GLib.Object.new(
++                            typeof(IBus.EmojiData),
++                            "emoji", favorite.dup(),
++                            "annotations", new_annotations,
++                            "description", annotation.dup()
++                    ) as IBus.EmojiData;
++                m_emoji_to_data_dict.insert(favorite, new_data);
++            } else {
++                unowned GLib.SList<string> annotations = data.get_annotations();
++                if (annotations.find_custom(annotation, GLib.strcmp) == null) {
++                    annotations.append(annotation);
++                    data.set_annotations(annotations.copy());
++                }
++            }
++            unowned GLib.SList<string> emojis =
++                    m_annotation_to_emojis_dict.lookup(annotation);
++            if (emojis.find_custom(favorite, GLib.strcmp) == null) {
++                emojis.append(favorite);
++                m_annotation_to_emojis_dict.replace(annotation, emojis.copy());
++            }
++        }
++    }
++
++
+     public string run(string input_context_path) {
+         assert (m_loop == null);
+ 
+@@ -1510,10 +1557,22 @@ class IBusEmojier : Gtk.ApplicationWindow {
+         m_partial_match_condition = condition;
+     }
+ 
+-    public static void set_favorites(string[]? unowned_favorites) {
++    public static void set_favorites(string[]? unowned_favorites,
++                                     string[]? unowned_favorite_annotations) {
+         m_favorites = {};
+-        foreach (string favorite in unowned_favorites) {
++        m_favorite_annotations = {};
++        for(int i = 0; i < unowned_favorites.length; i++) {
++            string? favorite = unowned_favorites[i];
++            // Avoid gsetting value error by manual setting
++            GLib.return_if_fail(favorite != null);
++            GLib.return_if_fail(favorite != "");
+             m_favorites += favorite;
+         }
++        for(int i = 0; i < unowned_favorite_annotations.length; i++) {
++            string? favorite_annotation = unowned_favorite_annotations[i];
++            GLib.return_if_fail(favorite_annotation != null);
++            m_favorite_annotations += favorite_annotation;
++        }
++        update_favorite_emoji_dict();
+     }
+ }
+diff --git a/ui/gtk3/emojierapp.vala b/ui/gtk3/emojierapp.vala
+index dbdbc27..24816bb 100644
+--- a/ui/gtk3/emojierapp.vala
++++ b/ui/gtk3/emojierapp.vala
+@@ -50,6 +50,20 @@ public class EmojiApplication : Application {
+         Gtk.Clipboard clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD);
+         clipboard.set_text(emoji, -1);
+         clipboard.store();
++
++        var emojier_favorites = m_settings_emoji.get_strv("favorites");
++        bool has_favorite = false;
++        foreach (unowned string favorite in emojier_favorites) {
++            if (favorite == emoji) {
++                has_favorite = true;
++                break;
++            }
++        }
++        if (!has_favorite) {
++            emojier_favorites += emoji;
++            m_settings_emoji.set_strv("favorites", emojier_favorites);
++        }
++
+         m_emojier = null;
+         command_line.print("%s\n", _("Copied an emoji to your clipboard."));
+     }
+@@ -147,6 +161,10 @@ public class EmojiApplication : Application {
+         if (emoji_font != null)
+             IBusEmojier.set_emoji_font(emoji_font);
+ 
++        IBusEmojier.set_favorites(
++                m_settings_emoji.get_strv("favorites"),
++                m_settings_emoji.get_strv("favorite-annotations"));
++
+         activate_dialog(command_line);
+ 
+         return Posix.EXIT_SUCCESS;
+diff --git a/ui/gtk3/ibusemojidialog.h b/ui/gtk3/ibusemojidialog.h
+index 1499a3c..fb0f5a6 100644
+--- a/ui/gtk3/ibusemojidialog.h
++++ b/ui/gtk3/ibusemojidialog.h
+@@ -145,18 +145,26 @@ void          ibus_emojier_set_annotation_lang    (const gchar* lang);
+  */
+ void          ibus_emojier_set_emoji_font         (const gchar* emoji_font);
+ 
+-#if 0
+-/* TODO: set customized annotations */
+ /**
+  * ibus_emojier_set_favorites:
+  * @favorites: (array length=favorites_length): A custom emoji list.
+  * @favorites_length: A length of @favorites
+- *
+- * Set emoji font on the emoji dialog
++ * @favorite_annotations: (array length=favorite_annotations_length):
++ *                        (nullable):
++ *                        A custom annotation listfor @favorites.
++ * @favorite_annotations_length: A length of @favorite_annotations
++ *
++ * Set custom emojis on the emoji dialog. @favorite_annotations
++ * can be null. If you don't assign an annotation for a specific emoji,
++ * you can pass the annotation as "", e.g.
++ * favorite_annotations = { "", "", "my annotation" };
+  */
+ void          ibus_emojier_set_favorites          (gchar**      favorites,
+                                                    int
+-                                                             favorites_length);
+-#endif
++                                                   favorites_length,
++                                                   gchar**
++                                                   favorite_annotations,
++                                                   int
++                                                   favorite_annotations_length);
+ G_END_DECLS
+ #endif
+diff --git a/ui/gtk3/panel.vala b/ui/gtk3/panel.vala
+index 5f0009e..e4936df 100644
+--- a/ui/gtk3/panel.vala
++++ b/ui/gtk3/panel.vala
+@@ -76,6 +76,7 @@ class Panel : IBus.PanelService {
+     private IBusEmojier? m_emojier;
+     private uint m_emojier_set_emoji_lang_id;
+     private uint m_emojier_focus_commit_text_id;
++    private string[] m_emojier_favorites = {};
+     private PropertyManager m_property_manager;
+     private PropertyPanel m_property_panel;
+     private GLib.Pid m_setup_pid = 0;
+@@ -245,6 +246,10 @@ class Panel : IBus.PanelService {
+                 set_emoji_favorites();
+         });
+ 
++        m_settings_emoji.changed["favorite-annotations"].connect((key) => {
++                set_emoji_favorites();
++        });
++
+         m_settings_emoji.changed["lang"].connect((key) => {
+                 set_emoji_lang();
+         });
+@@ -778,7 +783,10 @@ class Panel : IBus.PanelService {
+     }
+ 
+     private void set_emoji_favorites() {
+-        IBusEmojier.set_favorites(m_settings_emoji.get_strv("favorites"));
++        m_emojier_favorites = m_settings_emoji.get_strv("favorites");
++        IBusEmojier.set_favorites(
++                m_emojier_favorites,
++                m_settings_emoji.get_strv("favorite-annotations"));
+     }
+ 
+     private void set_emoji_lang() {
+@@ -1437,6 +1445,17 @@ class Panel : IBus.PanelService {
+             IBus.Text text = new IBus.Text.from_string(selected_string);
+             commit_text(text);
+             m_emojier = null;
++            bool has_favorite = false;
++            foreach (unowned string favorite in m_emojier_favorites) {
++                if (favorite == selected_string) {
++                    has_favorite = true;
++                    break;
++                }
++            }
++            if (!has_favorite) {
++                m_emojier_favorites += selected_string;
++                m_settings_emoji.set_strv("favorites", m_emojier_favorites);
++            }
+             return true;
+         }
+ 
+-- 
+2.9.3
+
+From a897dab2957568f842b78d54dc40dd294fb6191f Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Tue, 9 May 2017 14:47:08 +0900
+Subject: [PATCH] ui/gtk3: Rename ibus-emoji.1.in to ibus-emoji.7.in
+
+---
+ tools/ibus.1.in                              |  2 +-
+ ui/gtk3/Makefile.am                          | 18 +++++++++---------
+ ui/gtk3/{ibus-emoji.1.in => ibus-emoji.7.in} |  0
+ 3 files changed, 10 insertions(+), 10 deletions(-)
+ rename ui/gtk3/{ibus-emoji.1.in => ibus-emoji.7.in} (100%)
+
+diff --git a/tools/ibus.1.in b/tools/ibus.1.in
+index d34a77a..9275abb 100644
+--- a/tools/ibus.1.in
++++ b/tools/ibus.1.in
+@@ -113,4 +113,4 @@ utility.
+ If you find a bug, please report it at https://github.com/ibus/ibus/issues
+ 
+ .SH "SEE ALSO"
+-.BR ibus-emoji (1)
++.BR ibus-emoji (7)
+diff --git a/ui/gtk3/Makefile.am b/ui/gtk3/Makefile.am
+index 270ad1c..c79641a 100644
+--- a/ui/gtk3/Makefile.am
++++ b/ui/gtk3/Makefile.am
+@@ -148,7 +148,7 @@ emoji_headers =         \
+     ibusemojidialog.h   \
+     $(NULL)
+ 
+-man_one_in_files = ibus-emoji.1.in
++man_seven_in_files = ibus-emoji.7.in
+ 
+ # References:
+ # libappindicator/src/notification-item.xml
+@@ -157,7 +157,7 @@ man_one_in_files = ibus-emoji.1.in
+ # kdelibs/kdeui/knotifications/src/org.kde.StatusNotifierWatcher.xml
+ EXTRA_DIST =                            \
+     $(emoji_headers)                    \
+-    $(man_one_in_files)                 \
++    $(man_seven_in_files)               \
+     IBusEmojiDialog-1.0.metadata        \
+     gtkpanel.xml.in                     \
+     ibus-emoji-dialog-1.0.deps          \
+@@ -261,19 +261,19 @@ endif
+ # end of HAVE_INTROSPECTION
+ endif
+ 
+-man_one_files = $(man_one_in_files:.1.in=.1)
+-man_one_DATA =$(man_one_files:.1=.1.gz)
+-man_onedir = $(mandir)/man1
+-%.1: %.1.in
++man_seven_files = $(man_seven_in_files:.7.in=.7)
++man_seven_DATA =$(man_seven_files:.7=.7.gz)
++man_sevendir = $(mandir)/man7
++%.7: %.7.in
+ 	$(AM_V_GEN) sed \
+ 	    -e 's|@VERSION[@]|$(VERSION)|g' $< > $@.tmp && \
+ 	    mv $@.tmp $@
+-%.1.gz: %.1
++%.7.gz: %.7
+ 	$(AM_V_GEN) gzip -c $< > $@.tmp && mv $@.tmp $@
+ 
+ CLEANFILES += \
+-    $(man_one_DATA) \
+-    $(man_one_files) \
++    $(man_seven_DATA) \
++    $(man_seven_files) \
+     $(NULL)
+ 
+ # end of ENABLE_EMOJI_DICT
+diff --git a/ui/gtk3/ibus-emoji.1.in b/ui/gtk3/ibus-emoji.7.in
+similarity index 100%
+rename from ui/gtk3/ibus-emoji.1.in
+rename to ui/gtk3/ibus-emoji.7.in
 -- 
 2.9.3
 
