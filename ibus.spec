@@ -27,8 +27,8 @@
 %global dbus_python_version 0.83.0
 
 Name:           ibus
-Version:        1.5.15
-Release:        8%{?dist}
+Version:        1.5.16
+Release:        1%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -36,12 +36,9 @@ URL:            https://github.com/ibus/%name/wiki
 Source0:        https://github.com/ibus/%name/releases/download/%{version}/%{name}-%{version}.tar.gz
 Source1:        %{name}-xinput
 Source2:        %{name}.conf.5
-# FIXME: Use unicode-emoji package
-Source3:        http://www.unicode.org/Public/emoji/4.0/emoji-test.txt
 # Will remove the annotation tarball once the rpm is available on Fedora
 # Upstreamed patches.
 # Patch0:         %%{name}-HEAD.patch
-Patch0:         %{name}-HEAD.patch
 
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
@@ -71,6 +68,7 @@ BuildRequires:  libwayland-client-devel
 BuildRequires:  qt5-qtbase-devel
 %endif
 BuildRequires:  cldr-emoji-annotation
+BuildRequires:  unicode-emoji
 
 Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
 Requires:       %{name}-gtk2%{?_isa}   = %{version}-%{release}
@@ -229,12 +227,9 @@ The ibus-devel-docs package contains developer documentation for IBus
 %setup -q
 # %%patch0 -p1
 # cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
-%patch0 -p1
-cp %SOURCE3 data/annotations
 
 %build
 #autoreconf -f -i -v
-autoreconf -f -i -v
 #make -C ui/gtk3 maintainer-clean-generic
 #make -C tools maintainer-clean-generic
 %configure \
@@ -253,11 +248,8 @@ autoreconf -f -i -v
     --disable-appindicator \
 %endif
     --enable-introspection \
-    --with-unicode-emoji-dir=$PWD/data/annotations \
     %{nil}
 
-make -C ui/gtk3 maintainer-clean-generic
-make -C tools maintainer-clean-generic
 make %{?_smp_mflags}
 
 %install
@@ -424,6 +416,9 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon May 15 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.16-1
+- Bumped to 1.5.16
+
 * Tue May 09 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.15-8
 - Dropped nodejs-emojione-json and import unicode-emoji instead
 - Created emoji tab in ibus-setup
