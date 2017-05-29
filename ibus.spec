@@ -28,7 +28,7 @@
 
 Name:           ibus
 Version:        1.5.16
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -39,6 +39,7 @@ Source2:        %{name}.conf.5
 # Will remove the annotation tarball once the rpm is available on Fedora
 # Upstreamed patches.
 # Patch0:         %%{name}-HEAD.patch
+Patch0:         %{name}-HEAD.patch
 
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
@@ -227,11 +228,13 @@ The ibus-devel-docs package contains developer documentation for IBus
 %setup -q
 # %%patch0 -p1
 # cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
+%patch0 -p1
 
 %build
 #autoreconf -f -i -v
 #make -C ui/gtk3 maintainer-clean-generic
 #make -C tools maintainer-clean-generic
+autoreconf -f -i -v
 %configure \
     --disable-static \
     --enable-gtk2 \
@@ -250,6 +253,7 @@ The ibus-devel-docs package contains developer documentation for IBus
     --enable-introspection \
     %{nil}
 
+make -C ui/gtk3 maintainer-clean-generic
 make %{?_smp_mflags}
 
 %install
@@ -416,6 +420,11 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon May 29 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.16-2
+- Added ctrl-c,v,x for annotations and ctrl-shift-c for emoji
+- Added Malay and Mongolian keymaps
+- Made all emoji dicts to fully qualified
+
 * Mon May 15 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.16-1
 - Bumped to 1.5.16
 
