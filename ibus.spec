@@ -9,6 +9,8 @@
 %global with_kde5 0
 %endif
 
+%global with_emoji_harfbuzz 1
+
 %global ibus_api_version 1.0
 
 # for bytecompile in %%{_datadir}/ibus/setup
@@ -28,7 +30,7 @@
 
 Name:           ibus
 Version:        1.5.16
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -70,6 +72,11 @@ BuildRequires:  qt5-qtbase-devel
 %endif
 BuildRequires:  cldr-emoji-annotation
 BuildRequires:  unicode-emoji
+%if %with_emoji_harfbuzz
+BuildRequires:  cairo-devel
+BuildRequires:  fontconfig-devel
+BuildRequires:  harfbuzz-devel
+%endif
 
 Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
 Requires:       %{name}-gtk2%{?_isa}   = %{version}-%{release}
@@ -250,6 +257,9 @@ autoreconf -f -i -v
 %if ! %with_kde5
     --disable-appindicator \
 %endif
+%if %with_emoji_harfbuzz
+    --enable-harfbuzz-for-emoji \
+%endif
     --enable-introspection \
     %{nil}
 
@@ -420,6 +430,9 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Jul 13 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.16-3
+- Enabled HarfBuzz rendering without Pango glyph calc for emoji
+
 * Mon May 29 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.16-2
 - Added ctrl-c,v,x for annotations and ctrl-shift-c for emoji
 - Added Malay and Mongolian keymaps
