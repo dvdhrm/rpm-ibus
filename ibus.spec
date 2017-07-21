@@ -30,7 +30,7 @@
 
 Name:           ibus
 Version:        1.5.16
-Release:        3%{?dist}
+Release:        4%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -430,6 +430,9 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Jul 21 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.16-4
+- Fixed Bug 1471079 - SEGV of Emojier on de locale
+
 * Thu Jul 13 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.16-3
 - Enabled HarfBuzz rendering without Pango glyph calc for emoji
 

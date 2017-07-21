@@ -619,9 +619,117 @@ index 1d105fd..95912bf 100644
 -- 
 2.9.3
 
-From e10a2e344a947c3125190bdd55bbb7d0f6bc188e Mon Sep 17 00:00:00 2001
+From 76a83df1ab2aca4063968b2dd5300c64979e9496 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Thu, 13 Jul 2017 18:46:26 +0900
+Date: Wed, 19 Jul 2017 20:48:17 +0900
+Subject: [PATCH] ui/gtk3: Fix SEGV of IBusEmojier on de_DE.UTF-8
+
+de's decimal_point is ',' instead of '.' and failed to load the
+CSS data in Gtk.CssProvider.load_from_data(), launched null
+window of emojis and finally caused a SEGV due to the null window.
+This also fixes some memory leaks.
+---
+ src/ibusemoji.c      |  1 +
+ ui/gtk3/emojier.vala | 33 ++++++++++++++++++++++++++-------
+ 2 files changed, 27 insertions(+), 7 deletions(-)
+
+diff --git a/src/ibusemoji.c b/src/ibusemoji.c
+index 3d38c2a..d56c48a 100644
+--- a/src/ibusemoji.c
++++ b/src/ibusemoji.c
+@@ -591,6 +591,7 @@ out_load_cache:
+         g_variant_unref (variant);
+     if (variant_table)
+         g_variant_unref (variant_table);
++    g_free (contents);
+ 
+     return retval;
+ }
+diff --git a/ui/gtk3/emojier.vala b/ui/gtk3/emojier.vala
+index 95912bf..9df59ac 100644
+--- a/ui/gtk3/emojier.vala
++++ b/ui/gtk3/emojier.vala
+@@ -276,6 +276,17 @@ class IBusEmojier : Gtk.ApplicationWindow {
+             warning("Could not open display.");
+             return;
+         }
++        // Set en locale because de_DE's decimal_point is ',' instead of '.'
++        string? backup_locale =
++            Intl.setlocale(LocaleCategory.NUMERIC, null).dup();
++        if (Intl.setlocale(LocaleCategory.NUMERIC, "en_US.UTF-8") == null) {
++          if (Intl.setlocale(LocaleCategory.NUMERIC, "C.UTF-8") == null) {
++              if (Intl.setlocale(LocaleCategory.NUMERIC, "C") == null) {
++                  warning("You don't install either en_US.UTF-8 or C.UTF-8 " +
++                          "or C locale");
++              }
++          }
++        }
+         m_rgba = new ThemedRGBA(this);
+         uint bg_red = (uint)(m_rgba.normal_bg.red * 255);
+         uint bg_green = (uint)(m_rgba.normal_bg.green * 255);
+@@ -321,6 +332,10 @@ class IBusEmojier : Gtk.ApplicationWindow {
+             warning("Failed css_provider_from_data: %s", e.message);
+             return;
+         }
++        if (backup_locale != null)
++            Intl.setlocale(LocaleCategory.NUMERIC, backup_locale);
++        else
++            Intl.setlocale(LocaleCategory.NUMERIC, "");
+ 
+         Gtk.StyleContext.add_provider_for_screen(
+                 screen,
+@@ -424,8 +439,9 @@ class IBusEmojier : Gtk.ApplicationWindow {
+         unowned GLib.SList<string> annotations = data.get_annotations();
+         foreach (string annotation in annotations) {
+             bool has_emoji = false;
+-            unowned GLib.SList<string> hits =
+-                    m_annotation_to_emojis_dict.lookup(annotation);
++            GLib.SList<string> hits =
++                    m_annotation_to_emojis_dict.lookup(annotation).copy_deep(
++                            GLib.strdup);
+             foreach (string hit_emoji in hits) {
+                 if (hit_emoji == emoji) {
+                     has_emoji = true;
+@@ -485,7 +501,8 @@ class IBusEmojier : Gtk.ApplicationWindow {
+     private static void
+     update_annotations_with_description (IBus.EmojiData data,
+                                          string         description) {
+-        unowned GLib.SList<string> annotations = data.get_annotations();
++        GLib.SList<string> annotations =
++                data.get_annotations().copy_deep(GLib.strdup);
+         bool update_annotations = false;
+         string former = null;
+         string later = null;
+@@ -574,8 +591,9 @@ class IBusEmojier : Gtk.ApplicationWindow {
+                 buff.append_unichar(0xfe0f);
+                 if (m_emoji_to_data_dict.lookup(buff.str) != null)
+                     base_emoji = buff.str;
+-                unowned GLib.SList<string>? variants =
+-                    m_emoji_to_emoji_variants_dict.lookup(base_emoji);
++                GLib.SList<string>? variants =
++                        m_emoji_to_emoji_variants_dict.lookup(
++                                base_emoji).copy_deep(GLib.strdup);
+                 if (variants.find_custom(emoji, GLib.strcmp) == null) {
+                     if (variants == null)
+                         variants.append(base_emoji);
+@@ -587,8 +605,9 @@ class IBusEmojier : Gtk.ApplicationWindow {
+                 return;
+             }
+             bool has_emoji = false;
+-            unowned GLib.SList<string> hits =
+-                    m_category_to_emojis_dict.lookup(category);
++            GLib.SList<string> hits =
++                    m_category_to_emojis_dict.lookup(category).copy_deep(
++                            GLib.strdup);
+             foreach (string hit_emoji in hits) {
+                 if (hit_emoji == emoji) {
+                     has_emoji = true;
+-- 
+2.9.3
+
+From 2686b46b29e12b4408033568a898949a731b7938 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Wed, 19 Jul 2017 21:02:20 +0900
 Subject: [PATCH] Integrate custom rendering to use HarfBuzz glyph info
 
 IBusFontSet offers FcFontSet, glyph info with HarfBuzz and rendering
@@ -645,9 +753,9 @@ Need configure --enable-harfbuzz-for-emoji option to enable this feature.
  ui/gtk3/Makefile.am                                | 131 ++-
  ui/gtk3/emojier.vala                               | 119 ++-
  ui/gtk3/ibusemojidialog.h                          |  26 +
- ui/gtk3/ibusfontset.c                              | 922 +++++++++++++++++++++
+ ui/gtk3/ibusfontset.c                              | 923 +++++++++++++++++++++
  ui/gtk3/ibusfontset.h                              | 302 +++++++
- 12 files changed, 1674 insertions(+), 106 deletions(-)
+ 12 files changed, 1675 insertions(+), 106 deletions(-)
  rename {ui/gtk3 => bindings/vala}/IBusEmojiDialog-1.0.metadata (100%)
  create mode 100644 bindings/vala/IBusFontSet-1.0.metadata
  rename {ui/gtk3 => bindings/vala}/ibus-emoji-dialog-1.0.deps (100%)
@@ -1200,7 +1308,7 @@ index c79641a..cd1e9c2 100644
  
  -include $(top_srcdir)/git.mk
 diff --git a/ui/gtk3/emojier.vala b/ui/gtk3/emojier.vala
-index 95912bf..72e0093 100644
+index 9df59ac..492a42f 100644
 --- a/ui/gtk3/emojier.vala
 +++ b/ui/gtk3/emojier.vala
 @@ -80,6 +80,9 @@ class IBusEmojier : Gtk.ApplicationWindow {
@@ -1312,7 +1420,7 @@ index 95912bf..72e0093 100644
  
      private ThemedRGBA m_rgba;
      private Gtk.Box m_vbox;
-@@ -1120,6 +1196,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
+@@ -1139,6 +1215,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
                      m_category_active_index = (int)list.length();
          }
          Gtk.Adjustment adjustment = m_list_box.get_adjustment();
@@ -1320,7 +1428,7 @@ index 95912bf..72e0093 100644
          m_scrolled_window.set_vadjustment(adjustment);
          show_category_list();
      }
-@@ -1137,7 +1214,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
+@@ -1156,7 +1233,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
              else if (keyval == Gdk.Key.Right)
                  m_lookup_table.cursor_down();
              show_candidate_panel();
@@ -1329,7 +1437,7 @@ index 95912bf..72e0093 100644
              int step = 0;
              if (keyval == Gdk.Key.Left)
                  step = -1;
-@@ -1192,7 +1269,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
+@@ -1211,7 +1288,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
              show_candidate_panel();
              return true;
          }
@@ -1338,7 +1446,7 @@ index 95912bf..72e0093 100644
              int step = 0;
              if (keyval == Gdk.Key.Home)
                  step = -1;
-@@ -1391,7 +1468,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
+@@ -1410,7 +1487,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
              key_press_enter();
              return true;
          case Gdk.Key.BackSpace:
@@ -1347,7 +1455,7 @@ index 95912bf..72e0093 100644
                  if ((modifiers & Gdk.ModifierType.CONTROL_MASK) != 0) {
                      GLib.Signal.emit_by_name(m_entry, "delete-from-cursor",
                                               Gtk.DeleteType.WORD_ENDS, -1);
-@@ -1403,7 +1480,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
+@@ -1422,7 +1499,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
              break;
          case Gdk.Key.Delete:
          case Gdk.Key.KP_Delete:
@@ -1356,7 +1464,7 @@ index 95912bf..72e0093 100644
                  if ((modifiers & Gdk.ModifierType.CONTROL_MASK) != 0) {
                      GLib.Signal.emit_by_name(m_entry, "delete-from-cursor",
                                               Gtk.DeleteType.WORD_ENDS, 1);
-@@ -1417,7 +1494,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
+@@ -1436,7 +1513,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
          case Gdk.Key.space:
          case Gdk.Key.KP_Space:
              if ((modifiers & Gdk.ModifierType.SHIFT_MASK) != 0) {
@@ -1365,7 +1473,7 @@ index 95912bf..72e0093 100644
                      entry_enter_keyval(keyval);
              } else if (m_candidate_panel_is_visible) {
                  enter_notify_disable_with_timer();
-@@ -1493,7 +1570,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
+@@ -1512,7 +1589,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
                      return true;
                  break;
              case Gdk.Key.u:
@@ -1374,7 +1482,7 @@ index 95912bf..72e0093 100644
                      GLib.Signal.emit_by_name(m_entry,
                                               "delete-from-cursor",
                                               Gtk.DeleteType.PARAGRAPH_ENDS,
-@@ -1502,13 +1579,13 @@ class IBusEmojier : Gtk.ApplicationWindow {
+@@ -1521,13 +1598,13 @@ class IBusEmojier : Gtk.ApplicationWindow {
                  }
                  break;
              case Gdk.Key.a:
@@ -1390,7 +1498,7 @@ index 95912bf..72e0093 100644
                      GLib.Signal.emit_by_name(m_entry, "cut-clipboard");
                      return true;
                  }
-@@ -1525,7 +1602,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
+@@ -1544,7 +1621,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
                          clipboard.store();
                          return true;
                      }
@@ -1399,7 +1507,7 @@ index 95912bf..72e0093 100644
                      GLib.Signal.emit_by_name(m_entry, "copy-clipboard");
                      return true;
                  }
-@@ -1581,6 +1658,22 @@ class IBusEmojier : Gtk.ApplicationWindow {
+@@ -1600,6 +1677,22 @@ class IBusEmojier : Gtk.ApplicationWindow {
      }
  
  
@@ -1422,7 +1530,7 @@ index 95912bf..72e0093 100644
      public static bool has_loaded_emoji_dict() {
          if (m_emoji_to_data_dict == null)
              return false;
-@@ -1611,6 +1704,10 @@ class IBusEmojier : Gtk.ApplicationWindow {
+@@ -1630,6 +1723,10 @@ class IBusEmojier : Gtk.ApplicationWindow {
          int font_size = font_desc.get_size() / Pango.SCALE;
          if (font_size != 0)
              m_emoji_font_size = font_size;
@@ -1471,10 +1579,10 @@ index 24d195c..ed8886a 100644
  #endif
 diff --git a/ui/gtk3/ibusfontset.c b/ui/gtk3/ibusfontset.c
 new file mode 100644
-index 0000000..72dfa28
+index 0000000..7864a64
 --- /dev/null
 +++ b/ui/gtk3/ibusfontset.c
-@@ -0,0 +1,922 @@
+@@ -0,0 +1,923 @@
 +/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
 +/* vim:set et sts=4: */
 +/* ibus - The Input Bus
@@ -2245,6 +2353,7 @@ index 0000000..72dfa28
 +    FcConfigSubstitute (NULL, pattern, FcMatchFont);
 +    FcDefaultSubstitute (pattern);
 +    m_fcfontset = FcFontSort (NULL, pattern, FcTrue, NULL, &result);
++    FcPatternDestroy (pattern);
 +    if (result == FcResultNoMatch || m_fcfontset->nfont == 0) {
 +        g_warning ("No FcFontSet for %s", family ? family : "(null)");
 +        return FALSE;
