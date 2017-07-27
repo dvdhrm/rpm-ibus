@@ -30,7 +30,7 @@
 
 Name:           ibus
 Version:        1.5.16
-Release:        5%{?dist}
+Release:        6%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -42,6 +42,8 @@ Source2:        %{name}.conf.5
 # Upstreamed patches.
 # Patch0:         %%{name}-HEAD.patch
 Patch0:         %{name}-HEAD.patch
+# Under testing #1349148 #1385349 #1350291
+Patch1:         %{name}-1385349-segv-bus-proxy.patch
 
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
@@ -236,6 +238,7 @@ The ibus-devel-docs package contains developer documentation for IBus
 # %%patch0 -p1
 # cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 %patch0 -p1
+%patch1 -p1
 
 %build
 #autoreconf -f -i -v
@@ -430,6 +433,10 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Jul 27 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.16-6
+- Fixed some SEGVs #1349148 #1385349 #1350291 #1368593
+  Added 1385349-segv-bus-proxy.patch
+
 * Wed Jul 26 2017 Fedora Release Engineering <releng@fedoraproject.org> - 1.5.16-5
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_27_Mass_Rebuild
 
