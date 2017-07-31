@@ -30,7 +30,7 @@
 
 Name:           ibus
 Version:        1.5.16
-Release:        6%{?dist}
+Release:        7%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -433,6 +433,9 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon Jul 31 2017 Florian Weimer <fweimer@redhat.com> - 1.5.16-7
+- Rebuild with binutils fix for ppc64le (#1475636)
+
 * Thu Jul 27 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.16-6
 - Fixed some SEGVs #1349148 #1385349 #1350291 #1368593
   Added 1385349-segv-bus-proxy.patch
