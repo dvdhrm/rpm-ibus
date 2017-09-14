@@ -30,7 +30,7 @@
 
 Name:           ibus
 Version:        1.5.16
-Release:        8%{?dist}
+Release:        9%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -42,8 +42,12 @@ Source2:        %{name}.conf.5
 # Upstreamed patches.
 # Patch0:         %%{name}-HEAD.patch
 Patch0:         %{name}-HEAD.patch
-# Under testing #1349148 #1385349 #1350291
+# Under testing #1349148 #1385349 #1350291 #1406699 #1432252
 Patch1:         %{name}-1385349-segv-bus-proxy.patch
+%if %with_emoji_harfbuzz
+# Under testing self rendering until Pango, Fontconfig, Cairo are stable
+Patch2:         %{name}-xx-emoji-harfbuzz.patch
+%endif
 
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
@@ -238,7 +242,10 @@ The ibus-devel-docs package contains developer documentation for IBus
 # %%patch0 -p1
 # cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 %patch0 -p1
-%patch1 -p1
+%patch1 -p1 -z .segv
+%if %with_emoji_harfbuzz
+%patch2 -p1 -z .hb
+%endif
 
 %build
 #autoreconf -f -i -v
@@ -375,6 +382,7 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/man/man7/ibus-emoji.7.gz
 %{_libexecdir}/ibus-engine-simple
 %{_libexecdir}/ibus-dconf
+%{_libexecdir}/ibus-portal
 %{_libexecdir}/ibus-ui-emojier
 %{_libexecdir}/ibus-ui-gtk3
 %{_libexecdir}/ibus-x11
@@ -433,6 +441,13 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Sep 14 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.16-9
+- Fix scaling factor, mouse events on switcher, c-s-u on im-ibus, 
+  propertypanel position and menu 
+- Add ibus-portal
+- Move ibus-emoji-dialog.vapi in the build
+- Fixed some SEGVs #1406699 #1432252
+
 * Wed Aug 02 2017 Fedora Release Engineering <releng@fedoraproject.org> - 1.5.16-8
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_27_Binutils_Mass_Rebuild
 

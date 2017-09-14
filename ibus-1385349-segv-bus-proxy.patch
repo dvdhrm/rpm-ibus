@@ -1,18 +1,20 @@
-From ddb7cb30f10b1d1e40ae4b6c46583941545412d8 Mon Sep 17 00:00:00 2001
+From 8ea0d3f25078c612b4b16c955c1c0c17e764d8c5 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 26 Jul 2017 21:41:13 +0900
+Date: Thu, 27 Jul 2017 18:56:01 +0900
 Subject: [PATCH] bus: Fix SEGV in bus_panel_proxy_focus_in()
 
 BUG=rhbz#1349148
 BUG=rhbz#1385349
 BUG=rhbz#1350291
+BUG=rhbz#1406699
+BUG=rhbz#1432252
 ---
- bus/dbusimpl.c | 14 +++++++++++---
+ bus/dbusimpl.c | 38 ++++++++++++++++++++++++++++++++------
  bus/ibusimpl.c | 22 +++++++++++++++++++---
- 2 files changed, 30 insertions(+), 6 deletions(-)
+ 2 files changed, 51 insertions(+), 9 deletions(-)
 
 diff --git a/bus/dbusimpl.c b/bus/dbusimpl.c
-index b54ef81..4a60391 100644
+index b54ef81..e4dd868 100644
 --- a/bus/dbusimpl.c
 +++ b/bus/dbusimpl.c
 @@ -2,7 +2,8 @@
@@ -25,7 +27,80 @@ index b54ef81..4a60391 100644
   *
   * This library is free software; you can redistribute it and/or
   * modify it under the terms of the GNU Lesser General Public
-@@ -1464,13 +1465,20 @@ bus_dbus_impl_connection_filter_cb (GDBusConnection *dbus_connection,
+@@ -344,6 +345,8 @@ bus_name_service_set_primary_owner (BusNameService     *service,
+                                     BusConnectionOwner *owner,
+                                     BusDBusImpl        *dbus)
+ {
++    gboolean has_old_owner = FALSE;
++
+     g_assert (service != NULL);
+     g_assert (owner != NULL);
+     g_assert (dbus != NULL);
+@@ -351,6 +354,13 @@ bus_name_service_set_primary_owner (BusNameService     *service,
+     BusConnectionOwner *old = service->owners != NULL ?
+             (BusConnectionOwner *)service->owners->data : NULL;
+ 
++    /* rhbz#1432252 If bus_connection_get_unique_name() == NULL,
++     * "Hello" method is not received yet.
++     */
++    if (old != NULL && bus_connection_get_unique_name (old->conn) != NULL) {
++        has_old_owner = TRUE;
++    }
++
+     if (old != NULL) {
+         g_signal_emit (dbus,
+                        dbus_signals[NAME_LOST],
+@@ -370,7 +380,8 @@ bus_name_service_set_primary_owner (BusNameService     *service,
+                    0,
+                    owner->conn,
+                    service->name,
+-                   old != NULL ? bus_connection_get_unique_name (old->conn) : "",
++                   has_old_owner ? bus_connection_get_unique_name (old->conn) :
++                           "",
+                    bus_connection_get_unique_name (owner->conn));
+ 
+     if (old != NULL && old->do_not_queue != 0) {
+@@ -427,6 +438,7 @@ bus_name_service_remove_owner (BusNameService     *service,
+                                BusDBusImpl        *dbus)
+ {
+     GSList *owners;
++    gboolean has_new_owner = FALSE;
+ 
+     g_assert (service != NULL);
+     g_assert (owner != NULL);
+@@ -439,6 +451,13 @@ bus_name_service_remove_owner (BusNameService     *service,
+         BusConnectionOwner *_new = NULL;
+         if (owners->next != NULL) {
+             _new = (BusConnectionOwner *)owners->next->data;
++            /* rhbz#1406699 If bus_connection_get_unique_name() == NULL,
++             * "Hello" method is not received yet.
++             */
++            if (_new != NULL &&
++                bus_connection_get_unique_name (_new->conn) != NULL) {
++                has_new_owner = TRUE;
++            }
+         }
+ 
+         if (dbus != NULL) {
+@@ -447,7 +466,7 @@ bus_name_service_remove_owner (BusNameService     *service,
+                            0,
+                            owner->conn,
+                            service->name);
+-            if (_new != NULL) {
++            if (has_new_owner) {
+                 g_signal_emit (dbus,
+                                dbus_signals[NAME_ACQUIRED],
+                                0,
+@@ -460,7 +479,7 @@ bus_name_service_remove_owner (BusNameService     *service,
+                     _new != NULL ? _new->conn : NULL,
+                     service->name,
+                     bus_connection_get_unique_name (owner->conn),
+-                    _new != NULL ? bus_connection_get_unique_name (_new->conn) : "");
++                    has_new_owner ? bus_connection_get_unique_name (_new->conn) : "");
+ 
+         }
+     }
+@@ -1464,13 +1483,20 @@ bus_dbus_impl_connection_filter_cb (GDBusConnection *dbus_connection,
                                      gboolean         incoming,
                                      gpointer         user_data)
  {
