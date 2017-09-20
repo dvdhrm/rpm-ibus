@@ -1,6 +1,6 @@
-From c5e3a76dc92ea967b138d43dc9ed7ecdb2e3fc7a Mon Sep 17 00:00:00 2001
+From f85ce71361d3d55eccc0bcc4fba1ccfb2a6c670f Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Thu, 14 Sep 2017 15:55:21 +0900
+Date: Wed, 20 Sep 2017 13:04:55 +0900
 Subject: [PATCH] Integrate custom rendering to use HarfBuzz glyph info
 
 IBusFontSet offers FcFontSet, glyph info with HarfBuzz and rendering
@@ -20,9 +20,9 @@ Need configure --enable-harfbuzz-for-emoji option to enable this feature.
  configure.ac                           |  29 +
  ui/gtk3/Makefile.am                    |  32 ++
  ui/gtk3/emojier.vala                   | 100 +++-
- ui/gtk3/ibusfontset.c                  | 932 +++++++++++++++++++++++++++++++++
+ ui/gtk3/ibusfontset.c                  | 950 +++++++++++++++++++++++++++++++++
  ui/gtk3/ibusfontset.h                  | 302 +++++++++++
- 8 files changed, 1478 insertions(+), 2 deletions(-)
+ 8 files changed, 1496 insertions(+), 2 deletions(-)
  create mode 100644 bindings/vala/IBusFontSet-1.0.metadata
  create mode 100644 bindings/vala/ibus-fontset-1.0.deps
  create mode 100644 ui/gtk3/ibusfontset.c
@@ -250,7 +250,7 @@ index 786b80e6..cd1e9c2c 100644
  man_seven_DATA =$(man_seven_files:.7=.7.gz)
  man_sevendir = $(mandir)/man7
 diff --git a/ui/gtk3/emojier.vala b/ui/gtk3/emojier.vala
-index 36ab4bab..7d5116fe 100644
+index 9cd98140..c581671e 100644
 --- a/ui/gtk3/emojier.vala
 +++ b/ui/gtk3/emojier.vala
 @@ -80,6 +80,9 @@ class IBusEmojier : Gtk.ApplicationWindow {
@@ -362,7 +362,7 @@ index 36ab4bab..7d5116fe 100644
  
      private ThemedRGBA m_rgba;
      private Gtk.Box m_vbox;
-@@ -1601,6 +1677,22 @@ class IBusEmojier : Gtk.ApplicationWindow {
+@@ -1609,6 +1685,22 @@ class IBusEmojier : Gtk.ApplicationWindow {
      }
  
  
@@ -385,7 +385,7 @@ index 36ab4bab..7d5116fe 100644
      public static bool has_loaded_emoji_dict() {
          if (m_emoji_to_data_dict == null)
              return false;
-@@ -1631,6 +1723,10 @@ class IBusEmojier : Gtk.ApplicationWindow {
+@@ -1639,6 +1731,10 @@ class IBusEmojier : Gtk.ApplicationWindow {
          int font_size = font_desc.get_size() / Pango.SCALE;
          if (font_size != 0)
              m_emoji_font_size = font_size;
@@ -398,10 +398,10 @@ index 36ab4bab..7d5116fe 100644
  
 diff --git a/ui/gtk3/ibusfontset.c b/ui/gtk3/ibusfontset.c
 new file mode 100644
-index 00000000..66090ecd
+index 00000000..d637d034
 --- /dev/null
 +++ b/ui/gtk3/ibusfontset.c
-@@ -0,0 +1,932 @@
+@@ -0,0 +1,950 @@
 +/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
 +/* vim:set et sts=4: */
 +/* ibus - The Input Bus
@@ -444,6 +444,7 @@ index 00000000..66090ecd
 +#define SANS      "sans"
 +
 +
++static gboolean    m_color_supported;
 +static FT_Library  m_ftlibrary;
 +static FcFontSet  *m_fcfontset;
 +static gchar      *m_family;
@@ -485,7 +486,8 @@ index 00000000..66090ecd
 +static cairo_scaled_font_t *
 +                 ibus_fontset_cairo_scaled_font_new_with_font
 +                                            (const gchar           *family,
-+                                             guint                  size);
++                                             guint                  size,
++                                             gboolean               has_color);
 +
 +G_DEFINE_BOXED_TYPE (IBusCairoLine,
 +                     ibus_cairo_line,
@@ -505,6 +507,7 @@ index 00000000..66090ecd
 +    cairo_glyph_t dummy;
 +    IBusGlyph dummy2;
 +
++    m_color_supported = (FcGetVersion () >=  21205);
 +    gobject_class->constructor = ibus_fontset_constructor;
 +    gobject_class->get_property =
 +            (GObjectGetPropertyFunc) ibus_fontset_get_property;
@@ -596,7 +599,8 @@ index 00000000..66090ecd
 +    if (family != NULL && size > 0) {
 +        /* cache the font */
 +        ibus_fontset_cairo_scaled_font_new_with_font (family,
-+                                                      size);
++                                                      size,
++                                                      TRUE);
 +    }
 +    return object;
 +}
@@ -652,7 +656,8 @@ index 00000000..66090ecd
 +
 +static cairo_scaled_font_t *
 +ibus_fontset_cairo_scaled_font_new_with_font (const gchar *family,
-+                                              guint        size)
++                                              guint        size,
++                                              gboolean     has_color)
 +{
 +    gchar *font_name;
 +    cairo_scaled_font_t *scaled_font = NULL;
@@ -669,7 +674,13 @@ index 00000000..66090ecd
 +    g_return_val_if_fail (family != NULL, NULL);
 +    g_return_val_if_fail (m_scaled_font_table != NULL, NULL);
 +
-+    font_name = g_strdup_printf ("%s %u", family, size);
++    if (m_color_supported) {
++        font_name = g_strdup_printf ("%s %u:color=%s",
++                                     family, size,
++                                     has_color ? "TRUE" : "FALSE");
++    } else {
++        font_name = g_strdup_printf ("%s %u", family, size);
++    }
 +    scaled_font = g_hash_table_lookup (m_scaled_font_table, font_name);
 +    if (scaled_font != NULL) {
 +        g_free (font_name);
@@ -678,6 +689,8 @@ index 00000000..66090ecd
 +    pattern = FcPatternCreate ();
 +    FcPatternAddString (pattern, FC_FAMILY, (FcChar8*) family);
 +    FcPatternAddDouble (pattern, FC_SIZE, (double) size);
++    if (m_color_supported)
++        FcPatternAddBool (pattern, FC_COLOR, has_color);
 +    FcPatternAddDouble (pattern, FC_DPI, 96);
 +    FcConfigSubstitute(NULL, pattern, FcMatchPattern);
 +    font_options = cairo_font_options_create ();
@@ -850,7 +863,8 @@ index 00000000..66090ecd
 +        cairo_scaled_font_t  *unknown_font;
 +        unknown_font = ibus_fontset_cairo_scaled_font_new_with_font (
 +            (const gchar *) fallback_family,
-+            UNKNOWN_FONT_SIZE);
++            UNKNOWN_FONT_SIZE,
++            FALSE);
 +        (*cairo_lines)[n].scaled_font = unknown_font;
 +    }
 +    hb_buffer_destroy (hb_buffer);
@@ -864,6 +878,7 @@ index 00000000..66090ecd
 +{
 +    FcChar8 *family = NULL;
 +    FcChar8 *font_path = NULL;
++    gboolean has_color = TRUE;
 +    guint size = 0;
 +    cairo_scaled_font_t *scaled_font = NULL;
 +    PangoRectangle font_rect = { 0, };
@@ -874,6 +889,8 @@ index 00000000..66090ecd
 +
 +    FcPatternGetString (buff->fcfont, FC_FAMILY, 0, &family);
 +    g_return_if_fail (family != NULL);
++    if (m_color_supported)
++        FcPatternGetBool (buff->fcfont, FC_COLOR, 0, &has_color);
 +    size = m_size;
 +    if (size == 0) {
 +        g_warning ("Font size is not right for font %s.", family);
@@ -881,7 +898,8 @@ index 00000000..66090ecd
 +    }
 +    scaled_font = ibus_fontset_cairo_scaled_font_new_with_font (
 +            (const gchar *) family,
-+            size);
++            size,
++            has_color);
 +    g_return_if_fail (scaled_font != NULL);
 +    get_font_extents_with_scaled_font (scaled_font, &font_rect);
 +
@@ -1171,7 +1189,7 @@ index 00000000..66090ecd
 +    FcPatternAddInteger (pattern, FC_WEIGHT, FC_WEIGHT_NORMAL);
 +    FcPatternAddInteger (pattern, FC_WIDTH, FC_WIDTH_NORMAL);
 +    FcPatternAddInteger (pattern, FC_DPI, 96);
-+    if (FC_VERSION >= 21205 &&
++    if (m_color_supported &&
 +        (!g_ascii_strncasecmp (family, MONOSPACE, strlen (MONOSPACE)) ||
 +         !g_ascii_strncasecmp (family, SERIF, strlen (SERIF)) ||
 +         !g_ascii_strncasecmp (family, SANS, strlen (SANS)))) {

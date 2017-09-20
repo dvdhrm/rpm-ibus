@@ -30,7 +30,7 @@
 
 Name:           ibus
 Version:        1.5.16
-Release:        9%{?dist}
+Release:        10%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -441,6 +441,9 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Sep 20 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.16-10
+- Fix Bug 1490733 Emojier takes wrong fonts
+
 * Thu Sep 14 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.16-9
 - Fix scaling factor, mouse events on switcher, c-s-u on im-ibus, 
   propertypanel position and menu 
