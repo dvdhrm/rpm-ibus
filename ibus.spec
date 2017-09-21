@@ -30,7 +30,7 @@
 
 Name:           ibus
 Version:        1.5.16
-Release:        10%{?dist}
+Release:        11%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -246,6 +246,14 @@ The ibus-devel-docs package contains developer documentation for IBus
 %if %with_emoji_harfbuzz
 %patch2 -p1 -z .hb
 %endif
+cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
+
+# prep test
+diff client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
+if test $? -ne 0 ; then
+    echo "Have to copy ibusimcontext.c into client/gtk3"
+    abort
+fi
 
 %build
 #autoreconf -f -i -v
@@ -441,6 +449,10 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Sep 21 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.16-11
+- Copy ibusimcontext.c
+- Fix Super-space in Plasma after ibus exit
+
 * Wed Sep 20 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.16-10
 - Fix Bug 1490733 Emojier takes wrong fonts
 

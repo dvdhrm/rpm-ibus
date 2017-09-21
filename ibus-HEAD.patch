@@ -4266,11 +4266,12 @@ index 269a68d4..0ce742a1 100644
 -- 
 2.13.4
 
-From a7e78022b95329ca5782512872398a365503c410 Mon Sep 17 00:00:00 2001
+From 4a541639f50f05bf01b1b84792a7f4039b88c296 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Thu, 14 Sep 2017 18:07:42 +0900
-Subject: [PATCH 14/14] ui/gtk3: Fix to enable menu button on PropertyPanel
+Date: Fri, 15 Sep 2017 17:49:57 +0900
+Subject: [PATCH] ui/gtk3: Fix to enable menu button on PropertyPanel
 
+Review URL: https://codereview.appspot.com/330720043
 ---
  ui/gtk3/propertypanel.vala | 17 +++++++++++++++++
  1 file changed, 17 insertions(+)
@@ -4303,6 +4304,55 @@ index 857f8e20..f5d9cff7 100644
          foreach (var item in m_items)
              remove((item as Gtk.Widget));
          m_items = {};
+-- 
+2.13.4
+
+From f6a0100fcd123dc287b606d722b4d83a7d6b1ea7 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Thu, 21 Sep 2017 05:27:19 +0900
+Subject: [PATCH] ui/gtk3: Unset GDK_CORE_DEVICE_EVENTS
+
+Plasma deskop sets this variable and prevents Super+space,
+and Ctrl-Shift-e when ibus-ui-gtk3 runs after the
+desktop is launched.
+Also fixed a SEGV in display.get_monitor_at_window()
+Regression from rhbz#226465
+---
+ ui/gtk3/application.vala | 6 ++++++
+ ui/gtk3/switcher.vala    | 3 ++-
+ 2 files changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/ui/gtk3/application.vala b/ui/gtk3/application.vala
+index fa802721..770a32f2 100644
+--- a/ui/gtk3/application.vala
++++ b/ui/gtk3/application.vala
+@@ -100,6 +100,12 @@ class Application {
+     }
+ 
+     public static void main(string[] argv) {
++        // https://bugzilla.redhat.com/show_bug.cgi?id=1226465#c20
++        // In /etc/xdg/plasma-workspace/env/gtk3_scrolling.sh
++        // Plasma deskop sets this variable and prevents Super+space,
++        // and Ctrl-Shift-e when ibus-ui-gtk3 runs after the
++        // desktop is launched.
++        GLib.Environment.unset_variable("GDK_CORE_DEVICE_EVENTS");
+         // for Gdk.X11.get_default_xdisplay()
+         Gdk.set_allowed_backends("x11");
+ 
+diff --git a/ui/gtk3/switcher.vala b/ui/gtk3/switcher.vala
+index 0ce742a1..2a48c1f1 100644
+--- a/ui/gtk3/switcher.vala
++++ b/ui/gtk3/switcher.vala
+@@ -355,7 +355,8 @@ class Switcher : Gtk.Window {
+         Gdk.Display display = Gdk.Display.get_default();
+         int screen_width = 0;
+ #if VALA_0_34
+-        Gdk.Monitor monitor = display.get_monitor_at_window(this.get_window());
++        // display.get_monitor_at_window() is null because of unrealized window
++        Gdk.Monitor monitor = display.get_primary_monitor();
+         Gdk.Rectangle area = monitor.get_geometry();
+         screen_width = area.width;
+ #else
 -- 
 2.13.4
 
