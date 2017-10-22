@@ -29,8 +29,8 @@
 %global dbus_python_version 0.83.0
 
 Name:           ibus
-Version:        1.5.16
-Release:        11%{?dist}
+Version:        1.5.17
+Release:        1%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -41,7 +41,6 @@ Source2:        %{name}.conf.5
 # Will remove the annotation tarball once the rpm is available on Fedora
 # Upstreamed patches.
 # Patch0:         %%{name}-HEAD.patch
-Patch0:         %{name}-HEAD.patch
 # Under testing #1349148 #1385349 #1350291 #1406699 #1432252
 Patch1:         %{name}-1385349-segv-bus-proxy.patch
 %if %with_emoji_harfbuzz
@@ -93,7 +92,8 @@ Requires:       %{name}-wayland%{?_isa} = %{version}-%{release}
 Requires:       iso-codes
 Requires:       dbus-x11
 Requires:       dconf
-Requires:       librsvg2
+# rpmlint asks to delete librsvg2
+#Requires:       librsvg2
 # Owner of %%python3_sitearch/gi/overrides
 Requires:       python3-gobject
 # https://bugzilla.redhat.com/show_bug.cgi?id=1161871
@@ -177,7 +177,7 @@ Summary:        IBus PyGTK2 library
 Group:          System Environment/Libraries
 Requires:       %{name} = %{version}-%{release}
 Requires:       dbus-python >= %{dbus_python_version}
-Requires:       python
+Requires:       python2
 Requires:       pygtk2
 BuildArch:      noarch
 
@@ -192,7 +192,7 @@ Group:          System Environment/Libraries
 Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
 # Owner of %%python2_sitearch/gi/overrides
 Requires:       pygobject3-base
-Requires:       python
+Requires:       python2
 
 %description py2override
 This is a Python2 override library for IBus. The Python files override
@@ -241,12 +241,10 @@ The ibus-devel-docs package contains developer documentation for IBus
 %setup -q
 # %%patch0 -p1
 # cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
-%patch0 -p1
 %patch1 -p1 -z .segv
 %if %with_emoji_harfbuzz
 %patch2 -p1 -z .hb
 %endif
-cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 
 # prep test
 diff client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
@@ -415,6 +413,8 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_libdir}/gtk-3.0/%{gtk3_binary_version}/immodules/im-ibus.so
 
 %if %with_pygobject3
+# The setup package won't include icon files so that
+# gtk-update-icon-cache is executed in the main package only one time.
 %files setup
 %{_bindir}/ibus-setup
 %{_datadir}/applications/ibus-setup.desktop
@@ -449,6 +449,9 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Sun Oct 22 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.17-1
+- Bumped to 1.5.17
+
 * Thu Sep 21 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.16-11
 - Copy ibusimcontext.c
 - Fix Super-space in Plasma after ibus exit

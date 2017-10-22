@@ -1,6 +1,6 @@
-From f85ce71361d3d55eccc0bcc4fba1ccfb2a6c670f Mon Sep 17 00:00:00 2001
+From 1e358f28a2b36743847584671ef533769036b40d Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 20 Sep 2017 13:04:55 +0900
+Date: Sun, 22 Oct 2017 10:45:33 +0900
 Subject: [PATCH] Integrate custom rendering to use HarfBuzz glyph info
 
 IBusFontSet offers FcFontSet, glyph info with HarfBuzz and rendering
@@ -14,15 +14,15 @@ Need configure --enable-harfbuzz-for-emoji option to enable this feature.
 [1]: https://bugzilla.gnome.org/show_bug.cgi?id=780669
      https://bugzilla.gnome.org/show_bug.cgi?id=781123
 ---
- bindings/vala/IBusFontSet-1.0.metadata |   1 +
- bindings/vala/Makefile.am              |  83 +++
- bindings/vala/ibus-fontset-1.0.deps    |   1 +
- configure.ac                           |  29 +
- ui/gtk3/Makefile.am                    |  32 ++
- ui/gtk3/emojier.vala                   | 100 +++-
- ui/gtk3/ibusfontset.c                  | 950 +++++++++++++++++++++++++++++++++
- ui/gtk3/ibusfontset.h                  | 302 +++++++++++
- 8 files changed, 1496 insertions(+), 2 deletions(-)
+ bindings/vala/IBusFontSet-1.0.metadata |    1 +
+ bindings/vala/Makefile.am              |   83 +++
+ bindings/vala/ibus-fontset-1.0.deps    |    1 +
+ configure.ac                           |   29 +
+ ui/gtk3/Makefile.am                    |   32 +
+ ui/gtk3/emojier.vala                   |  100 +++-
+ ui/gtk3/ibusfontset.c                  | 1030 ++++++++++++++++++++++++++++++++
+ ui/gtk3/ibusfontset.h                  |  302 ++++++++++
+ 8 files changed, 1576 insertions(+), 2 deletions(-)
  create mode 100644 bindings/vala/IBusFontSet-1.0.metadata
  create mode 100644 bindings/vala/ibus-fontset-1.0.deps
  create mode 100644 ui/gtk3/ibusfontset.c
@@ -250,10 +250,10 @@ index 786b80e6..cd1e9c2c 100644
  man_seven_DATA =$(man_seven_files:.7=.7.gz)
  man_sevendir = $(mandir)/man7
 diff --git a/ui/gtk3/emojier.vala b/ui/gtk3/emojier.vala
-index 9cd98140..c581671e 100644
+index f3e9f15c..58a26dd6 100644
 --- a/ui/gtk3/emojier.vala
 +++ b/ui/gtk3/emojier.vala
-@@ -80,6 +80,9 @@ class IBusEmojier : Gtk.ApplicationWindow {
+@@ -99,6 +99,9 @@ class IBusEmojier : Gtk.ApplicationWindow {
          }
      }
      private class EWhiteLabel : Gtk.Label {
@@ -263,7 +263,7 @@ index 9cd98140..c581671e 100644
          public EWhiteLabel(string text) {
              GLib.Object(
                  name : "IBusEmojierWhiteLabel"
-@@ -87,8 +90,78 @@ class IBusEmojier : Gtk.ApplicationWindow {
+@@ -106,8 +109,78 @@ class IBusEmojier : Gtk.ApplicationWindow {
              if (text != "")
                  set_label(text);
          }
@@ -343,7 +343,7 @@ index 9cd98140..c581671e 100644
          public ESelectedLabel(string text) {
              GLib.Object(
                  name : "IBusEmojierSelectedLabel"
-@@ -97,7 +170,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
+@@ -116,7 +189,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
                  set_label(text);
          }
      }
@@ -352,7 +352,7 @@ index 9cd98140..c581671e 100644
          public EGoldLabel(string text) {
              GLib.Object(
                  name : "IBusEmojierGoldLabel"
-@@ -212,6 +285,9 @@ class IBusEmojier : Gtk.ApplicationWindow {
+@@ -231,6 +304,9 @@ class IBusEmojier : Gtk.ApplicationWindow {
              m_category_to_emojis_dict;
      private static GLib.HashTable<string, GLib.SList<string>>?
              m_emoji_to_emoji_variants_dict;
@@ -362,7 +362,7 @@ index 9cd98140..c581671e 100644
  
      private ThemedRGBA m_rgba;
      private Gtk.Box m_vbox;
-@@ -1609,6 +1685,22 @@ class IBusEmojier : Gtk.ApplicationWindow {
+@@ -1666,6 +1742,22 @@ class IBusEmojier : Gtk.ApplicationWindow {
      }
  
  
@@ -385,7 +385,7 @@ index 9cd98140..c581671e 100644
      public static bool has_loaded_emoji_dict() {
          if (m_emoji_to_data_dict == null)
              return false;
-@@ -1639,6 +1731,10 @@ class IBusEmojier : Gtk.ApplicationWindow {
+@@ -1696,6 +1788,10 @@ class IBusEmojier : Gtk.ApplicationWindow {
          int font_size = font_desc.get_size() / Pango.SCALE;
          if (font_size != 0)
              m_emoji_font_size = font_size;
@@ -398,10 +398,10 @@ index 9cd98140..c581671e 100644
  
 diff --git a/ui/gtk3/ibusfontset.c b/ui/gtk3/ibusfontset.c
 new file mode 100644
-index 00000000..d637d034
+index 00000000..16ceef05
 --- /dev/null
 +++ b/ui/gtk3/ibusfontset.c
-@@ -0,0 +1,950 @@
+@@ -0,0 +1,1030 @@
 +/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
 +/* vim:set et sts=4: */
 +/* ibus - The Input Bus
@@ -443,15 +443,22 @@ index 00000000..d637d034
 +#define SERIF     "serif"
 +#define SANS      "sans"
 +
++typedef struct _FcFontSetEx {
++    int                 nfont;
++    int                 sfont;
++    FcPattern         **fonts;
++    FT_Face            *ft_faces;
++} FcFontSetEx;
 +
-+static gboolean    m_color_supported;
-+static FT_Library  m_ftlibrary;
-+static FcFontSet  *m_fcfontset;
-+static gchar      *m_family;
-+static guint       m_size;
-+static gchar      *m_language;
-+static GHashTable *m_scaled_font_table;
-+static GHashTable *m_hb_font_table;
++static gboolean         m_color_supported;
++static FT_Library       m_ftlibrary;
++static FcFontSetEx     *m_fcfontset;
++static gchar           *m_family;
++static guint            m_size;
++static gchar           *m_language;
++static GHashTable      *m_font_index_per_char_table;
++static GHashTable      *m_scaled_font_table;
++static GHashTable      *m_hb_font_table;
 +
 +enum {
 +    PROP_0,
@@ -689,8 +696,13 @@ index 00000000..d637d034
 +    pattern = FcPatternCreate ();
 +    FcPatternAddString (pattern, FC_FAMILY, (FcChar8*) family);
 +    FcPatternAddDouble (pattern, FC_SIZE, (double) size);
++/* FC_VERSION is for the build check of FC_COLOR and m_color_supported is
++ * for the runtime check.
++ */
++#if FC_VERSION >=  21205
 +    if (m_color_supported)
 +        FcPatternAddBool (pattern, FC_COLOR, has_color);
++#endif
 +    FcPatternAddDouble (pattern, FC_DPI, 96);
 +    FcConfigSubstitute(NULL, pattern, FcMatchPattern);
 +    font_options = cairo_font_options_create ();
@@ -889,8 +901,10 @@ index 00000000..d637d034
 +
 +    FcPatternGetString (buff->fcfont, FC_FAMILY, 0, &family);
 +    g_return_if_fail (family != NULL);
++#if FC_VERSION >=  21205
 +    if (m_color_supported)
 +        FcPatternGetBool (buff->fcfont, FC_COLOR, 0, &has_color);
++#endif
 +    size = m_size;
 +    if (size == 0) {
 +        g_warning ("Font size is not right for font %s.", family);
@@ -937,7 +951,7 @@ index 00000000..d637d034
 +    return ft_face;
 +}
 +
-+void
++static void
 +_cairo_show_unknown_glyphs (cairo_t             *cr,
 +                            const cairo_glyph_t *glyphs,
 +                            guint                num_glyphs,
@@ -997,6 +1011,25 @@ index 00000000..d637d034
 +    cairo_stroke (cr);
 +
 +    cairo_restore (cr);
++}
++
++static void
++ibus_fcfontset_destroy_ex (FcFontSetEx *fcfontset_ex)
++{
++    FcFontSet *fcfontset = NULL;
++    int i;
++
++    g_return_if_fail (fcfontset_ex != NULL);
++
++    for (i = 0; i < fcfontset_ex->nfont; i++)
++        FT_Done_Face (fcfontset_ex->ft_faces[i]);
++    fcfontset = FcFontSetCreate ();
++    fcfontset->nfont = fcfontset_ex->nfont;
++    fcfontset->sfont = fcfontset_ex->sfont;
++    fcfontset->fonts = fcfontset_ex->fonts;
++    FcFontSetDestroy (fcfontset);
++    g_free (fcfontset_ex->ft_faces);
++    g_free (fcfontset_ex);
 +}
 +
 +IBusCairoLine *
@@ -1151,6 +1184,7 @@ index 00000000..d637d034
 +    guint size;
 +    const gchar *language;
 +    gboolean update_fontset = FALSE;
++    FcFontSet *fcfontset = NULL;
 +    FcResult result;
 +
 +    g_return_val_if_fail (IBUS_IS_FONTSET (fontset), FALSE);
@@ -1177,9 +1211,13 @@ index 00000000..d637d034
 +    if (!update_fontset && m_fcfontset != NULL)
 +        return FALSE;
 +
++    if (m_font_index_per_char_table)
++        g_hash_table_destroy (m_font_index_per_char_table);
 +    if (m_fcfontset)
-+        g_clear_pointer (&m_fcfontset, FcFontSetDestroy);
++        g_clear_pointer (&m_fcfontset, ibus_fcfontset_destroy_ex);
 +
++    m_font_index_per_char_table = g_hash_table_new (g_direct_hash,
++                                                    g_direct_equal);
 +    if (g_strcmp0 (family, ""))
 +        FcPatternAddString (pattern, FC_FAMILY, (const FcChar8*) family);
 +    if (size > 0)
@@ -1189,21 +1227,32 @@ index 00000000..d637d034
 +    FcPatternAddInteger (pattern, FC_WEIGHT, FC_WEIGHT_NORMAL);
 +    FcPatternAddInteger (pattern, FC_WIDTH, FC_WIDTH_NORMAL);
 +    FcPatternAddInteger (pattern, FC_DPI, 96);
++#if FC_VERSION >=  21205
 +    if (m_color_supported &&
 +        (!g_ascii_strncasecmp (family, MONOSPACE, strlen (MONOSPACE)) ||
 +         !g_ascii_strncasecmp (family, SERIF, strlen (SERIF)) ||
 +         !g_ascii_strncasecmp (family, SANS, strlen (SANS)))) {
 +        FcPatternAddBool (pattern, FC_COLOR, TRUE);
 +    }
++#endif
 +    FcConfigSubstitute (NULL, pattern, FcMatchPattern);
 +    FcConfigSubstitute (NULL, pattern, FcMatchFont);
 +    FcDefaultSubstitute (pattern);
-+    m_fcfontset = FcFontSort (NULL, pattern, FcTrue, NULL, &result);
++    fcfontset = FcFontSort (NULL, pattern, FcTrue, NULL, &result);
 +    FcPatternDestroy (pattern);
-+    if (result == FcResultNoMatch || m_fcfontset->nfont == 0) {
++    if (result == FcResultNoMatch || fcfontset->nfont == 0) {
 +        g_warning ("No FcFontSet for %s", family ? family : "(null)");
 +        return FALSE;
 +    }
++    m_fcfontset = g_new0 (FcFontSetEx, 1);
++    m_fcfontset->nfont = fcfontset->nfont;
++    m_fcfontset->sfont = fcfontset->sfont;
++    m_fcfontset->fonts = fcfontset->fonts;
++    m_fcfontset->ft_faces = g_new0 (FT_Face, fcfontset->nfont);
++    fcfontset->nfont = 0;
++    fcfontset->sfont = 0;
++    fcfontset->fonts = NULL;
++    FcFontSetDestroy (fcfontset);
 +    return TRUE;
 +}
 +
@@ -1244,14 +1293,37 @@ index 00000000..d637d034
 +            ++n;
 +            continue;
 +        }
-+        for (i = 0; i < m_fcfontset->nfont; i++) {
-+            if (g_unichar_iscntrl (c) && !g_unichar_isspace (c))
-+                break;
-+            FT_Face ft_face = ibus_fontset_get_ftface_from_fcfont (
-+                    fontset,
-+                    m_fcfontset->fonts[i]);
-+            if (FT_Get_Char_Index (ft_face, c) != 0) {
++        i = GPOINTER_TO_INT (g_hash_table_lookup (m_font_index_per_char_table,
++                                                  GINT_TO_POINTER (c)));
++        if (i > 0) {
++            i--;
++            if (i >= m_fcfontset->nfont) {
++                g_warning ("i:%d >= m_fcfontset->nfont:%d",
++                           i, m_fcfontset->nfont);
++            } else {
 +                buff[n].fcfont = m_fcfontset->fonts[i];
++                has_glyphs = TRUE;
++            }
++        }
++        for (; i < m_fcfontset->nfont; i++) {
++            if (!has_glyphs && g_unichar_iscntrl (c) && !g_unichar_isspace (c))
++                break;
++            FT_Face ft_face = m_fcfontset->ft_faces[i];
++            if (!has_glyphs && ft_face == 0) {
++               ft_face = ibus_fontset_get_ftface_from_fcfont (
++                       fontset,
++                       m_fcfontset->fonts[i]);
++               m_fcfontset->ft_faces[i] = ft_face;
++            }
++            if (has_glyphs || FT_Get_Char_Index (ft_face, c) != 0) {
++                FcChar8 *font_file = NULL;
++                FcPatternGetString (m_fcfontset->fonts[i], FC_FILE, 0, &font_file);
++                buff[n].fcfont = m_fcfontset->fonts[i];
++                if (!has_glyphs) {
++                    g_hash_table_insert (m_font_index_per_char_table,
++                                         GINT_TO_POINTER (c),
++                                         GINT_TO_POINTER (i + 1));
++                }
 +                if (n > 0 && buff[n - 1].fcfont != buff[n].fcfont) {
 +                    get_string_extents_with_font (str->str,
 +                                                  &buff[n - 1],
@@ -1265,10 +1337,8 @@ index 00000000..d637d034
 +                }
 +                ++n;
 +                has_glyphs = TRUE;
-+                FT_Done_Face (ft_face);
 +                break;
 +            }
-+            FT_Done_Face (ft_face);
 +        }
 +        if (!has_glyphs) {
 +            if (n > 0) {
@@ -1278,24 +1348,34 @@ index 00000000..d637d034
 +                 * likes Pango.
 +                 */
 +                for (i = 0; i < m_fcfontset->nfont; i++) {
-+                    FT_Face ft_face = ibus_fontset_get_ftface_from_fcfont (
-+                            fontset,
-+                            m_fcfontset->fonts[i]);
++                    FT_Face ft_face = m_fcfontset->ft_faces[i];
++                    if (ft_face == 0) {
++                        ft_face = ibus_fontset_get_ftface_from_fcfont (
++                                fontset,
++                                m_fcfontset->fonts[i]);
++                        m_fcfontset->ft_faces[i] = ft_face;
++                    }
 +                    /* Check alphabets instead of space or digits
 +                     * because 'Noto Emoji Color' font's digits are
 +                     * white color and cannot change the font color.
 +                     * the font does not have alphabets.
 +                     */
 +                    if (FT_Get_Char_Index (ft_face, 'A') != 0) {
++                        FcChar8 *font_file = NULL;
++                        FcPatternGetString (m_fcfontset->fonts[i], FC_FILE, 0, &font_file);
 +                        buff[n].fcfont = m_fcfontset->fonts[i];
-+                        FT_Done_Face (ft_face);
++                        g_hash_table_insert (m_font_index_per_char_table,
++                                             GINT_TO_POINTER (c),
++                                             GINT_TO_POINTER (i + 1));
 +                        has_glyphs = TRUE;
 +                        break;
 +                    }
-+                    FT_Done_Face (ft_face);
 +                }
 +                if (!has_glyphs) {
 +                    buff[n].fcfont = m_fcfontset->fonts[0];
++                    g_hash_table_insert (m_font_index_per_char_table,
++                                         GINT_TO_POINTER (c),
++                                         GINT_TO_POINTER (1));
 +                    g_warning ("Not found fonts for unicode %04X at %d in %s",
 +                               c, n, text);
 +                }
