@@ -30,7 +30,7 @@
 
 Name:           ibus
 Version:        1.5.17
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -312,22 +312,14 @@ desktop-file-install --delete-original          \
 %find_lang %{name}10
 
 %post
-# recreate icon cache
-touch --no-create %{_datadir}/icons/hicolor &>/dev/null || :
-
 %{_sbindir}/alternatives --install %{_sysconfdir}/X11/xinit/xinputrc xinputrc %{_xinputconf} 83 || :
 
 %postun
 if [ "$1" -eq 0 ]; then
-  # recreate icon cache
-  touch --no-create %{_datadir}/icons/hicolor &>/dev/null || :
-  gtk-update-icon-cache %{_datadir}/icons/hicolor &>/dev/null || :
-
   %{_sbindir}/alternatives --remove xinputrc %{_xinputconf} || :
   # if alternative was set to manual, reset to auto
   [ -L %{_sysconfdir}/alternatives/xinputrc -a "`readlink %{_sysconfdir}/alternatives/xinputrc`" = "%{_xinputconf}" ] && %{_sbindir}/alternatives --auto xinputrc || :
 
-  glib-compile-schemas %{_datadir}/glib-2.0/schemas &>/dev/null || :
   # 'dconf update' sometimes does not update the db...
   dconf update || :
   [ -f %{_sysconfdir}/dconf/db/ibus ] && \
@@ -338,8 +330,6 @@ if [ "$1" -eq 0 ]; then
 fi
 
 %posttrans
-gtk-update-icon-cache %{_datadir}/icons/hicolor &>/dev/null || :
-glib-compile-schemas %{_datadir}/glib-2.0/schemas &>/dev/null || :
 dconf update || :
 [ -x %{_bindir}/ibus ] && \
   %{_bindir}/ibus write-cache --system &>/dev/null || :
@@ -449,6 +439,9 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Jan 05 2018 Igor Gnatenko <ignatenkobrain@fedoraproject.org> - 1.5.17-2
+- Remove obsolete scriptlets
+
 * Sun Oct 22 2017 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.17-1
 - Bumped to 1.5.17
 
