@@ -36,7 +36,7 @@
 
 Name:           ibus
 Version:        1.5.17
-Release:        3%{?dist}
+Release:        4%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -47,6 +47,7 @@ Source2:        %{name}.conf.5
 # Will remove the annotation tarball once the rpm is available on Fedora
 # Upstreamed patches.
 # Patch0:         %%{name}-HEAD.patch
+Patch0:         %{name}-HEAD.patch
 # Under testing #1349148 #1385349 #1350291 #1406699 #1432252
 Patch1:         %{name}-1385349-segv-bus-proxy.patch
 %if %with_emoji_harfbuzz
@@ -246,6 +247,7 @@ The ibus-devel-docs package contains developer documentation for IBus
 %prep
 %setup -q
 # %%patch0 -p1
+%patch0 -p1
 # cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 %patch1 -p1 -z .segv
 %if %with_emoji_harfbuzz
@@ -475,6 +477,9 @@ gtk-query-immodules-3.0-%{__isa_bits} --update-cache &> /dev/null || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Jan 17 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.17-4
+- Added DBus filtering
+
 * Sat Jan 06 2018 Igor Gnatenko <ignatenkobrain@fedoraproject.org> - 1.5.17-3
 - Remove obsolete scriptlets
 
