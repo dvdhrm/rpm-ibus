@@ -30,7 +30,7 @@
 
 Name:           ibus
 Version:        1.5.17
-Release:        4%{?dist}
+Release:        5%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -422,6 +422,9 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Jan 19 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.17-5
+- Rebuilt for scriptlets
+
 * Wed Jan 17 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.17-4
 - Added DBus filtering
 
