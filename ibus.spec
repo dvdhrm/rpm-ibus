@@ -30,7 +30,7 @@
 
 Name:           ibus
 Version:        1.5.17
-Release:        5%{?dist}
+Release:        6%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -336,9 +336,7 @@ dconf update || :
 [ -x %{_bindir}/ibus ] && \
   %{_bindir}/ibus write-cache --system &>/dev/null || :
 
-%post libs -p /sbin/ldconfig
-
-%postun libs -p /sbin/ldconfig
+%ldconfig_scriptlets libs
 
 # FIXME: no version number
 %files -f %{name}10.lang
@@ -422,6 +420,9 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Sat Feb 03 2018 Igor Gnatenko <ignatenkobrain@fedoraproject.org> - 1.5.17-6
+- Switch to %%ldconfig_scriptlets
+
 * Fri Jan 19 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.17-5
 - Rebuilt for scriptlets
 
