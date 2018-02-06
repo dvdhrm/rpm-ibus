@@ -88,7 +88,6 @@ Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
 Requires:       %{name}-gtk2%{?_isa}   = %{version}-%{release}
 Requires:       %{name}-gtk3%{?_isa}   = %{version}-%{release}
 Requires:       %{name}-setup          = %{version}-%{release}
-Requires:       %{name}-wayland%{?_isa} = %{version}-%{release}
 
 Requires:       iso-codes
 Requires:       dbus-x11
