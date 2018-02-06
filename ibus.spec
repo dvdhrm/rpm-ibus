@@ -128,6 +128,14 @@ Requires:       dbus >= 1.2.4
 Requires:       glib2 >= %{glib_ver}
 # Owner of %%{_libdir}/girepository-1.0
 Requires:       gobject-introspection
+# https://fedoraproject.org/wiki/Changes/Removing_ldconfig_scriptlets
+%if (0%{?fedora} >= 27 || 0%{?rhel} >= 8)
+Requires:       redhat-rpm-config >= 70-1
+%else
+%if (0%{?fedora} >= 26 || 0%{?rhel} >= 8)
+Requires:       redhat-rpm-config >= 64-1
+%endif
+%endif
 
 %description libs
 This package contains the libraries for IBus
