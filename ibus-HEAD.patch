@@ -170,3 +170,4275 @@ index 468aa324..33949fa1 100644
 -- 
 2.14.3
 
+From e17c99859d06ab75326730e45072e1061f7d87c7 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Mon, 29 Jan 2018 16:50:07 +0900
+Subject: [PATCH] Implement Unicode choice on Emojier
+
+BUG=https://github.com/ibus/ibus/issues/1922
+
+Review URL: https://codereview.appspot.com/340190043
+---
+ configure.ac              |   41 +-
+ po/POTFILES.in            |    1 +
+ src/Makefile.am           |   55 ++-
+ src/emoji-parser.c        |    3 +-
+ src/ibus.h                |    4 +-
+ src/ibusunicode.c         | 1069 +++++++++++++++++++++++++++++++++++++++++
+ src/ibusunicode.h         |  299 ++++++++++++
+ src/ibusunicodegen.h      | 1151 +++++++++++++++++++++++++++++++++++++++++++++
+ src/unicode-parser.c      |  502 ++++++++++++++++++++
+ ui/gtk3/emojier.vala      |  550 +++++++++++++++++++---
+ ui/gtk3/emojierapp.vala   |    2 +
+ ui/gtk3/ibusemojidialog.h |    9 +-
+ ui/gtk3/panel.vala        |    3 +-
+ 13 files changed, 3613 insertions(+), 76 deletions(-)
+ create mode 100644 src/ibusunicode.c
+ create mode 100644 src/ibusunicode.h
+ create mode 100644 src/ibusunicodegen.h
+ create mode 100644 src/unicode-parser.c
+
+diff --git a/configure.ac b/configure.ac
+index 4789328e..bd41069b 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -3,8 +3,8 @@
+ # ibus - The Input Bus
+ #
+ # Copyright (c) 2007-2016 Peng Huang <shawn.p.huang@gmail.com>
+-# Copyright (c) 2015-2017 Takao Fujiwara <takao.fujiwara1@gmail.com>
+-# Copyright (c) 2007-2017 Red Hat, Inc.
++# Copyright (c) 2015-2018 Takao Fujiwara <takao.fujiwara1@gmail.com>
++# Copyright (c) 2007-2018 Red Hat, Inc.
+ #
+ # This library is free software; you can redistribute it and/or
+ # modify it under the terms of the GNU Lesser General Public
+@@ -653,6 +653,41 @@ https://github.com/fujiwarat/cldr-emoji-annotation)
+     enable_emoji_dict="yes (enabled, use --disable-emoji-dict to disable)"
+ fi
+ 
++# --disable-unicode-dict option.
++AC_ARG_ENABLE(unicode-dict,
++    AS_HELP_STRING([--disable-unicode-dict],
++                   [Do not build Unicode dict files]),
++    [enable_unicode_dict=$enableval],
++    [enable_unicode_dict=yes]
++)
++AM_CONDITIONAL([ENABLE_UNICODE_DICT], [test x"$enable_unicode_dict" = x"yes"])
++
++AC_ARG_WITH(ucd-dir,
++    AS_HELP_STRING([--with-ucd-dir[=DIR]],
++        [Set the directory of UCD (Unicode Character Database) files.
++         (default: "/usr/share/unicode/ucd")]),
++    UCD_DIR=$with_emoji_annotation_dir,
++    UCD_DIR="/usr/share/unicode/ucd"
++)
++AC_SUBST(UCD_DIR)
++
++if test x"$enable_unicode_dict" = x"yes"; then
++    if test ! -f $UCD_DIR/NamesList.txt ; then
++        AC_MSG_ERROR(Not found $UCD_DIR/NamesList.txt. You can get \
++the UCD files from https://www.unicode.org/Public/UNIDATA/)
++    elif test ! -f $UCD_DIR/Blocks.txt ; then
++        AC_MSG_ERROR(Not found $UCD_DIR/Blocks.txt. You can get \
++the UCD files from https://www.unicode.org/Public/UNIDATA/)
++    else
++        # POSIX SHELL has no ${FOO:0:1}
++        head=`echo "$UCD_DIR" | cut -c1`;
++        if test $head != "/" ; then
++            UCD_DIR=`realpath "$UCD_DIR"`
++        fi
++    fi
++    enable_unicode_dict="yes (enabled, use --disable-unicode-dict to disable)"
++fi
++
+ # Check iso-codes.
+ PKG_CHECK_MODULES(ISOCODES, [
+     iso-codes
+@@ -743,6 +778,8 @@ Build options:
+   Enable Emoji dict             $enable_emoji_dict
+   Unicode Emoji directory       $UNICODE_EMOJI_DIR
+   CLDR annotation directory     $EMOJI_ANNOTATION_DIR
++  Enable Unicode dict           $enable_unicode_dict
++  UCD directory                 $UCD_DIR
+   Run test cases                $enable_tests
+ ])
+ 
+diff --git a/po/POTFILES.in b/po/POTFILES.in
+index 00f7c7f6..58d1e39d 100644
+--- a/po/POTFILES.in
++++ b/po/POTFILES.in
+@@ -51,6 +51,7 @@ src/ibuspanelservice.c
+ src/ibusproxy.c
+ src/ibusregistry.c
+ src/ibusservice.c
++src/ibusunicodegen.h
+ src/ibusutil.c
+ src/keyname-table.h
+ tools/main.vala
+diff --git a/src/Makefile.am b/src/Makefile.am
+index 303250f5..1ba418d8 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -41,6 +41,7 @@ INTROSPECTION_COMPILER_ARGS = \
+     $(NULL)
+ INTROSPECTION_GIRS =
+ CLEANFILES =
++noinst_PROGRAMS =
+ 
+ # C preprocessor flags
+ AM_CPPFLAGS =                                           \
+@@ -100,6 +101,7 @@ ibus_sources =              \
+     ibusservice.c           \
+     ibusshare.c             \
+     ibustext.c              \
++    ibusunicode.c           \
+     ibusutil.c              \
+     ibusxml.c               \
+     $(NULL)
+@@ -151,6 +153,7 @@ ibus_headers =              \
+     ibusshare.h             \
+     ibustext.h              \
+     ibustypes.h             \
++    ibusunicode.h           \
+     ibusutil.h              \
+     ibusxml.h               \
+     $(NULL)
+@@ -169,6 +172,7 @@ ibus_private_headers =          \
+     ibusemojigen.h              \
+     ibusenginesimpleprivate.h   \
+     ibusinternal.h              \
++    ibusunicodegen.h            \
+     keyname-table.h             \
+     $(NULL)
+ noinst_HEADERS =            \
+@@ -241,7 +245,7 @@ dictdir = $(pkgdatadir)/dicts
+ dict_DATA = dicts/emoji-en.dict
+ LANG_FILES = $(basename $(notdir $(wildcard $(EMOJI_ANNOTATION_DIR)/*.xml)))
+ 
+-noinst_PROGRAMS = emoji-parser
++noinst_PROGRAMS += emoji-parser
+ 
+ dicts/emoji-en.dict: emoji-parser
+ 	$(AM_V_at)if test x"$(LANG_FILES)" = x ; then \
+@@ -325,12 +329,60 @@ clean-local:
+ 	$(NULL)
+ endif
+ 
++if ENABLE_UNICODE_DICT
++unicodedir = $(pkgdatadir)/dicts
++unicode_DATA = dicts/unicode-names.dict dicts/unicode-blocks.dict
++noinst_PROGRAMS += unicode-parser
++
++dicts/unicode-names.dict: unicode-parser
++	$(AM_V_at)input_file="$(UCD_DIR)/NamesList.txt"; \
++	if test ! -f "$$input_file" ; then \
++	    echo "WARNING: Not found $$input_file" 1>&2; \
++	else \
++	    $(builddir)/unicode-parser \
++	        --input-names-list $$input_file \
++	        --output-names-list $@; \
++	    echo "Generated $@"; \
++	fi;
++
++dicts/unicode-blocks.dict: unicode-parser
++	$(AM_V_at)input_file="$(UCD_DIR)/Blocks.txt"; \
++	if test ! -f "$$input_file" ; then \
++	    echo "WARNING: Not found $$input_file" 1>&2; \
++	else \
++	    $(builddir)/unicode-parser \
++	        --input-blocks $$input_file \
++	        --output-blocks-trans ibusunicodegen.h \
++	        --output-blocks $@; \
++	    echo "Generated $@"; \
++	fi;
++
++ibusunicodegen.h: dicts/unicode-blocks.dict
++	$(NULL)
++
++unicode_parser_SOURCES =        \
++    unicode-parser.c            \
++    $(NULL)
++unicode_parser_CFLAGS =         \
++    $(GLIB2_CFLAGS)             \
++    $(NULL)
++unicode_parser_LDADD =          \
++    $(GLIB2_LIBS)               \
++    $(libibus)                  \
++    $(NULL)
++
++clean-local:
++	-rm -rf dicts
++	$(NULL)
++endif
++
+ EXTRA_DIST =                    \
+     emoji-parser.c              \
+     ibusversion.h.in            \
+     ibusmarshalers.list         \
+     ibusenumtypes.h.template    \
+     ibusenumtypes.c.template    \
++    unicode-parser.c            \
+     $(NULL)
+ 
+ CLEANFILES +=                   \
+@@ -341,6 +393,7 @@ CLEANFILES +=                   \
+ 
+ DISTCLEANFILES =                \
+     ibusemojigen.h              \
++    ibusunicodegen.h            \
+     ibusversion.h               \
+     $(NULL)
+ 
+diff --git a/src/emoji-parser.c b/src/emoji-parser.c
+index fe3e4ef8..0f7c8cfb 100644
+--- a/src/emoji-parser.c
++++ b/src/emoji-parser.c
+@@ -1,7 +1,7 @@
+ /* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
+ /* vim:set et sts=4: */
+ /* ibus - The Input Bus
+- * Copyright (C) 2016-2017 Takao Fujiwara <takao.fujiwara1@gmail.com>
++ * Copyright (C) 2016-2018 Takao Fujiwara <takao.fujiwara1@gmail.com>
+  * Copyright (C) 2016 Red Hat, Inc.
+  *
+  * This library is free software; you can redistribute it and/or
+@@ -1126,6 +1126,7 @@ category_file_save (const gchar *filename,
+     if (!g_file_get_contents (__FILE__, &content, &length, &error)) {
+         g_warning ("Failed to load %s: %s", __FILE__, error->message);
+         g_clear_pointer (&error, g_error_free);
++        return;
+     }
+     buff = g_string_new (NULL);
+     p = content;
+diff --git a/src/ibus.h b/src/ibus.h
+index c6cf58cf..8011729f 100644
+--- a/src/ibus.h
++++ b/src/ibus.h
+@@ -2,7 +2,8 @@
+ /* vim:set et sts=4: */
+ /* ibus - The Input Bus
+  * Copyright (C) 2008-2013 Peng Huang <shawn.p.huang@gmail.com>
+- * Copyright (C) 2008-2013 Red Hat, Inc.
++ * Copyright (C) 2018 Takao Fujiwara <takao.fujiwara1@gmail.com>
++ * Copyright (C) 2008-2018 Red Hat, Inc.
+  *
+  * This library is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU Lesser General Public
+@@ -57,6 +58,7 @@
+ #include <ibusutil.h>
+ #include <ibusregistry.h>
+ #include <ibusemoji.h>
++#include <ibusunicode.h>
+ 
+ #ifndef IBUS_DISABLE_DEPRECATED
+ #include <ibuskeysyms-compat.h>
+diff --git a/src/ibusunicode.c b/src/ibusunicode.c
+new file mode 100644
+index 00000000..8559819d
+--- /dev/null
++++ b/src/ibusunicode.c
+@@ -0,0 +1,1069 @@
++/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
++/* vim:set et sts=4: */
++/* bus - The Input Bus
++ * Copyright (C) 2018 Takao Fujiwara <takao.fujiwara1@gmail.com>
++ * Copyright (C) 2018 Red Hat, Inc.
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301
++ * USA
++ */
++#ifdef HAVE_CONFIG_H
++#include <config.h>
++#endif
++
++#include <glib.h>
++#include <glib/gstdio.h>
++#include "ibusinternal.h"
++#include "ibuserror.h"
++#include "ibusunicode.h"
++
++#define IBUS_UNICODE_DATA_MAGIC "IBusUnicodeData"
++#define IBUS_UNICODE_BLOCK_MAGIC "IBusUnicodeBlock"
++#define IBUS_UNICODE_DATA_VERSION (1)
++#define IBUS_UNICODE_DESERIALIZE_SIGNALL_STR \
++        "deserialize-unicode"
++
++enum {
++    PROP_0 = 0,
++    PROP_CODE,
++    PROP_NAME,
++    PROP_ALIAS,
++    PROP_BLOCK_NAME,
++    PROP_START,
++    PROP_END
++};
++
++struct _IBusUnicodeDataPrivate {
++    gunichar    code;
++    gchar      *name;
++    gchar      *alias;
++    gchar      *block_name;
++};
++
++struct _IBusUnicodeBlockPrivate {
++    gunichar    start;
++    gunichar    end;
++    gchar      *name;
++};
++
++typedef struct {
++    IBusUnicodeDataLoadAsyncFinish callback;
++    gpointer                       user_data;
++} IBusUnicodeDataLoadData;
++
++#define IBUS_UNICODE_DATA_GET_PRIVATE(o)  \
++   (G_TYPE_INSTANCE_GET_PRIVATE ((o), \
++    IBUS_TYPE_UNICODE_DATA, \
++    IBusUnicodeDataPrivate))
++#define IBUS_UNICODE_BLOCK_GET_PRIVATE(o)  \
++   (G_TYPE_INSTANCE_GET_PRIVATE ((o), \
++    IBUS_TYPE_UNICODE_BLOCK, \
++    IBusUnicodeBlockPrivate))
++
++/* functions prototype */
++static void      ibus_unicode_data_set_property (IBusUnicodeData      *unicode,
++                                                 guint                 prop_id,
++                                                 const GValue         *value,
++                                                 GParamSpec           *pspec);
++static void      ibus_unicode_data_get_property (IBusUnicodeData      *unicode,
++                                                 guint                 prop_id,
++                                                 GValue               *value,
++                                                 GParamSpec           *pspec);
++static void      ibus_unicode_data_destroy      (IBusUnicodeData      *unicode);
++static gboolean  ibus_unicode_data_serialize    (IBusUnicodeData      *unicode,
++                                                 GVariantBuilder      *builder);
++static gint      ibus_unicode_data_deserialize  (IBusUnicodeData      *unicode,
++                                                 GVariant             *variant);
++static gboolean  ibus_unicode_data_copy         (IBusUnicodeData      *dest,
++                                                const IBusUnicodeData *src);
++static void      ibus_unicode_block_set_property
++                                                (IBusUnicodeBlock     *block,
++                                                 guint                 prop_id,
++                                                 const GValue         *value,
++                                                 GParamSpec           *pspec);
++static void      ibus_unicode_block_get_property
++                                                (IBusUnicodeBlock     *block,
++                                                 guint                 prop_id,
++                                                 GValue               *value,
++                                                 GParamSpec           *pspec);
++static void      ibus_unicode_block_destroy     (IBusUnicodeBlock     *block);
++static gboolean  ibus_unicode_block_serialize   (IBusUnicodeBlock     *block,
++                                                 GVariantBuilder      *builder);
++static gint      ibus_unicode_block_deserialize (IBusUnicodeBlock     *block,
++                                                 GVariant             *variant);
++static gboolean  ibus_unicode_block_copy        (IBusUnicodeBlock     *dest,
++                                                const IBusUnicodeBlock *src);
++
++G_DEFINE_TYPE (IBusUnicodeData, ibus_unicode_data, IBUS_TYPE_SERIALIZABLE)
++G_DEFINE_TYPE (IBusUnicodeBlock, ibus_unicode_block, IBUS_TYPE_SERIALIZABLE)
++
++static void
++ibus_unicode_data_class_init (IBusUnicodeDataClass *class)
++{
++    IBusObjectClass *object_class = IBUS_OBJECT_CLASS (class);
++    GObjectClass *gobject_class = G_OBJECT_CLASS (class);
++    IBusSerializableClass *serializable_class = IBUS_SERIALIZABLE_CLASS (class);
++
++    object_class->destroy = (IBusObjectDestroyFunc) ibus_unicode_data_destroy;
++    gobject_class->set_property =
++            (GObjectSetPropertyFunc) ibus_unicode_data_set_property;
++    gobject_class->get_property =
++            (GObjectGetPropertyFunc) ibus_unicode_data_get_property;
++    serializable_class->serialize   =
++            (IBusSerializableSerializeFunc) ibus_unicode_data_serialize;
++    serializable_class->deserialize =
++            (IBusSerializableDeserializeFunc) ibus_unicode_data_deserialize;
++    serializable_class->copy        =
++            (IBusSerializableCopyFunc) ibus_unicode_data_copy;
++
++    g_type_class_add_private (class, sizeof (IBusUnicodeDataPrivate));
++
++    /* install properties */
++    /**
++     * IBusUnicodeData:code:
++     *
++     * The Uniode code point
++     */
++    g_object_class_install_property (gobject_class,
++                    PROP_CODE,
++                    g_param_spec_unichar ("code",
++                        "code point",
++                        "The Unicode code point",
++                        0,
++                        G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
++
++
++    /**
++     * IBusUnicodeData:name:
++     *
++     * The Uniode name
++     */
++    g_object_class_install_property (gobject_class,
++                    PROP_NAME,
++                    g_param_spec_string ("name",
++                        "name",
++                        "The Unicode name",
++                        "",
++                        G_PARAM_READWRITE | G_PARAM_CONSTRUCT));
++
++    /**
++     * IBusUnicodeData:alias:
++     *
++     * The Uniode alias name
++     */
++    g_object_class_install_property (gobject_class,
++                    PROP_ALIAS,
++                    g_param_spec_string ("alias",
++                        "alias name",
++                        "The Unicode alias name",
++                        "",
++                        G_PARAM_READWRITE | G_PARAM_CONSTRUCT));
++
++    /**
++     * IBusUnicodeData:block-name:
++     *
++     * The Uniode block name
++     */
++    g_object_class_install_property (gobject_class,
++                    PROP_BLOCK_NAME,
++                    g_param_spec_string ("block-name",
++                        "block name",
++                        "The Unicode block name",
++                        "",
++                        G_PARAM_READWRITE | G_PARAM_CONSTRUCT));
++}
++
++static void
++ibus_unicode_data_init (IBusUnicodeData *unicode)
++{
++    unicode->priv = IBUS_UNICODE_DATA_GET_PRIVATE (unicode);
++}
++
++static void
++ibus_unicode_data_destroy (IBusUnicodeData *unicode)
++{
++    g_clear_pointer (&unicode->priv->name, g_free);
++    g_clear_pointer (&unicode->priv->alias, g_free);
++    g_clear_pointer (&unicode->priv->block_name, g_free);
++
++    IBUS_OBJECT_CLASS (ibus_unicode_data_parent_class)->
++            destroy (IBUS_OBJECT (unicode));
++}
++
++static void
++ibus_unicode_data_set_property (IBusUnicodeData *unicode,
++                                guint            prop_id,
++                                const GValue    *value,
++                                GParamSpec      *pspec)
++{
++    switch (prop_id) {
++    case PROP_CODE:
++        g_assert (unicode->priv->code == 0);
++        unicode->priv->code = g_value_get_uint (value);
++        break;
++    case PROP_NAME:
++        g_assert (unicode->priv->name == NULL);
++        unicode->priv->name = g_value_dup_string (value);
++        break;
++    case PROP_ALIAS:
++        g_assert (unicode->priv->alias == NULL);
++        unicode->priv->alias = g_value_dup_string (value);
++        break;
++    case PROP_BLOCK_NAME:
++        g_free (unicode->priv->block_name);
++        unicode->priv->block_name = g_value_dup_string (value);
++        break;
++    default:
++        G_OBJECT_WARN_INVALID_PROPERTY_ID (unicode, prop_id, pspec);
++    }
++}
++
++static void
++ibus_unicode_data_get_property (IBusUnicodeData *unicode,
++                                guint            prop_id,
++                                GValue          *value,
++                                GParamSpec      *pspec)
++{
++    switch (prop_id) {
++    case PROP_CODE:
++        g_value_set_uint (value, ibus_unicode_data_get_code (unicode));
++        break;
++    case PROP_NAME:
++        g_value_set_string (value, ibus_unicode_data_get_name (unicode));
++        break;
++    case PROP_ALIAS:
++        g_value_set_string (value, ibus_unicode_data_get_alias (unicode));
++        break;
++    case PROP_BLOCK_NAME:
++        g_value_set_string (value, ibus_unicode_data_get_block_name (unicode));
++        break;
++    default:
++        G_OBJECT_WARN_INVALID_PROPERTY_ID (unicode, prop_id, pspec);
++    }
++}
++
++static gboolean
++ibus_unicode_data_serialize (IBusUnicodeData   *unicode,
++                             GVariantBuilder   *builder)
++{
++    gboolean retval = IBUS_SERIALIZABLE_CLASS (ibus_unicode_data_parent_class)->
++            serialize ((IBusSerializable *)unicode, builder);
++    g_return_val_if_fail (retval, FALSE);
++
++#define NOTNULL(s) ((s) != NULL ? (s) : "")
++    /* If you will add a new property, you can append it at the end and
++     * you should not change the serialized order of name, longname,
++     * description, ... because the order is also used in other applications
++     * likes ibus-qt. */
++    g_variant_builder_add (builder, "u", unicode->priv->code);
++    g_variant_builder_add (builder, "s", NOTNULL (unicode->priv->name));
++    g_variant_builder_add (builder, "s", NOTNULL (unicode->priv->alias));
++    /* Use IBusUnicodeBlock for memory usage.
++    g_variant_builder_add (builder, "s", NOTNULL (unicode->priv->block_name));
++     */
++#undef NOTNULL
++    return TRUE;
++}
++
++static gint
++ibus_unicode_data_deserialize (IBusUnicodeData *unicode,
++                               GVariant        *variant)
++{
++    gint retval = IBUS_SERIALIZABLE_CLASS (ibus_unicode_data_parent_class)->
++            deserialize ((IBusSerializable *)unicode, variant);
++    g_return_val_if_fail (retval, 0);
++
++    /* If you will add a new property, you can append it at the end and
++     * you should not change the serialized order of name, longname,
++     * description, ... because the order is also used in other applications
++     * likes ibus-qt. */
++    g_variant_get_child (variant, retval++, "u", &unicode->priv->code);
++    ibus_g_variant_get_child_string (variant, retval++,
++                                     &unicode->priv->name);
++    ibus_g_variant_get_child_string (variant, retval++,
++                                     &unicode->priv->alias);
++    /* Use IBusUnicodeBlock for memory usage.
++    ibus_g_variant_get_child_string (variant, retval++,
++                                     &unicode->priv->block_name);
++     */
++    return retval;
++}
++
++static gboolean
++ibus_unicode_data_copy (IBusUnicodeData       *dest,
++                        const IBusUnicodeData *src)
++{
++    gboolean retval = IBUS_SERIALIZABLE_CLASS (ibus_unicode_data_parent_class)->
++            copy ((IBusSerializable *)dest,
++                  (IBusSerializable *)src);
++    g_return_val_if_fail (retval, FALSE);
++
++    dest->priv->code             = src->priv->code;
++    dest->priv->name             = g_strdup (src->priv->name);
++    dest->priv->alias            = g_strdup (src->priv->alias);
++    dest->priv->block_name       = g_strdup (src->priv->block_name);
++    return TRUE;
++}
++
++IBusUnicodeData *
++ibus_unicode_data_new (const gchar *first_property_name, ...)
++{
++    va_list var_args;
++    IBusUnicodeData *unicode;
++
++    g_assert (first_property_name != NULL);
++    va_start (var_args, first_property_name);
++    unicode = (IBusUnicodeData *) g_object_new_valist (IBUS_TYPE_UNICODE_DATA,
++                                                       first_property_name,
++                                                       var_args);
++    va_end (var_args);
++    /* code is required. Other properties are set in class_init by default. */
++    g_assert (unicode->priv->name != NULL);
++    g_assert (unicode->priv->alias != NULL);
++    g_assert (unicode->priv->block_name != NULL);
++    return unicode;
++}
++
++gunichar
++ibus_unicode_data_get_code (IBusUnicodeData *unicode)
++{
++    g_return_val_if_fail (IBUS_IS_UNICODE_DATA (unicode), G_MAXUINT32);
++
++    return unicode->priv->code;
++}
++
++const gchar *
++ibus_unicode_data_get_name (IBusUnicodeData *unicode)
++{
++    g_return_val_if_fail (IBUS_IS_UNICODE_DATA (unicode), "");
++
++    return unicode->priv->name;
++}
++
++const gchar *
++ibus_unicode_data_get_alias (IBusUnicodeData *unicode)
++{
++    g_return_val_if_fail (IBUS_IS_UNICODE_DATA (unicode), "");
++
++    return unicode->priv->alias;
++}
++
++const gchar *
++ibus_unicode_data_get_block_name (IBusUnicodeData *unicode)
++{
++    g_return_val_if_fail (IBUS_IS_UNICODE_DATA (unicode), "");
++
++    return unicode->priv->block_name;
++}
++
++void
++ibus_unicode_data_set_block_name (IBusUnicodeData *unicode,
++                                  const gchar     *block_name)
++{
++    g_return_if_fail (IBUS_IS_UNICODE_DATA (unicode));
++
++    g_free (unicode->priv->block_name);
++    unicode->priv->block_name = g_strdup (block_name);
++}
++
++static void
++variant_foreach_add_unicode (IBusUnicodeData *unicode,
++                             GVariantBuilder *builder)
++{
++    g_variant_builder_add (
++            builder, "v",
++            ibus_serializable_serialize (IBUS_SERIALIZABLE (unicode)));
++}
++
++static GVariant *
++ibus_unicode_data_list_serialize (GSList *list)
++{
++    GVariantBuilder builder;
++
++    g_variant_builder_init (&builder, G_VARIANT_TYPE ("av"));
++    g_slist_foreach (list,  (GFunc) variant_foreach_add_unicode, &builder);
++    return g_variant_builder_end (&builder);
++}
++
++static GSList *
++ibus_unicode_data_list_deserialize (GVariant *variant,
++                                    GObject  *source_object)
++{
++    GSList *list = NULL;
++    GVariantIter iter;
++    GVariant *unicode_variant = NULL;
++    gsize i, size;
++    gboolean has_signal = FALSE;
++
++    if (G_IS_OBJECT (source_object)) {
++        has_signal = g_signal_lookup (
++                IBUS_UNICODE_DESERIALIZE_SIGNALL_STR,
++                G_OBJECT_TYPE (source_object));
++        if (!has_signal) {
++            const gchar type_name = g_type_name (source_object);
++            g_warning ("GObject %s does not have the signal \"%s\"",
++                       type_name ? type_name : "(null)",
++                       IBUS_UNICODE_DESERIALIZE_SIGNALL_STR);
++        }
++    }
++    g_variant_iter_init (&iter, variant);
++    size = g_variant_iter_n_children (&iter);
++    i = 0;
++    while (g_variant_iter_loop (&iter, "v", &unicode_variant)) {
++        IBusUnicodeData *data =
++                IBUS_UNICODE_DATA (ibus_serializable_deserialize (
++                        unicode_variant));
++        list = g_slist_append (list, data);
++        g_clear_pointer (&unicode_variant, g_variant_unref);
++        if (has_signal && (i == 0 || ((i + 1) % 100) == 0)) {
++            g_signal_emit_by_name (source_object,
++                                   IBUS_UNICODE_DESERIALIZE_SIGNALL_STR,
++                                   i + 1, size);
++        }
++        i++;
++    }
++    if (has_signal && (i != 1 && (i % 100) != 0)) {
++        g_signal_emit_by_name (source_object,
++                               IBUS_UNICODE_DESERIALIZE_SIGNALL_STR,
++                               i, size);
++    }
++
++    return list;
++}
++
++void
++ibus_unicode_data_save (const gchar *path,
++                        GSList      *list)
++{
++    GVariant *variant;
++    const gchar *header = IBUS_UNICODE_DATA_MAGIC;
++    const guint16 version = IBUS_UNICODE_DATA_VERSION;
++    const gchar *contents;
++    gsize length;
++    gchar *dir;
++    GStatBuf buf = { 0, };
++    GError *error = NULL;
++
++    g_return_if_fail (path != NULL);
++    g_return_if_fail (list != NULL);
++    if (list->data == NULL) {
++        g_warning ("Failed to save IBus Unicode data: Need a list data.");
++        return;
++    }
++
++    variant = g_variant_new ("(sqv)",
++                             header,
++                             version,
++                             ibus_unicode_data_list_serialize (list));
++
++    contents =  g_variant_get_data (variant);
++    length =  g_variant_get_size (variant);
++
++    dir = g_path_get_dirname (path);
++    if (g_strcmp0 (dir, ".") != 0 && g_stat (dir, &buf) != 0) {
++        g_mkdir_with_parents (dir, 0777);
++    }
++    g_free (dir);
++    if (!g_file_set_contents (path, contents, length, &error)) {
++        g_warning ("Failed to save Unicode dict %s: %s", path, error->message);
++        g_error_free (error);
++    }
++
++    g_variant_unref (variant);
++}
++
++static GSList *
++ibus_unicode_data_load_with_error (const gchar *path,
++                                   GObject     *source_object,
++                                   GError     **error)
++{
++    gchar *contents = NULL;
++    gsize length = 0;
++    GVariant *variant_table = NULL;
++    GVariant *variant = NULL;
++    const gchar *header = NULL;
++    guint16 version = 0;
++    GSList *retval = NULL;
++
++    if (!g_file_test (path, G_FILE_TEST_EXISTS)) {
++        g_set_error (error,
++                     IBUS_ERROR,
++                     IBUS_ERROR_FAILED,
++                     "Unicode dict does not exist: %s", path);
++        goto out_load_cache;
++    }
++
++    if (!g_file_get_contents (path, &contents, &length, error)) {
++        goto out_load_cache;
++    }
++
++    variant_table = g_variant_new_from_data (G_VARIANT_TYPE ("(sq)"),
++                                             contents,
++                                             length,
++                                             FALSE,
++                                             NULL,
++                                             NULL);
++
++    if (variant_table == NULL) {
++        g_set_error (error,
++                     IBUS_ERROR,
++                     IBUS_ERROR_FAILED,
++                     "cache table is broken.");
++        goto out_load_cache;
++    }
++
++    g_variant_get (variant_table, "(&sq)", &header, &version);
++
++    if (g_strcmp0 (header, IBUS_UNICODE_DATA_MAGIC) != 0) {
++        g_set_error (error,
++                     IBUS_ERROR,
++                     IBUS_ERROR_FAILED,
++                     "cache is not IBusUnicodeData.");
++        goto out_load_cache;
++    }
++
++    if (version > IBUS_UNICODE_DATA_VERSION) {
++        g_set_error (error,
++                     IBUS_ERROR,
++                     IBUS_ERROR_FAILED,
++                     "cache version is different: %u != %u",
++                     version, IBUS_UNICODE_DATA_VERSION);
++        goto out_load_cache;
++    }
++
++    version = 0;
++    header = NULL;
++    g_variant_unref (variant_table);
++
++    variant_table = g_variant_new_from_data (G_VARIANT_TYPE ("(sqv)"),
++                                             contents,
++                                             length,
++                                             FALSE,
++                                             NULL,
++                                             NULL);
++
++    if (variant_table == NULL) {
++        g_set_error (error,
++                     IBUS_ERROR,
++                     IBUS_ERROR_FAILED,
++                     "cache table is broken.");
++        goto out_load_cache;
++    }
++
++    g_variant_get (variant_table, "(&sqv)",
++                   NULL,
++                   NULL,
++                   &variant);
++
++    if (variant == NULL) {
++        g_set_error (error,
++                     IBUS_ERROR,
++                     IBUS_ERROR_FAILED,
++                     "cache dict is broken.");
++        goto out_load_cache;
++    }
++
++    retval = ibus_unicode_data_list_deserialize (variant, source_object);
++
++out_load_cache:
++    if (variant)
++        g_variant_unref (variant);
++    if (variant_table)
++        g_variant_unref (variant_table);
++    g_free (contents);
++
++    return retval;
++}
++
++GSList *
++ibus_unicode_data_load (const gchar *path,
++                        GObject     *source_object)
++{
++    GError *error = NULL;
++    GSList *retval = ibus_unicode_data_load_with_error (path,
++                                                        source_object,
++                                                        &error);
++
++    if (retval == NULL) {
++        g_warning ("%s", error->message);
++        g_error_free (error);
++    }
++
++    return retval;
++}
++
++static void
++ibus_unicode_data_load_async_thread (GTask        *task,
++                                     gpointer      source_object,
++                                     gpointer      task_data,
++                                     GCancellable *cancellable)
++{
++    GSList *retval;
++    gchar *path = (gchar *)task_data;
++    GError *error = NULL;
++
++    g_assert (path != NULL);
++
++    retval = ibus_unicode_data_load_with_error (path, source_object, &error);
++    g_free (path);
++    if (retval == NULL)
++        g_task_return_error (task, error);
++    else
++        g_task_return_pointer (task, retval, NULL);
++    g_object_unref (task);
++}
++
++static void
++ibus_unicode_data_load_async_done (GObject *source_object,
++                                   GAsyncResult *res,
++                                   gpointer user_data)
++{
++    IBusUnicodeDataLoadData *data = (IBusUnicodeDataLoadData*)user_data;
++    GSList *list;
++    GError *error = NULL;
++    g_assert (data != NULL);
++    list = g_task_propagate_pointer (G_TASK (res), &error);
++    if (error) {
++        g_warning ("%s", error->message);
++        g_error_free (error);
++        data->callback (NULL, data->user_data);
++    } else {
++        data->callback (list, data->user_data);
++    }
++    g_slice_free (IBusUnicodeDataLoadData, data);
++}
++
++void
++ibus_unicode_data_load_async (const gchar        *path,
++                              GObject            *source_object,
++                              GCancellable       *cancellable,
++                              IBusUnicodeDataLoadAsyncFinish
++                                                  callback,
++                              gpointer            user_data)
++{
++    GTask *task;
++    IBusUnicodeDataLoadData *data;
++
++    g_return_if_fail (path != NULL);
++
++    data = g_slice_new0 (IBusUnicodeDataLoadData);
++    data->callback = callback;
++    data->user_data = user_data;
++    task = g_task_new (source_object,
++                       cancellable,
++                       ibus_unicode_data_load_async_done,
++                       data);
++    g_task_set_source_tag (task, ibus_unicode_data_load_async);
++    g_task_set_task_data (task, g_strdup (path), NULL);
++    g_task_run_in_thread (task, ibus_unicode_data_load_async_thread);
++}
++
++static void
++ibus_unicode_block_class_init (IBusUnicodeBlockClass *class)
++{
++    IBusObjectClass *object_class = IBUS_OBJECT_CLASS (class);
++    GObjectClass *gobject_class = G_OBJECT_CLASS (class);
++    IBusSerializableClass *serializable_class = IBUS_SERIALIZABLE_CLASS (class);
++
++    object_class->destroy = (IBusObjectDestroyFunc) ibus_unicode_data_destroy;
++    gobject_class->set_property =
++            (GObjectSetPropertyFunc) ibus_unicode_block_set_property;
++    gobject_class->get_property =
++            (GObjectGetPropertyFunc) ibus_unicode_block_get_property;
++    serializable_class->serialize   =
++            (IBusSerializableSerializeFunc) ibus_unicode_block_serialize;
++    serializable_class->deserialize =
++            (IBusSerializableDeserializeFunc) ibus_unicode_block_deserialize;
++    serializable_class->copy        =
++            (IBusSerializableCopyFunc) ibus_unicode_block_copy;
++
++    g_type_class_add_private (class, sizeof (IBusUnicodeBlockPrivate));
++
++    /* install properties */
++    /**
++     * IBusUnicodeBlock:start:
++     *
++     * The Uniode start code point
++     */
++    g_object_class_install_property (gobject_class,
++                    PROP_START,
++                    /* Cannot use g_param_spec_unichar() for the Unicode
++                     * boundary values because the function checks
++                     * if the value is a valid Unicode besides MAXUINT.
++                     */
++                    g_param_spec_uint ("start",
++                        "start code point",
++                        "The Unicode start code point",
++                        0,
++                        G_MAXUINT,
++                        0,
++                        G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
++
++
++    /**
++     * IBusUnicodeBlock:end:
++     *
++     * The Uniode end code point
++     */
++    g_object_class_install_property (gobject_class,
++                    PROP_END,
++                    /* Cannot use g_param_spec_unichar() for the Unicode
++                     * boundary values because the function checks
++                     * if the value is a valid Unicode besides MAXUINT.
++                     */
++                    g_param_spec_uint ("end",
++                        "end code point",
++                        "The Unicode end code point",
++                        0,
++                        G_MAXUINT,
++                        0,
++                        G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
++
++
++    /**
++     * IBusUnicodeBlock:name:
++     *
++     * The Uniode block name
++     */
++    g_object_class_install_property (gobject_class,
++                    PROP_NAME,
++                    g_param_spec_string ("name",
++                        "name",
++                        "The Unicode name",
++                        "",
++                        G_PARAM_READWRITE | G_PARAM_CONSTRUCT));
++}
++
++static void
++ibus_unicode_block_init (IBusUnicodeBlock *block)
++{
++    block->priv = IBUS_UNICODE_BLOCK_GET_PRIVATE (block);
++}
++
++static void
++ibus_unicode_block_destroy (IBusUnicodeBlock *block)
++{
++    g_clear_pointer (&block->priv->name, g_free);
++
++    IBUS_OBJECT_CLASS (ibus_unicode_data_parent_class)->
++            destroy (IBUS_OBJECT (block));
++}
++
++static void
++ibus_unicode_block_set_property (IBusUnicodeBlock *block,
++                                 guint             prop_id,
++                                 const GValue     *value,
++                                 GParamSpec       *pspec)
++{
++    switch (prop_id) {
++    case PROP_START:
++        g_assert (block->priv->start == 0);
++        block->priv->start = g_value_get_uint (value);
++        break;
++    case PROP_END:
++        g_assert (block->priv->end == 0);
++        block->priv->end = g_value_get_uint (value);
++        break;
++    case PROP_NAME:
++        g_assert (block->priv->name == NULL);
++        block->priv->name = g_value_dup_string (value);
++        break;
++    default:
++        G_OBJECT_WARN_INVALID_PROPERTY_ID (block, prop_id, pspec);
++    }
++}
++
++static void
++ibus_unicode_block_get_property (IBusUnicodeBlock *block,
++                                 guint             prop_id,
++                                 GValue           *value,
++                                 GParamSpec       *pspec)
++{
++    switch (prop_id) {
++    case PROP_START:
++        g_value_set_uint (value, ibus_unicode_block_get_start (block));
++        break;
++    case PROP_END:
++        g_value_set_uint (value, ibus_unicode_block_get_end (block));
++        break;
++    case PROP_NAME:
++        g_value_set_string (value, ibus_unicode_block_get_name (block));
++        break;
++    default:
++        G_OBJECT_WARN_INVALID_PROPERTY_ID (block, prop_id, pspec);
++    }
++}
++
++static gboolean
++ibus_unicode_block_serialize (IBusUnicodeBlock *block,
++                              GVariantBuilder  *builder)
++{
++    gboolean retval = IBUS_SERIALIZABLE_CLASS (ibus_unicode_block_parent_class)->
++            serialize ((IBusSerializable *)block, builder);
++    g_return_val_if_fail (retval, FALSE);
++
++#define NOTNULL(s) ((s) != NULL ? (s) : "")
++    /* If you will add a new property, you can append it at the end and
++     * you should not change the serialized order of name, longname,
++     * description, ... because the order is also used in other applications
++     * likes ibus-qt. */
++    g_variant_builder_add (builder, "u", block->priv->start);
++    g_variant_builder_add (builder, "u", block->priv->end);
++    g_variant_builder_add (builder, "s", NOTNULL (block->priv->name));
++#undef NOTNULL
++    return TRUE;
++}
++
++static gint
++ibus_unicode_block_deserialize (IBusUnicodeBlock *block,
++                                GVariant        *variant)
++{
++    gint retval = IBUS_SERIALIZABLE_CLASS (ibus_unicode_block_parent_class)->
++            deserialize ((IBusSerializable *)block, variant);
++    g_return_val_if_fail (retval, 0);
++
++    /* If you will add a new property, you can append it at the end and
++     * you should not change the serialized order of name, longname,
++     * description, ... because the order is also used in other applications
++     * likes ibus-qt. */
++    g_variant_get_child (variant, retval++, "u", &block->priv->start);
++    g_variant_get_child (variant, retval++, "u", &block->priv->end);
++    ibus_g_variant_get_child_string (variant, retval++,
++                                     &block->priv->name);
++    return retval;
++}
++
++static gboolean
++ibus_unicode_block_copy (IBusUnicodeBlock       *dest,
++                         const IBusUnicodeBlock *src)
++{
++    gboolean retval = IBUS_SERIALIZABLE_CLASS (ibus_unicode_block_parent_class)->
++            copy ((IBusSerializable *)dest,
++                  (IBusSerializable *)src);
++    g_return_val_if_fail (retval, FALSE);
++
++    dest->priv->start            = src->priv->start;
++    dest->priv->end              = src->priv->end;
++    dest->priv->name             = g_strdup (src->priv->name);
++    return TRUE;
++}
++
++IBusUnicodeBlock *
++ibus_unicode_block_new (const gchar *first_property_name, ...)
++{
++    va_list var_args;
++    IBusUnicodeBlock *block;
++
++    g_assert (first_property_name != NULL);
++    va_start (var_args, first_property_name);
++    block = (IBusUnicodeBlock *) g_object_new_valist (IBUS_TYPE_UNICODE_BLOCK,
++                                                     first_property_name,
++                                                     var_args);
++    va_end (var_args);
++    /* end is required. Other properties are set in class_init by default. */
++    g_assert (block->priv->start != block->priv->end);
++    g_assert (block->priv->name != NULL);
++    return block;
++}
++
++gunichar
++ibus_unicode_block_get_start (IBusUnicodeBlock *block)
++{
++    g_return_val_if_fail (IBUS_IS_UNICODE_BLOCK (block), G_MAXUINT32);
++
++    return block->priv->start;
++}
++
++gunichar
++ibus_unicode_block_get_end (IBusUnicodeBlock *block)
++{
++    g_return_val_if_fail (IBUS_IS_UNICODE_BLOCK (block), G_MAXUINT32);
++
++    return block->priv->end;
++}
++
++const gchar *
++ibus_unicode_block_get_name (IBusUnicodeBlock *block)
++{
++    g_return_val_if_fail (IBUS_IS_UNICODE_BLOCK (block), "");
++
++    return block->priv->name;
++}
++
++static void
++variant_foreach_add_block (IBusUnicodeBlock *block,
++                           GVariantBuilder *builder)
++{
++    g_variant_builder_add (
++            builder, "v",
++            ibus_serializable_serialize (IBUS_SERIALIZABLE (block)));
++}
++
++static GVariant *
++ibus_unicode_block_list_serialize (GSList *list)
++{
++    GVariantBuilder builder;
++
++    g_variant_builder_init (&builder, G_VARIANT_TYPE ("av"));
++    g_slist_foreach (list,  (GFunc) variant_foreach_add_block, &builder);
++    return g_variant_builder_end (&builder);
++}
++
++static GSList *
++ibus_unicode_block_list_deserialize (GVariant *variant)
++{
++    GSList *list = NULL;
++    GVariantIter iter;
++    GVariant *unicode_variant = NULL;
++
++    g_variant_iter_init (&iter, variant);
++    while (g_variant_iter_loop (&iter, "v", &unicode_variant)) {
++        IBusUnicodeBlock *data =
++                IBUS_UNICODE_BLOCK (ibus_serializable_deserialize (
++                        unicode_variant));
++        list = g_slist_append (list, data);
++        g_clear_pointer (&unicode_variant, g_variant_unref);
++    }
++
++    return list;
++}
++
++void
++ibus_unicode_block_save (const gchar *path,
++                         GSList      *list)
++{
++    GVariant *variant;
++    const gchar *header = IBUS_UNICODE_BLOCK_MAGIC;
++    const guint16 version = IBUS_UNICODE_DATA_VERSION;
++    const gchar *contents;
++    gsize length;
++    gchar *dir;
++    GStatBuf buf = { 0, };
++    GError *error = NULL;
++
++    g_return_if_fail (path != NULL);
++    g_return_if_fail (list != NULL);
++    if (list->data == NULL) {
++        g_warning ("Failed to save IBus Unicode block: Need a list data.");
++        return;
++    }
++
++    variant = g_variant_new ("(sqv)",
++                             header,
++                             version,
++                             ibus_unicode_block_list_serialize (list));
++
++    contents =  g_variant_get_data (variant);
++    length =  g_variant_get_size (variant);
++
++    dir = g_path_get_dirname (path);
++    if (g_strcmp0 (dir, ".") != 0 && g_stat (dir, &buf) != 0) {
++        g_mkdir_with_parents (dir, 0777);
++    }
++    g_free (dir);
++    if (!g_file_set_contents (path, contents, length, &error)) {
++        g_warning ("Failed to save Unicode dict %s: %s", path, error->message);
++        g_error_free (error);
++    }
++
++    g_variant_unref (variant);
++}
++
++GSList *
++ibus_unicode_block_load (const gchar *path)
++{
++    gchar *contents = NULL;
++    gsize length = 0;
++    GError *error = NULL;
++    GVariant *variant_table = NULL;
++    GVariant *variant = NULL;
++    const gchar *header = NULL;
++    guint16 version = 0;
++    GSList *retval = NULL;
++
++    if (!g_file_test (path, G_FILE_TEST_EXISTS)) {
++        g_warning ("Unicode dict does not exist: %s", path);
++        goto out_load_cache;
++    }
++
++    if (!g_file_get_contents (path, &contents, &length, &error)) {
++        g_warning ("Failed to get dict content %s: %s", path, error->message);
++        g_error_free (error);
++        goto out_load_cache;
++    }
++
++    variant_table = g_variant_new_from_data (G_VARIANT_TYPE ("(sq)"),
++                                             contents,
++                                             length,
++                                             FALSE,
++                                             NULL,
++                                             NULL);
++
++    if (variant_table == NULL) {
++        g_warning ("cache table is broken.");
++        goto out_load_cache;
++    }
++
++    g_variant_get (variant_table, "(&sq)", &header, &version);
++
++    if (g_strcmp0 (header, IBUS_UNICODE_BLOCK_MAGIC) != 0) {
++        g_warning ("cache is not IBusUnicodeBlock.");
++        goto out_load_cache;
++    }
++
++    if (version > IBUS_UNICODE_DATA_VERSION) {
++        g_warning ("cache version is different: %u != %u",
++                   version, IBUS_UNICODE_DATA_VERSION);
++        goto out_load_cache;
++    }
++
++    version = 0;
++    header = NULL;
++    g_variant_unref (variant_table);
++
++    variant_table = g_variant_new_from_data (G_VARIANT_TYPE ("(sqv)"),
++                                             contents,
++                                             length,
++                                             FALSE,
++                                             NULL,
++                                             NULL);
++
++    if (variant_table == NULL) {
++        g_warning ("cache table is broken.");
++        goto out_load_cache;
++    }
++
++    g_variant_get (variant_table, "(&sqv)",
++                   NULL,
++                   NULL,
++                   &variant);
++
++    if (variant == NULL) {
++        g_warning ("cache dict is broken.");
++        goto out_load_cache;
++    }
++
++    retval = ibus_unicode_block_list_deserialize (variant);
++
++out_load_cache:
++    if (variant)
++        g_variant_unref (variant);
++    if (variant_table)
++        g_variant_unref (variant_table);
++    g_free (contents);
++
++    return retval;
++}
++
+diff --git a/src/ibusunicode.h b/src/ibusunicode.h
+new file mode 100644
+index 00000000..99de9451
+--- /dev/null
++++ b/src/ibusunicode.h
+@@ -0,0 +1,299 @@
++/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
++/* vim:set et sts=4: */
++/* bus - The Input Bus
++ * Copyright (C) 2018 Takao Fujiwara <takao.fujiwara1@gmail.com>
++ * Copyright (C) 2018 Red Hat, Inc.
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301
++ * USA
++ */
++
++#if !defined (__IBUS_H_INSIDE__) && !defined (IBUS_COMPILATION)
++#error "Only <ibus.h> can be included directly"
++#endif
++
++#ifndef __IBUS_UNICODE_H_
++#define __IBUS_UNICODE_H_
++
++/**
++ * SECTION: ibusunicode
++ * @short_description: unicode utility.
++ * @stability: Unstable
++ *
++ * miscellaneous unicode APIs.
++ */
++
++#include <gio/gio.h>
++#include "ibusserializable.h"
++
++/*
++ * Type macros.
++ */
++/* define GOBJECT macros */
++#define IBUS_TYPE_UNICODE_DATA       (ibus_unicode_data_get_type ())
++#define IBUS_UNICODE_DATA(obj)       (G_TYPE_CHECK_INSTANCE_CAST ((obj), \
++                                      IBUS_TYPE_UNICODE_DATA, IBusUnicodeData))
++#define IBUS_UNICODE_DATA_CLASS(klass) (G_TYPE_CHECK_CLASS_CAST ((klass), \
++                                      IBUS_TYPE_UNICODE_DATA, \
++                                      IBusUnicodeDataClass))
++#define IBUS_IS_UNICODE_DATA(obj)    (G_TYPE_CHECK_INSTANCE_TYPE ((obj), \
++                                      IBUS_TYPE_UNICODE_DATA))
++#define IBUS_TYPE_UNICODE_BLOCK      (ibus_unicode_block_get_type ())
++#define IBUS_UNICODE_BLOCK(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), \
++                                      IBUS_TYPE_UNICODE_BLOCK, \
++                                      IBusUnicodeBlock))
++#define IBUS_UNICODE_BLOCK_CLASS(klass) (G_TYPE_CHECK_CLASS_CAST ((klass), \
++                                      IBUS_TYPE_UNICODE_BLOCK, \
++                                      IBusUnicodeBlockClass))
++#define IBUS_IS_UNICODE_BLOCK(obj)   (G_TYPE_CHECK_INSTANCE_TYPE ((obj), \
++                                      IBUS_TYPE_UNICODE_BLOCK))
++
++
++G_BEGIN_DECLS
++
++typedef struct _IBusUnicodeData IBusUnicodeData;
++typedef struct _IBusUnicodeDataPrivate IBusUnicodeDataPrivate;
++typedef struct _IBusUnicodeDataClass IBusUnicodeDataClass;
++typedef struct _IBusUnicodeBlock IBusUnicodeBlock;
++typedef struct _IBusUnicodeBlockPrivate IBusUnicodeBlockPrivate;
++typedef struct _IBusUnicodeBlockClass IBusUnicodeBlockClass;
++
++/**
++ * IBusUnicodeDataLoadAsyncFinish:
++ * @data_list: (transfer full) (element-type IBusUnicodeData):
++ *
++ * This callback can receive the list of #IBusUnicodeData.
++ */
++typedef void (*IBusUnicodeDataLoadAsyncFinish) (GSList  *data_list,
++                                                gpointer user_data);
++
++/**
++ * IBusUnicodeData:
++ *
++ * Unicode data likes code, name, alias, block-name.
++ * You can get extended values with g_object_get_properties.
++ */
++struct _IBusUnicodeData {
++    IBusSerializable parent;
++    /* instance members */
++
++    /*< public >*/
++    /*< private >*/
++    IBusUnicodeDataPrivate *priv;
++};
++
++struct _IBusUnicodeDataClass {
++    IBusSerializableClass parent;
++    /* class members */
++};
++
++struct _IBusUnicodeBlock {
++    IBusSerializable parent;
++    /* instance members */
++
++    /*< public >*/
++    /*< private >*/
++    IBusUnicodeBlockPrivate *priv;
++};
++
++struct _IBusUnicodeBlockClass {
++    IBusSerializableClass parent;
++    /* class members */
++};
++
++GType           ibus_unicode_data_get_type    (void);
++GType           ibus_unicode_block_get_type   (void);
++
++/**
++ * ibus_unicode_data_new:
++ * @first_property_name: Name of the first property.
++ * @...: the NULL-terminated arguments of the properties and values.
++ *
++ * Creates a new #IBusUnicodeData.
++ * code property is required. e.g.
++ * ibus_unicode_data_new ("code", 0x3042, NULL)
++ *
++ * Returns: A newly allocated #IBusUnicodeData.
++ */
++IBusUnicodeData * ibus_unicode_data_new       (const gchar *first_property_name,
++                                               ...);
++
++/**
++ * ibus_unicode_data_get_code:
++ * @unicode: An #IBusUnicodeData
++ *
++ * Gets the code point in #IBusUnicodeData.
++ *
++ * Returns: code property in #IBusUnicodeData
++ */
++gunichar          ibus_unicode_data_get_code  (IBusUnicodeData    *unicode);
++
++/**
++ * ibus_unicode_data_get_name:
++ * @unicode: An #IBusUnicodeData
++ *
++ * Gets the name in #IBusUnicodeData. It should not be freed.
++ *
++ * Returns: name property in #IBusUnicodeData
++ */
++const gchar *     ibus_unicode_data_get_name  (IBusUnicodeData    *unicode);
++
++/**
++ * ibus_unicode_data_get_alias:
++ * @unicode: An #IBusUnicodeData
++ *
++ * Gets the alias in #IBusUnicodeData. It should not be freed.
++ *
++ * Returns: alias property in #IBusUnicodeData
++ */
++const gchar *     ibus_unicode_data_get_alias (IBusUnicodeData    *unicode);
++
++/**
++ * ibus_unicode_data_get_block_name:
++ * @unicode: An #IBusUnicodeData
++ *
++ * Gets the block name in #IBusUnicodeData. It should not be freed.
++ *
++ * Returns: block-name property in #IBusUnicodeData
++ */
++const gchar *     ibus_unicode_data_get_block_name
++                                              (IBusUnicodeData    *unicode);
++
++/**
++ * ibus_unicode_data_set_block_name:
++ * @unicode: An #IBusUnicodeData
++ * @block_name: A block name
++ *
++ * Sets the block name in #IBusUnicodeData.
++ */
++void              ibus_unicode_data_set_block_name
++                                              (IBusUnicodeData    *unicode,
++                                               const gchar        *block_name);
++
++/**
++ * ibus_unicode_data_save:
++ * @path: A path of the saved Unicode data.
++ * @list: (element-type IBusUnicodeData) (transfer none): A list of unicode
++ *  data.
++ *
++ * Save the list of #IBusUnicodeData to the cache file.
++ */
++void              ibus_unicode_data_save      (const gchar        *path,
++                                               GSList             *list);
++
++/**
++ * ibus_unicode_data_load:
++ * @path: A path of the saved dictionary file.
++ * @object: (nullable): If the #GObject has "unicode-deserialize-progress"
++ *    signal, this function will emit (the number of desrialized
++ *    #IBusUnicodeData, * the total number of #IBusUnicodeData) of uint values
++ *    with that signal by 100 times. Otherwise %NULL.
++ *
++ * Returns: (element-type IBusUnicodeData) (transfer container):
++ * An #IBusUnicodeData list loaded from the saved cache file.
++ */
++GSList *          ibus_unicode_data_load      (const gchar        *path,
++                                               GObject            *object);
++
++/**
++ * ibus_unicode_data_load_async:
++ * @path: A path of the saved dictionary file.
++ * @object: (nullable): If the #GObject has "unicode-deserialize-progress"
++ *    signal, this function will emit (the number of desrialized
++ *    #IBusUnicodeData, * the total number of #IBusUnicodeData) of uint values
++ *    with that signal by 100 times. Otherwise %NULL.
++ * @cancellable: cancellable.
++ * @callback: (scope notified): IBusUnicodeDataLoadAsyncFinish.
++ * @user_data: User data.
++ *
++ * IBusUnicodeDataLoadAsyncFinish can receive the list of #IBusUnicodeData.
++ */
++void              ibus_unicode_data_load_async
++                                              (const gchar        *path,
++                                               GObject            *object,
++                                               GCancellable       *cancellable,
++                                               IBusUnicodeDataLoadAsyncFinish
++                                                                   callback,
++                                               gpointer            user_data);
++
++/**
++ * ibus_unicode_block_new:
++ * @first_property_name: Name of the first property.
++ * @...: the NULL-terminated arguments of the properties and values.
++ *
++ * Creates a new #IBusUnicodeBlock.
++ * block property is required. e.g.
++ * ibus_unicode_block_new ("start", 0x0000, "end", "0x007f", "name", "basic",
++ * NULL)
++ *
++ * Returns: A newly allocated #IBusUnicodeBlock.
++ */
++IBusUnicodeBlock *ibus_unicode_block_new      (const gchar *first_property_name,
++                                               ...);
++
++/**
++ * ibus_unicode_block_get_start:
++ * @block: An #IBusUnicodeData
++ *
++ * Gets the start code point in #IBusUnicodeBlock.
++ *
++ * Returns: start property in #IBusUnicodeBlock
++ */
++gunichar          ibus_unicode_block_get_start
++                                              (IBusUnicodeBlock   *block);
++
++/**
++ * ibus_unicode_block_get_end:
++ * @block: An #IBusUnicodeData
++ *
++ * Gets the end code point in #IBusUnicodeBlock.
++ *
++ * Returns: end property in #IBusUnicodeBlock
++ */
++gunichar          ibus_unicode_block_get_end
++                                              (IBusUnicodeBlock   *block);
++
++/**
++ * ibus_unicode_block_get_name:
++ * @block: An #IBusUnicodeBlock
++ *
++ * Gets the name in #IBusUnicodeBlock. It should not be freed.
++ *
++ * Returns: name property in #IBusUnicodeBlock
++ */
++const gchar *     ibus_unicode_block_get_name (IBusUnicodeBlock   *block);
++
++/**
++ * ibus_unicode_block_save:
++ * @path: A path of the saved Unicode block.
++ * @list: (element-type IBusUnicodeBlock) (transfer none): A list of unicode
++ *  block.
++ *
++ * Save the list of #IBusUnicodeBlock to the cache file.
++ */
++void              ibus_unicode_block_save     (const gchar        *path,
++                                               GSList             *list);
++
++/**
++ * ibus_unicode_block_load:
++ * @path: A path of the saved dictionary file.
++ *
++ * Returns: (element-type IBusUnicodeBlock) (transfer container):
++ * An #IBusUnicodeBlock list loaded from the saved cache file.
++ */
++GSList *          ibus_unicode_block_load     (const gchar        *path);
++
++G_END_DECLS
++#endif
+diff --git a/src/ibusunicodegen.h b/src/ibusunicodegen.h
+new file mode 100644
+index 00000000..c613b81b
+--- /dev/null
++++ b/src/ibusunicodegen.h
+@@ -0,0 +1,1151 @@
++/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
++/* vim:set et sts=4: */
++/* ibus - The Input Bus
++ * Copyright (C) 2018 Takao Fujiwara <takao.fujiwara1@gmail.com>
++ * Copyright (C) 2018 Red Hat, Inc.
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301
++ * USA
++ */
++
++
++/* This file is generated by unicode-parser.c. */
++include <glib/gi18n.h>
++
++#ifndef __IBUS_UNICODE_GEN_H_
++#define __IBUS_UNICODE_GEN_H_
++const static char *unicode_blocks[] = {
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Basic Latin"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Latin-1 Supplement"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Latin Extended-A"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Latin Extended-B"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("IPA Extensions"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Spacing Modifier Letters"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Combining Diacritical Marks"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Greek and Coptic"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Cyrillic"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Cyrillic Supplement"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Armenian"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Hebrew"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Arabic"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Syriac"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Arabic Supplement"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Thaana"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("NKo"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Samaritan"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Mandaic"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Syriac Supplement"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Arabic Extended-A"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Devanagari"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Bengali"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Gurmukhi"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Gujarati"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Oriya"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Tamil"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Telugu"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Kannada"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Malayalam"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Sinhala"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Thai"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Lao"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Tibetan"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Myanmar"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Georgian"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Hangul Jamo"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Ethiopic"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Ethiopic Supplement"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Cherokee"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Unified Canadian Aboriginal Syllabics"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Ogham"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Runic"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Tagalog"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Hanunoo"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Buhid"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Tagbanwa"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Khmer"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Mongolian"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Unified Canadian Aboriginal Syllabics Extended"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Limbu"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Tai Le"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("New Tai Lue"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Khmer Symbols"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Buginese"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Tai Tham"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Combining Diacritical Marks Extended"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Balinese"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Sundanese"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Batak"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Lepcha"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Ol Chiki"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Cyrillic Extended-C"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Sundanese Supplement"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Vedic Extensions"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Phonetic Extensions"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Phonetic Extensions Supplement"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Combining Diacritical Marks Supplement"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Latin Extended Additional"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Greek Extended"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("General Punctuation"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Superscripts and Subscripts"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Currency Symbols"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Combining Diacritical Marks for Symbols"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Letterlike Symbols"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Number Forms"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Arrows"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Mathematical Operators"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Miscellaneous Technical"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Control Pictures"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Optical Character Recognition"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Enclosed Alphanumerics"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Box Drawing"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Block Elements"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Geometric Shapes"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Miscellaneous Symbols"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Dingbats"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Miscellaneous Mathematical Symbols-A"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Supplemental Arrows-A"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Braille Patterns"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Supplemental Arrows-B"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Miscellaneous Mathematical Symbols-B"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Supplemental Mathematical Operators"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Miscellaneous Symbols and Arrows"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Glagolitic"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Latin Extended-C"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Coptic"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Georgian Supplement"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Tifinagh"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Ethiopic Extended"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Cyrillic Extended-A"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Supplemental Punctuation"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("CJK Radicals Supplement"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Kangxi Radicals"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Ideographic Description Characters"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("CJK Symbols and Punctuation"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Hiragana"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Katakana"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Bopomofo"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Hangul Compatibility Jamo"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Kanbun"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Bopomofo Extended"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("CJK Strokes"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Katakana Phonetic Extensions"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Enclosed CJK Letters and Months"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("CJK Compatibility"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("CJK Unified Ideographs Extension A"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Yijing Hexagram Symbols"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("CJK Unified Ideographs"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Yi Syllables"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Yi Radicals"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Lisu"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Vai"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Cyrillic Extended-B"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Bamum"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Modifier Tone Letters"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Latin Extended-D"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Syloti Nagri"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Common Indic Number Forms"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Phags-pa"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Saurashtra"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Devanagari Extended"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Kayah Li"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Rejang"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Hangul Jamo Extended-A"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Javanese"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Myanmar Extended-B"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Cham"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Myanmar Extended-A"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Tai Viet"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Meetei Mayek Extensions"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Ethiopic Extended-A"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Latin Extended-E"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Cherokee Supplement"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Meetei Mayek"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Hangul Syllables"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Hangul Jamo Extended-B"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("High Surrogates"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("High Private Use Surrogates"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Low Surrogates"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Private Use Area"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("CJK Compatibility Ideographs"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Alphabetic Presentation Forms"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Arabic Presentation Forms-A"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Variation Selectors"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Vertical Forms"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Combining Half Marks"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("CJK Compatibility Forms"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Small Form Variants"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Arabic Presentation Forms-B"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Halfwidth and Fullwidth Forms"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Specials"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Linear B Syllabary"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Linear B Ideograms"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Aegean Numbers"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Ancient Greek Numbers"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Ancient Symbols"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Phaistos Disc"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Lycian"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Carian"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Coptic Epact Numbers"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Old Italic"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Gothic"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Old Permic"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Ugaritic"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Old Persian"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Deseret"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Shavian"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Osmanya"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Osage"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Elbasan"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Caucasian Albanian"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Linear A"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Cypriot Syllabary"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Imperial Aramaic"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Palmyrene"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Nabataean"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Hatran"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Phoenician"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Lydian"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Meroitic Hieroglyphs"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Meroitic Cursive"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Kharoshthi"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Old South Arabian"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Old North Arabian"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Manichaean"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Avestan"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Inscriptional Parthian"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Inscriptional Pahlavi"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Psalter Pahlavi"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Old Turkic"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Old Hungarian"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Rumi Numeral Symbols"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Brahmi"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Kaithi"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Sora Sompeng"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Chakma"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Mahajani"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Sharada"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Sinhala Archaic Numbers"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Khojki"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Multani"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Khudawadi"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Grantha"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Newa"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Tirhuta"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Siddham"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Modi"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Mongolian Supplement"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Takri"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Ahom"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Warang Citi"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Zanabazar Square"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Soyombo"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Pau Cin Hau"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Bhaiksuki"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Marchen"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Masaram Gondi"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Cuneiform"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Cuneiform Numbers and Punctuation"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Early Dynastic Cuneiform"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Egyptian Hieroglyphs"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Anatolian Hieroglyphs"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Bamum Supplement"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Mro"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Bassa Vah"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Pahawh Hmong"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Miao"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Ideographic Symbols and Punctuation"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Tangut"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Tangut Components"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Kana Supplement"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Kana Extended-A"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Nushu"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Duployan"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Shorthand Format Controls"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Byzantine Musical Symbols"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Musical Symbols"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Ancient Greek Musical Notation"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Tai Xuan Jing Symbols"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Counting Rod Numerals"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Mathematical Alphanumeric Symbols"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Sutton SignWriting"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Glagolitic Supplement"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Mende Kikakui"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Adlam"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Arabic Mathematical Alphabetic Symbols"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Mahjong Tiles"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Domino Tiles"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Playing Cards"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Enclosed Alphanumeric Supplement"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Enclosed Ideographic Supplement"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Miscellaneous Symbols and Pictographs"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Emoticons"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Ornamental Dingbats"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Transport and Map Symbols"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Alchemical Symbols"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Geometric Shapes Extended"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Supplemental Arrows-C"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Supplemental Symbols and Pictographs"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("CJK Unified Ideographs Extension B"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("CJK Unified Ideographs Extension C"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("CJK Unified Ideographs Extension D"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("CJK Unified Ideographs Extension E"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("CJK Unified Ideographs Extension F"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("CJK Compatibility Ideographs Supplement"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Tags"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Variation Selectors Supplement"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Supplementary Private Use Area-A"),
++    /* TRANSLATORS: You might refer the translations from gucharmap with
++                    the following command:
++       msgmerge -C gucharmap.po ibus.po ibus.pot */
++    N_("Supplementary Private Use Area-B"),
++};
++#endif
+diff --git a/src/unicode-parser.c b/src/unicode-parser.c
+new file mode 100644
+index 00000000..e98c6d5f
+--- /dev/null
++++ b/src/unicode-parser.c
+@@ -0,0 +1,502 @@
++/* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
++/* vim:set et sts=4: */
++/* ibus - The Input Bus
++ * Copyright (C) 2018 Takao Fujiwara <takao.fujiwara1@gmail.com>
++ * Copyright (C) 2018 Red Hat, Inc.
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301
++ * USA
++ */
++
++#ifdef HAVE_CONFIG_H
++#include <config.h>
++#endif
++
++#include <glib.h>
++#include <stdlib.h>
++#include <string.h>
++
++#ifdef HAVE_LOCALE_H
++#include <locale.h>
++#endif
++
++#include "ibusunicode.h"
++
++#define NAMES_LIST_SUBJECT "The Unicode Standard"
++#define BLOCKS_SUBJECT "Blocks-"
++
++/* This file has 21 lines about the license at the top of the file. */
++#define LICENSE_LINES 21
++
++typedef enum
++{
++    UCD_NAMES_LIST,
++    UCD_BLOCKS
++} UCDType;
++
++typedef struct _UnicodeData UnicodeData;
++typedef struct _UnicodeDataIndex UnicodeDataIndex;
++
++struct _UnicodeData{
++    gunichar code;
++    gchar   *name;
++    gchar   *alias;
++    gunichar start;
++    gunichar end;
++    GSList  *list;
++};
++
++struct _UnicodeDataIndex {
++    gchar *index;
++    UnicodeData *data_list;
++};
++
++static gchar *unicode_version;
++
++static void
++unicode_data_new_object (UnicodeData *data)
++{
++    g_return_if_fail (data != NULL);
++    if (!data->name) {
++        g_warning ("No name in U+%04X", data->code);
++    }
++    IBusUnicodeData *unicode =
++            ibus_unicode_data_new ("code",
++                                   data->code,
++                                   "name",
++                                   data->name ? g_strdup (data->name)
++                                           : g_strdup (""),
++                                   "alias",
++                                   data->alias ? g_strdup (data->alias)
++                                           : g_strdup (""),
++                                   NULL);
++    data->list = g_slist_append (data->list, unicode);
++}
++
++static void
++unicode_block_new_object (UnicodeData *data)
++{
++    g_return_if_fail (data != NULL);
++    if (!data->name) {
++        g_warning ("No name in U+%04X", data->start);
++    }
++    IBusUnicodeBlock *block =
++            ibus_unicode_block_new ("start",
++                                    data->start,
++                                    "end",
++                                    data->end,
++                                    "name",
++                                    data->name ? g_strdup (data->name)
++                                           : g_strdup (""),
++                                   NULL);
++    data->list = g_slist_append (data->list, block);
++}
++
++static void
++unicode_data_reset (UnicodeData *data)
++{
++    g_return_if_fail (data != NULL);
++    data->code = 0;
++    g_clear_pointer (&data->name, g_free);
++    g_clear_pointer (&data->alias, g_free);
++    data->start = 0;
++    data->end = 0;
++}
++
++static gboolean
++ucd_names_list_parse_comment (const gchar *line)
++{
++    static gboolean has_version = FALSE;
++
++    if (has_version)
++        return TRUE;
++    if (strlen (line) > 4 && strncmp (line, "@@@", 3) == 0) {
++        gchar **elements = g_strsplit (line, "\t", -1);
++        if (strncmp (elements[1], NAMES_LIST_SUBJECT,
++            strlen (NAMES_LIST_SUBJECT)) == 0) {
++            unicode_version =
++                    g_strdup (elements[1] + strlen (NAMES_LIST_SUBJECT) + 1);
++            has_version = TRUE;
++        }
++        g_strfreev (elements);
++    }
++    return TRUE;
++}
++
++static gboolean
++ucd_names_list_parse_alias (const gchar *line,
++                            UnicodeData *data)
++{
++    g_return_val_if_fail (line != NULL, FALSE);
++    g_return_val_if_fail (data != NULL, FALSE);
++
++    if (*line == '\0')
++        return FALSE;
++    data->alias = g_strdup (line);
++    return TRUE;
++}
++
++static gboolean
++ucd_names_list_parse_indent_line (const gchar *line,
++                                  UnicodeData *data)
++{
++    g_return_val_if_fail (line != NULL, FALSE);
++
++    switch (*line) {
++    case '\0':
++        return FALSE;
++    case '=':
++        line++;
++        while (*line == ' ') line++;
++        return ucd_names_list_parse_alias (line, data);
++    default:;
++    }
++    return TRUE;
++}
++
++static gboolean
++ucd_names_list_parse_line (const gchar *line,
++                           UnicodeData *data)
++{
++    g_return_val_if_fail (line != NULL, FALSE);
++
++    switch (*line) {
++    case '\0':
++        return TRUE;
++    case ';':
++        return TRUE;
++    case '@':
++        return ucd_names_list_parse_comment (line);
++    case '\t':
++        return ucd_names_list_parse_indent_line (line + 1, data);
++    default:;
++    }
++    if (g_ascii_isxdigit (*line)) {
++        gchar **elements = g_strsplit (line, "\t", -1);
++        gunichar code;
++        gchar *name;
++
++        if (g_strv_length (elements) < 2) {
++            g_strfreev (elements);
++            return FALSE;
++        }
++        code = g_ascii_strtoull (elements[0], NULL, 16);
++        name = g_strdup (elements[1]);
++        if (data->name) {
++            unicode_data_new_object (data);
++            unicode_data_reset (data);
++        }
++        data->code = code;
++        data->name = name;
++    }
++    return TRUE;
++}
++
++static gboolean
++ucd_blocks_parse_comment (const gchar *line)
++{
++    static gboolean has_version = FALSE;
++
++    g_return_val_if_fail (line != NULL, FALSE);
++
++    if (has_version)
++        return TRUE;
++    while (*line == ' ') line++;
++    if (strlen (line) > strlen (BLOCKS_SUBJECT) &&
++        strncmp (line, BLOCKS_SUBJECT, strlen (BLOCKS_SUBJECT)) == 0) {
++            unicode_version = g_strdup (line + strlen (BLOCKS_SUBJECT) + 1);
++            has_version = TRUE;
++    }
++    return TRUE;
++}
++
++static gboolean
++ucd_blocks_parse_line (const gchar *line,
++                       UnicodeData *data)
++{
++    g_return_val_if_fail (line != NULL, FALSE);
++
++    switch (*line) {
++    case '\0':
++        return TRUE;
++    case '#':
++        return ucd_blocks_parse_comment (line + 1);
++    default:;
++    }
++    if (g_ascii_isxdigit (*line)) {
++        gchar *endptr = NULL;
++        gunichar start = g_ascii_strtoull (line, &endptr, 16);
++        gunichar end;
++        gchar *name = NULL;
++
++        if (endptr == NULL || *endptr == '\0')
++            return FALSE;
++        while (*endptr == '.') endptr++;
++        line = endptr;
++        endptr = NULL;
++        end = g_ascii_strtoull (line, &endptr, 16);
++        if (endptr == NULL || *endptr == '\0')
++            return FALSE;
++        while (*endptr == ';') endptr++;
++        while (*endptr == ' ') endptr++;
++        if (*endptr == '\0')
++            return FALSE;
++        name = g_strdup (endptr);
++        if (data->name) {
++            unicode_block_new_object (data);
++            unicode_data_reset (data);
++        }
++        data->start = start;
++        data->end = end;
++        data->name = name;
++    }
++    return TRUE;
++}
++
++static gboolean
++ucd_parse_file (const gchar *filename,
++                GSList     **list,
++                UCDType      type)
++{
++    UnicodeData data = { 0, };
++    gchar *content = NULL;
++    gsize length = 0;
++    GError *error = NULL;
++    gchar *head, *end, *line;
++    int n = 1;
++
++    g_return_val_if_fail (filename != NULL, FALSE);
++    g_return_val_if_fail (list != NULL, FALSE);
++
++    if (!g_file_get_contents (filename, &content, &length, &error)) {
++        g_warning ("Failed to load %s: %s", filename, error->message);
++        goto failed_to_parse_ucd_names_list;
++    }
++    head = end = content;
++    while (*end == '\n' && end - content < length) {
++        end++;
++        n++;
++    }
++    head = end;
++    while (end - content < length) {
++        while (*end != '\n' && end - content < length)
++            end++;
++        if (end - content >= length)
++            break;
++        line = g_strndup (head, end - head);
++        switch (type) {
++        case UCD_NAMES_LIST:
++            if (!ucd_names_list_parse_line (line, &data)) {
++                g_warning ("parse error #%d in %s version %s: %s",
++                           n, filename,
++                           unicode_version ? unicode_version : "(null)",
++                           line);
++            }
++            break;
++        case UCD_BLOCKS:
++            if (!ucd_blocks_parse_line (line, &data)) {
++                g_warning ("parse error #%d in %s version %s: %s",
++                           n, filename,
++                           unicode_version ? unicode_version : "(null)",
++                           line);
++            }
++            break;
++        default:
++            g_abort ();
++        }
++        while (*end == '\n' && end - content < length) {
++            end++;
++            n++;
++        }
++        g_free (line);
++        head = end;
++    }
++    if (data.name != NULL) {
++        switch (type) {
++        case UCD_NAMES_LIST:
++            unicode_data_new_object (&data);
++            break;
++        case UCD_BLOCKS:
++            unicode_block_new_object (&data);
++            break;
++        default:;
++        }
++        unicode_data_reset (&data);
++    }
++    g_free (content);
++    *list = data.list;
++    return TRUE;
++
++failed_to_parse_ucd_names_list:
++    if (error)
++        g_error_free (error);
++    g_clear_pointer (&content, g_free);
++    *list = data.list;
++    return FALSE;
++}
++
++static void
++block_list_dump (IBusUnicodeBlock *block,
++                 GString          *buff)
++{
++    g_return_if_fail (buff != NULL);
++
++    g_string_append (buff, "    /* TRANSLATORS: You might refer the "         \
++                           "translations from gucharmap with\n"               \
++                           "                    the following command:\n"     \
++                           "       msgmerge -C gucharmap.po ibus.po "         \
++                           "ibus.pot */\n");
++    gchar *line = g_strdup_printf ("    N_(\"%s\"),\n",
++                                   ibus_unicode_block_get_name (block));
++    g_string_append (buff, line);
++}
++
++static void
++ucd_block_translatable_save (const gchar *filename,
++                             GSList      *blocks_list)
++{
++    gchar *content = NULL;
++    gsize length = 0;
++    GError *error = NULL;
++    gchar *p;
++    GString *buff = NULL;
++    int i;
++    GSList *list = blocks_list;
++
++    g_return_if_fail (filename != NULL);
++    g_return_if_fail (list != NULL);
++
++    if (!g_file_get_contents (__FILE__, &content, &length, &error)) {
++        g_warning ("Failed to load %s: %s", __FILE__, error->message);
++        g_clear_pointer (&error, g_error_free);
++        return;
++    }
++
++    buff = g_string_new (NULL);
++    p = content;
++    for (i = 0; i < LICENSE_LINES; i++, p++) {
++        if ((p = strchr (p, '\n')) == NULL)
++            break;
++    }
++    if (p != NULL) {
++        g_string_append (buff, g_strndup (content, p - content));
++        g_string_append_c (buff, '\n');
++    }
++    g_clear_pointer (&content, g_free);
++
++    g_string_append (buff, g_strdup ("\n"));
++    g_string_append (buff, g_strdup_printf ("/* This file is generated by %s. */", __FILE__));
++    g_string_append (buff, g_strdup ("\n"));
++    g_string_append (buff, g_strdup ("include <glib/gi18n.h>\n"));
++    g_string_append (buff, g_strdup ("\n"));
++    g_string_append (buff, g_strdup ("#ifndef __IBUS_UNICODE_GEN_H_\n"));
++    g_string_append (buff, g_strdup ("#define __IBUS_UNICODE_GEN_H_\n"));
++    g_string_append (buff, g_strdup ("const static char *unicode_blocks[] = {\n"));
++    g_slist_foreach (list, (GFunc)block_list_dump, buff);
++    g_string_append (buff, g_strdup ("};\n"));
++    g_string_append (buff, g_strdup ("#endif\n"));
++
++    if (!g_file_set_contents (filename, buff->str, -1, &error)) {
++        g_warning ("Failed to save emoji category file %s: %s", filename, error->message);
++        g_error_free (error);
++    }
++
++    g_string_free (buff, TRUE);
++}
++
++int
++main (int argc, char *argv[])
++{
++    gchar *prgname;
++    gchar *input_names_list = NULL;
++    gchar *input_blocks = NULL;
++    gchar *output_names_list = NULL;
++    gchar *output_blocks = NULL;
++    gchar *output_blocks_trans = NULL;
++    GOptionEntry     entries[] = {
++        { "input-names-list", 'n', 0, G_OPTION_ARG_STRING, &input_names_list,
++          "Parse NamesList.txt FILE in unicode.org ",
++          "FILE"
++        },
++        { "input-blocks", 'b', 0, G_OPTION_ARG_STRING, &input_blocks,
++          "Parse Blocks.txt FILE in unicode.org ",
++          "FILE"
++        },
++        { "output-names-list", 'o', 0, G_OPTION_ARG_STRING, &output_names_list,
++          "Save the Unicode data as FILE",
++          "FILE"
++        },
++        { "output-blocks", 'B', 0, G_OPTION_ARG_STRING, &output_blocks,
++          "Save the Unicode block list as FILE",
++          "FILE"
++        },
++        { "output-blocks-trans", 'C', 0, G_OPTION_ARG_STRING,
++          &output_blocks_trans,
++          "Save the translatable Unicode blocks as FILE",
++          "FILE"
++        },
++        { NULL }
++    };
++    GOptionContext *context;
++    GError *error = NULL;
++    GSList *names_list = NULL;
++    GSList *blocks_list = NULL;
++
++#ifdef HAVE_LOCALE_H
++    /* To output emoji warnings. */
++    setlocale (LC_ALL, "");
++#endif
++
++    prgname = g_path_get_basename (argv[0]);
++    g_set_prgname (prgname);
++    g_free (prgname);
++
++    context = g_option_context_new (NULL);
++    g_option_context_add_main_entries (context, entries, NULL);
++
++    if (argc < 3) {
++        g_print ("%s", g_option_context_get_help (context, TRUE, NULL));
++        g_option_context_free (context);
++        return -1;
++    }
++
++    if (!g_option_context_parse (context, &argc, &argv, &error)) {
++        g_warning ("Failed options: %s", error->message);
++        g_error_free (error);
++        return -1;
++    }
++    g_option_context_free (context);
++
++    if (input_names_list) {
++        ucd_parse_file (input_names_list, &names_list, UCD_NAMES_LIST);
++        g_free (input_names_list);
++    }
++    if (output_names_list && names_list)
++        ibus_unicode_data_save (output_names_list, names_list);
++    g_free (output_names_list);
++
++    if (input_blocks) {
++        ucd_parse_file (input_blocks, &blocks_list, UCD_BLOCKS);
++        g_free (input_blocks);
++    }
++    if (output_blocks && blocks_list)
++        ibus_unicode_block_save (output_blocks, blocks_list);
++    if (output_blocks_trans && blocks_list)
++        ucd_block_translatable_save (output_blocks_trans, blocks_list);
++    g_free (output_blocks);
++
++    g_free (unicode_version);
++    return 0;
++}
+diff --git a/ui/gtk3/emojier.vala b/ui/gtk3/emojier.vala
+index f3e9f15c..555ea68f 100644
+--- a/ui/gtk3/emojier.vala
++++ b/ui/gtk3/emojier.vala
+@@ -2,7 +2,7 @@
+  *
+  * ibus - The Input Bus
+  *
+- * Copyright (c) 2017 Takao Fujiwara <takao.fujiwara1@gmail.com>
++ * Copyright (c) 2017-2018 Takao Fujiwara <takao.fujiwara1@gmail.com>
+  *
+  * This library is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU Lesser General Public
+@@ -20,7 +20,7 @@
+  * USA
+  */
+ 
+-class IBusEmojier : Gtk.ApplicationWindow {
++public class IBusEmojier : Gtk.ApplicationWindow {
+     private class EEntry : Gtk.SearchEntry {
+         public EEntry() {
+             GLib.Object(
+@@ -99,15 +99,70 @@ class IBusEmojier : Gtk.ApplicationWindow {
+         }
+     }
+     private class EWhiteLabel : Gtk.Label {
++        private int m_minimum_width = 0;
++        private int m_natural_width = 0;
++        private int m_minimum_height = 0;
++        private int m_natural_height = 0;
+         public EWhiteLabel(string text) {
+             GLib.Object(
+                 name : "IBusEmojierWhiteLabel"
+             );
+-            if (text != "")
+-                set_label(text);
++            set_label(text);
++        }
++        public override void get_preferred_width(out int minimum_width,
++                                                 out int natural_width) {
++            if (m_minimum_height == 0 && m_natural_height == 0) {
++                base.get_preferred_height(out m_minimum_height,
++                                          out m_natural_height);
++            }
++            var text = get_label();
++            var ch = text.get_char();
++            if (text.length == 1 && ch == '\t') {
++                m_minimum_width = minimum_width = m_minimum_height;
++                m_natural_width = natural_width = m_natural_height;
++                return;
++            }
++            base.get_preferred_width(out minimum_width, out natural_width);
++            if (text.length == 1 && (ch == '\n' || ch == '\r')) {
++                minimum_width /= 2;
++                natural_width /= 2;
++                m_minimum_width = minimum_width;
++                m_natural_width = natural_width;
++                return;
++            }
++            if (minimum_width < m_minimum_height)
++                minimum_width = m_minimum_height;
++            if (natural_width < m_natural_height)
++                natural_width = m_natural_height;
++            m_minimum_width = minimum_width;
++            m_natural_width = natural_width;
++        }
++        public override void get_preferred_height(out int minimum_height,
++                                                  out int natural_height) {
++            if (m_minimum_width == 0 && m_natural_width == 0) {
++                base.get_preferred_width(out m_minimum_width,
++                                         out m_natural_width);
++            }
++            var text = get_label();
++            var ch = text.get_char();
++            if (text.length == 1 && ch == '\v') {
++                m_minimum_height = minimum_height = m_minimum_width;
++                m_natural_height = natural_height = m_natural_width;
++                return;
++            }
++            base.get_preferred_height(out minimum_height, out natural_height);
++            if (text.length == 1 && (ch == '\n' || ch == '\r')) {
++                minimum_height /= 2;
++                natural_height /= 2;
++                m_minimum_height = minimum_height;
++                m_natural_height = natural_height;
++                return;
++            }
++            m_minimum_height = minimum_height;
++            m_natural_height = natural_height;
+         }
+     }
+-    private class ESelectedLabel : Gtk.Label {
++    private class ESelectedLabel : EWhiteLabel {
+         public ESelectedLabel(string text) {
+             GLib.Object(
+                 name : "IBusEmojierSelectedLabel"
+@@ -116,7 +171,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
+                 set_label(text);
+         }
+     }
+-    private class EGoldLabel : Gtk.Label {
++    private class EGoldLabel : EWhiteLabel {
+         public EGoldLabel(string text) {
+             GLib.Object(
+                 name : "IBusEmojierGoldLabel"
+@@ -167,6 +222,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
+     }
+     private class ETitleLabelBox : Gtk.HeaderBar {
+         private Gtk.Label m_lang_label;
++        private Gtk.Label m_title_label;
+ 
+         public ETitleLabelBox(string title) {
+             GLib.Object(
+@@ -177,9 +233,9 @@ class IBusEmojier : Gtk.ApplicationWindow {
+             );
+             var vbox = new Gtk.Box(Gtk.Orientation.VERTICAL, 0);
+             set_custom_title(vbox);
+-            var label = new Gtk.Label(title);
+-            label.get_style_context().add_class(Gtk.STYLE_CLASS_TITLE);
+-            vbox.pack_start(label, true, false, 0);
++            m_title_label = new Gtk.Label(title);
++            m_title_label.get_style_context().add_class(Gtk.STYLE_CLASS_TITLE);
++            vbox.pack_start(m_title_label, true, false, 0);
+             m_lang_label = new Gtk.Label(null);
+             m_lang_label.get_style_context().add_class(
+                     Gtk.STYLE_CLASS_SUBTITLE);
+@@ -194,10 +250,19 @@ class IBusEmojier : Gtk.ApplicationWindow {
+             menu_button.set_tooltip_text(_("Menu"));
+             pack_end(menu_button);
+         }
++        public new void set_title(string title) {
++            m_title_label.set_text(title);
++        }
+         public void set_lang_label(string str) {
+             m_lang_label.set_text(str);
+         }
+     }
++    private class LoadProgressObject : GLib.Object {
++        public LoadProgressObject() {
++        }
++        public signal void deserialize_unicode(uint done, uint total);
++    }
++
+ 
+     private enum TravelDirection {
+         NONE,
+@@ -207,6 +272,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
+     private const uint EMOJI_GRID_PAGE = 10;
+     private const string EMOJI_CATEGORY_FAVORITES = N_("Favorites");
+     private const string EMOJI_CATEGORY_OTHERS = N_("Others");
++    private const string EMOJI_CATEGORY_UNICODE = N_("Open Unicode choice");
+     private const unichar[] EMOJI_VARIANT_LIST = {
+             0x1f3fb, 0x1f3fc, 0x1f3fd, 0x1f3fe, 0x1f3ff, 0x200d };
+ 
+@@ -223,6 +289,8 @@ class IBusEmojier : Gtk.ApplicationWindow {
+     private static uint m_partial_match_length;
+     private static uint m_partial_match_condition;
+     private static bool m_show_emoji_variant = false;
++    private static int m_default_window_width;
++    private static int m_default_window_height;
+     private static GLib.HashTable<string, GLib.SList<string>>?
+             m_annotation_to_emojis_dict;
+     private static GLib.HashTable<string, IBus.EmojiData>?
+@@ -231,6 +299,14 @@ class IBusEmojier : Gtk.ApplicationWindow {
+             m_category_to_emojis_dict;
+     private static GLib.HashTable<string, GLib.SList<string>>?
+             m_emoji_to_emoji_variants_dict;
++    private static GLib.HashTable<unichar, IBus.UnicodeData>?
++            m_unicode_to_data_dict;
++    private static GLib.HashTable<string, GLib.SList<unichar>>?
++            m_name_to_unicodes_dict;
++    private static GLib.SList<IBus.UnicodeBlock> m_unicode_block_list;
++    private static bool m_show_unicode = false;
++    private static LoadProgressObject m_unicode_progress_object;
++    private static bool m_loaded_unicode = false;
+ 
+     private ThemedRGBA m_rgba;
+     private Gtk.Box m_vbox;
+@@ -246,7 +322,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
+     private string? m_result;
+     private string? m_unicode_point = null;
+     private bool m_candidate_panel_is_visible;
+-    private int m_category_active_index;
++    private int m_category_active_index = -1;
+     private IBus.LookupTable m_lookup_table;
+     private Gtk.Label[] m_candidates;
+     private bool m_enter_notify_enable = true;
+@@ -254,6 +330,9 @@ class IBusEmojier : Gtk.ApplicationWindow {
+     private uint m_entry_notify_disable_id;
+     protected static double m_mouse_x;
+     protected static double m_mouse_y;
++    private Gtk.ProgressBar m_unicode_progress_bar;
++    private Gtk.Label m_unicode_percent_label;
++    private double m_unicode_percent;
+ 
+     public signal void candidate_clicked(uint index, uint button, uint state);
+ 
+@@ -402,6 +481,8 @@ class IBusEmojier : Gtk.ApplicationWindow {
+         if (m_annotation_to_emojis_dict == null) {
+             reload_emoji_dict();
+         }
++
++        get_load_progress_object();
+     }
+ 
+ 
+@@ -433,6 +514,13 @@ class IBusEmojier : Gtk.ApplicationWindow {
+         m_emoji_to_emoji_variants_dict =
+                 new GLib.HashTable<string, GLib.SList<string>>(GLib.str_hash,
+                                                                GLib.str_equal);
++        m_unicode_to_data_dict =
++                new GLib.HashTable<unichar, IBus.UnicodeData>(
++                        GLib.direct_hash,
++                        GLib.direct_equal);
++        m_name_to_unicodes_dict =
++                new GLib.HashTable<string, GLib.SList<unichar>>(GLib.str_hash,
++                                                                GLib.str_equal);
+     }
+ 
+ 
+@@ -482,6 +570,10 @@ class IBusEmojier : Gtk.ApplicationWindow {
+     private static string utf8_code_point(string str) {
+         var buff = new GLib.StringBuilder();
+         int length = str.char_count();
++        if (length == 0) {
++            buff.append("U+%04X".printf(0));
++            return buff.str;
++        }
+         for (int i = 0; i < length; i++) {
+             unichar ch = str.get_char(0);
+             if (i == 0)
+@@ -644,6 +736,72 @@ class IBusEmojier : Gtk.ApplicationWindow {
+     }
+ 
+ 
++    private static void make_unicode_block_dict() {
++        m_unicode_block_list = IBus.UnicodeBlock.load(
++                    Config.PKGDATADIR + "/dicts/unicode-blocks.dict");
++        foreach (unowned IBus.UnicodeBlock block in m_unicode_block_list) {
++            unowned string name = block.get_name();
++            if (m_emoji_max_seq_len < name.length)
++                m_emoji_max_seq_len = name.length;
++        }
++    }
++
++
++    private static void make_unicode_name_dict(Object source_object) {
++        IBus.UnicodeData.load_async(
++                    Config.PKGDATADIR + "/dicts/unicode-names.dict",
++                    source_object,
++                    null,
++        (IBus.UnicodeDataLoadAsyncFinish)make_unicode_name_dict_finish);
++    }
++
++    private static void
++    make_unicode_name_dict_finish(GLib.SList<IBus.UnicodeData> unicode_list) {
++        if (unicode_list == null)
++            return;
++        foreach (IBus.UnicodeData data in unicode_list) {
++            update_unicode_to_data_dict(data);
++            update_name_to_unicodes_dict(data);
++        }
++        GLib.List<unowned string> names =
++                m_name_to_unicodes_dict.get_keys();
++        foreach (unowned string name in names) {
++            if (m_emoji_max_seq_len < name.length)
++                m_emoji_max_seq_len = name.length;
++        }
++        m_loaded_unicode = true;
++    }
++
++
++    private static void update_unicode_to_data_dict(IBus.UnicodeData data) {
++        unichar code = data.get_code();
++        m_unicode_to_data_dict.replace(code, data);
++    }
++
++
++    private static void update_name_to_unicodes_dict(IBus.UnicodeData data) {
++        unichar code = data.get_code();
++        string[] names = {data.get_name().down(), data.get_alias().down()};
++        foreach (unowned string name in names) {
++            if (name == "")
++                continue;
++            bool has_code = false;
++            GLib.SList<unichar> hits =
++                    m_name_to_unicodes_dict.lookup(name).copy();
++            foreach (unichar hit_code in hits) {
++                if (hit_code == code) {
++                    has_code = true;
++                    break;
++                }
++            }
++            if (!has_code) {
++                hits.append(code);
++                m_name_to_unicodes_dict.replace(name, hits.copy());
++            }
++        }
++    }
++
++
+     private void set_fixed_size() {
+         resize(20, 1);
+     }
+@@ -665,6 +823,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
+         m_scrolled_window = new EScrolledWindow();
+         set_fixed_size();
+ 
++        m_title.set_title(_("Emoji Choice"));
+         string language =
+             IBus.get_language_name(m_current_lang_id);
+         m_title.set_lang_label(language);
+@@ -677,12 +836,12 @@ class IBusEmojier : Gtk.ApplicationWindow {
+         Gtk.Adjustment adjustment = m_scrolled_window.get_vadjustment();
+         m_list_box.set_adjustment(adjustment);
+         m_list_box.row_activated.connect((box, gtkrow) => {
+-            m_category_active_index = 0;
++            m_category_active_index = -1;
+             EBoxRow row = gtkrow as EBoxRow;
+             show_emoji_for_category(row.text);
+         });
+ 
+-        uint n = 1;
++        uint n = 0;
+         if (m_favorites.length > 0) {
+             EBoxRow row = new EBoxRow(EMOJI_CATEGORY_FAVORITES);
+             EPaddedLabelBox widget =
+@@ -716,9 +875,19 @@ class IBusEmojier : Gtk.ApplicationWindow {
+             if (n++ == m_category_active_index)
+                 m_list_box.select_row(row);
+         }
++        if (m_unicode_block_list.length() > 0) {
++            EBoxRow row = new EBoxRow(EMOJI_CATEGORY_UNICODE);
++            EPaddedLabelBox widget =
++                    new EPaddedLabelBox(_(EMOJI_CATEGORY_UNICODE),
++                                        Gtk.Align.CENTER);
++            row.add(widget);
++            m_list_box.add(row);
++            if (n++ == m_category_active_index)
++                m_list_box.select_row(row);
++        }
+ 
+         m_scrolled_window.show_all();
+-        if (m_category_active_index == 0)
++        if (m_category_active_index == -1)
+             m_list_box.unselect_all();
+         m_list_box.invalidate_filter();
+         m_list_box.set_selection_mode(Gtk.SelectionMode.SINGLE);
+@@ -733,6 +902,11 @@ class IBusEmojier : Gtk.ApplicationWindow {
+                 m_lookup_table.append_candidate(text);
+             }
+             m_backward = category;
++        } else if (category == EMOJI_CATEGORY_UNICODE) {
++            m_category_active_index = -1;
++            m_show_unicode = true;
++            show_unicode_blocks();
++            return;
+         } else {
+             unowned GLib.SList<unowned string> emojis =
+                     m_category_to_emojis_dict.lookup(category);
+@@ -764,6 +938,126 @@ class IBusEmojier : Gtk.ApplicationWindow {
+     }
+ 
+ 
++    private void show_unicode_blocks() {
++        m_show_unicode = true;
++        if (m_default_window_width == 0 && m_default_window_height == 0)
++            get_size(out m_default_window_width, out m_default_window_height);
++        remove_all_children();
++        set_fixed_size();
++
++        m_title.set_title(_("Unicode Choice"));
++        EPaddedLabelBox label =
++                new EPaddedLabelBox(_("Bring back emoji choice"),
++                                    Gtk.Align.CENTER,
++                                    TravelDirection.BACKWARD);
++        Gtk.Button button = new Gtk.Button();
++        button.add(label);
++        m_vbox.add(button);
++        button.show_all();
++        button.button_press_event.connect((w, e) => {
++            m_category_active_index = -1;
++            m_show_unicode = false;
++            hide_candidate_panel();
++            return true;
++        });
++        m_scrolled_window = new EScrolledWindow();
++        m_title.set_lang_label("");
++        m_vbox.add(m_scrolled_window);
++        Gtk.Viewport viewport = new Gtk.Viewport(null, null);
++        m_scrolled_window.add(viewport);
++
++        m_list_box = new EListBox();
++        viewport.add(m_list_box);
++        Gtk.Adjustment adjustment = m_scrolled_window.get_vadjustment();
++        m_list_box.set_adjustment(adjustment);
++        m_list_box.row_activated.connect((box, gtkrow) => {
++            m_category_active_index = -1;
++            EBoxRow row = gtkrow as EBoxRow;
++            show_unicode_for_block(row.text);
++        });
++
++        uint n = 0;
++        foreach (unowned IBus.UnicodeBlock block in m_unicode_block_list) {
++            string name = block.get_name();
++            EBoxRow row = new EBoxRow(name);
++            EPaddedLabelBox widget =
++                    new EPaddedLabelBox(_(name), Gtk.Align.CENTER);
++            row.add(widget);
++            m_list_box.add(row);
++            if (n++ == m_category_active_index) {
++                m_list_box.select_row(row);
++            }
++        }
++
++        set_size_request(-1, m_default_window_height + 100);
++        m_scrolled_window.set_policy(Gtk.PolicyType.NEVER,
++                                     Gtk.PolicyType.AUTOMATIC);
++        m_scrolled_window.show_all();
++        if (m_category_active_index == -1)
++            m_list_box.unselect_all();
++        m_list_box.invalidate_filter();
++        m_list_box.set_selection_mode(Gtk.SelectionMode.SINGLE);
++    }
++
++    private void show_unicode_for_block(string block_name) {
++        if (!m_loaded_unicode) {
++            remove_all_children();
++            set_fixed_size();
++            m_unicode_progress_bar = new Gtk.ProgressBar();
++            m_unicode_progress_bar.set_ellipsize(Pango.EllipsizeMode.MIDDLE);
++            m_unicode_progress_bar.set_halign(Gtk.Align.CENTER);
++            m_unicode_progress_bar.set_valign(Gtk.Align.CENTER);
++            m_vbox.add(m_unicode_progress_bar);
++            m_unicode_progress_bar.show();
++            var hbox = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 5);
++            hbox.set_halign(Gtk.Align.CENTER);
++            hbox.set_valign(Gtk.Align.CENTER);
++            m_vbox.add(hbox);
++            var label = new Gtk.Label(_("Loading a Unicode dictionary:"));
++            hbox.pack_start(label, false, true, 0);
++            m_unicode_percent_label = new Gtk.Label("");
++            hbox.pack_start(m_unicode_percent_label, false, true, 0);
++            hbox.show_all();
++
++            m_unicode_progress_object.deserialize_unicode.connect((i, n) => {
++                m_unicode_percent = (double)i / n;
++            });
++            GLib.Timeout.add(100, () => {
++                m_unicode_progress_bar.set_fraction(m_unicode_percent);
++                m_unicode_percent_label.set_text(
++                        "%.0f%%\n".printf(m_unicode_percent * 100));
++                m_unicode_progress_bar.show();
++                m_unicode_percent_label.show();
++                if (m_loaded_unicode) {
++                    show_unicode_for_block(block_name);
++                }
++                return !m_loaded_unicode;
++            });
++            return;
++        }
++        unichar start = 0;
++        unichar end = 0;
++        foreach (unowned IBus.UnicodeBlock block in m_unicode_block_list) {
++            string name = block.get_name();
++            if (block_name == name) {
++                start = block.get_start();
++                end = block.get_end();
++            }
++        }
++        m_lookup_table.clear();
++        for (unichar ch = start; ch < end; ch++) {
++            unowned IBus.UnicodeData? data =
++                    m_unicode_to_data_dict.lookup(ch);
++            if (data == null)
++                continue;
++            IBus.Text text = new IBus.Text.from_unichar(ch);
++            m_lookup_table.append_candidate(text);
++        }
++        m_backward = block_name;
++        show_candidate_panel();
++    }
++
++
+     private void show_arrow_buttons() {
+         Gtk.Button next_button = new Gtk.Button();
+         next_button.clicked.connect(() => {
+@@ -840,6 +1134,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
+     lookup_emojis_from_annotation(string annotation) {
+         GLib.SList<string>? total_emojis = null;
+         unowned GLib.SList<string>? sub_emojis = null;
++        unowned GLib.SList<unichar>? sub_unicodes = null;
+         int length = annotation.length;
+         if (m_has_partial_match && length >= m_partial_match_length) {
+             foreach (unowned string key in
+@@ -877,6 +1172,22 @@ class IBusEmojier : Gtk.ApplicationWindow {
+             foreach (unowned string emoji in sub_emojis)
+                 total_emojis.append(emoji);
+         }
++        if (length >= m_partial_match_length) {
++            foreach (unowned string key in m_name_to_unicodes_dict.get_keys()) {
++                bool matched = false;
++                if (key.index_of(annotation) >= 0)
++                        matched = true;
++                if (!matched)
++                    continue;
++                sub_unicodes = m_name_to_unicodes_dict.lookup(key);
++                foreach (unichar code in sub_unicodes) {
++                    string ch = code.to_string();
++                    if (total_emojis.find_custom(ch, GLib.strcmp) == null) {
++                        total_emojis.append(ch);
++                    }
++                }
++            }
++        }
+         return total_emojis;
+     }
+ 
+@@ -1049,58 +1360,99 @@ class IBusEmojier : Gtk.ApplicationWindow {
+             grid.show_all();
+             string text = m_lookup_table.get_candidate(cursor).text;
+             unowned IBus.EmojiData? data = m_emoji_to_data_dict.lookup(text);
+-            if (data == null) {
+-                // TODO: Provide a custom description and annotation for
+-                // the favorite emojis.
+-                EPaddedLabelBox widget = new EPaddedLabelBox(
+-                        _("Description: %s").printf(_("None")),
+-                        Gtk.Align.START);
+-                m_vbox.add(widget);
+-                widget.show_all();
+-                show_code_point_description(text);
++            if (data != null) {
++                show_emoji_description(data, text);
+                 return;
+-            } else {
+-                unowned string description = data.get_description();
+-                EPaddedLabelBox widget = new EPaddedLabelBox(
+-                        _("Description: %s").printf(description),
+-                        Gtk.Align.START);
+-                m_vbox.add(widget);
+-                widget.show_all();
+             }
+-            unowned GLib.SList<unowned string>? annotations =
+-                    data.get_annotations();
+-            var buff = new GLib.StringBuilder();
+-            int i = 0;
+-            foreach (unowned string annotation in annotations) {
+-                if (i++ == 0)
+-                    buff.append_printf(_("Annotations: %s"), annotation);
+-                else
+-                    buff.append_printf(" | %s", annotation);
+-                if (buff.str.char_count() > 30) {
+-                    EPaddedLabelBox widget =
+-                            new EPaddedLabelBox(buff.str,
+-                                                Gtk.Align.START);
+-                    m_vbox.add(widget);
+-                    widget.show_all();
+-                    buff.erase();
++            if (text.char_count() <= 1) {
++                unichar code = text.get_char();
++                unowned IBus.UnicodeData? udata =
++                        m_unicode_to_data_dict.lookup(code);
++                if (udata != null) {
++                    show_unicode_description(udata, text);
++                    return;
+                 }
+             }
+-            if (buff.str != "") {
+-                EPaddedLabelBox widget = new EPaddedLabelBox(buff.str,
+-                                                             Gtk.Align.START);
++            // TODO: Provide a custom description and annotation for
++            // the favorite emojis.
++            EPaddedLabelBox widget = new EPaddedLabelBox(
++                        _("Description: %s").printf(_("None")),
++                        Gtk.Align.START);
++            m_vbox.add(widget);
++            widget.show_all();
++            show_code_point_description(text);
++        }
++    }
++
++
++    private void show_emoji_description(IBus.EmojiData data,
++                                        string         text) {
++        unowned string description = data.get_description();
++        {
++            EPaddedLabelBox widget = new EPaddedLabelBox(
++                    _("Description: %s").printf(description),
++                    Gtk.Align.START);
++            m_vbox.add(widget);
++            widget.show_all();
++        }
++        unowned GLib.SList<unowned string>? annotations =
++                data.get_annotations();
++        var buff = new GLib.StringBuilder();
++        int i = 0;
++        foreach (unowned string annotation in annotations) {
++            if (i++ == 0)
++                buff.append_printf(_("Annotations: %s"), annotation);
++            else
++                buff.append_printf(" | %s", annotation);
++            if (buff.str.char_count() > 30) {
++                EPaddedLabelBox widget =
++                        new EPaddedLabelBox(buff.str,
++                                            Gtk.Align.START);
+                 m_vbox.add(widget);
+                 widget.show_all();
++                buff.erase();
+             }
+-            show_code_point_description(text);
+         }
++        if (buff.str != "") {
++            EPaddedLabelBox widget = new EPaddedLabelBox(buff.str,
++                                                         Gtk.Align.START);
++            m_vbox.add(widget);
++            widget.show_all();
++        }
++        show_code_point_description(text);
++    }
++
++    private void show_unicode_description(IBus.UnicodeData data,
++                                          string           text) {
++        unowned string name = data.get_name();
++        {
++            EPaddedLabelBox widget = new EPaddedLabelBox(
++                    _("Name: %s").printf(name),
++                    Gtk.Align.START);
++            m_vbox.add(widget);
++            widget.show_all();
++        }
++        unowned string alias = data.get_alias();
++        {
++            EPaddedLabelBox widget = new EPaddedLabelBox(
++                    _("Alias: %s").printf(alias),
++                    Gtk.Align.START);
++            m_vbox.add(widget);
++            widget.show_all();
++        }
++        show_code_point_description(text);
+     }
+ 
+ 
+     private void hide_candidate_panel() {
+         m_enter_notify_enable = true;
+         m_candidate_panel_is_visible = false;
+-        if (m_loop.is_running())
+-            show_category_list();
++        if (m_loop.is_running()) {
++            if (m_show_unicode)
++                show_unicode_blocks();
++            else
++                show_category_list();
++        }
+     }
+ 
+ 
+@@ -1165,19 +1517,41 @@ class IBusEmojier : Gtk.ApplicationWindow {
+     }
+ 
+ 
+-    private void category_list_cursor_move(uint keyval) {
++    private bool category_list_cursor_move(uint keyval) {
+         GLib.List<weak Gtk.Widget> list = m_list_box.get_children();
+-        if (keyval == Gdk.Key.Down) {
+-            m_category_active_index =
+-                    ++m_category_active_index % ((int)list.length() + 1);
+-        } else if (keyval == Gdk.Key.Up) {
++        int length = (int)list.length();
++        if (length == 0)
++            return false;
++        switch(keyval) {
++        case Gdk.Key.Down:
++            if (++m_category_active_index == length)
++                m_category_active_index = 0;
++            break;
++        case Gdk.Key.Up:
+             if (--m_category_active_index < 0)
+-                    m_category_active_index = (int)list.length();
++                    m_category_active_index = length - 1;
++            break;
++        case Gdk.Key.Home:
++            m_category_active_index = 0;
++            break;
++        case Gdk.Key.End:
++            m_category_active_index = length - 1;
++            break;
+         }
+-        Gtk.Adjustment adjustment = m_list_box.get_adjustment();
+-        m_scrolled_window.set_hadjustment(new Gtk.Adjustment(0, 0, 0, 0, 0, 0));
+-        m_scrolled_window.set_vadjustment(adjustment);
+-        show_category_list();
++        var row = m_list_box.get_selected_row();
++        if (row != null)
++            m_list_box.unselect_row(row);
++        if (m_category_active_index >= 0) {
++            row = m_list_box.get_row_at_index(m_category_active_index);
++            m_list_box.select_row(row);
++        } else {
++            row = m_list_box.get_row_at_index(0);
++        }
++        Gtk.Allocation alloc = { 0, 0, 0, 0 };
++        row.get_allocation(out alloc);
++        var adjustment = m_scrolled_window.get_vadjustment();
++        adjustment.clamp_page(alloc.y, alloc.y + alloc.height);
++        return true;
+     }
+ 
+ 
+@@ -1211,7 +1585,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
+                 keyval = Gdk.Key.Up;
+             else if (keyval == Gdk.Key.Right)
+                 keyval = Gdk.Key.Down;
+-            category_list_cursor_move(keyval);
++            return category_list_cursor_move(keyval);
+         }
+         return true;
+     }
+@@ -1227,7 +1601,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
+             else if (keyval == Gdk.Key.Up)
+                 candidate_panel_cursor_up();
+         } else {
+-            category_list_cursor_move(keyval);
++            return category_list_cursor_move(keyval);
+         }
+         return true;
+     }
+@@ -1262,12 +1636,25 @@ class IBusEmojier : Gtk.ApplicationWindow {
+                             ? true : false);
+             return true;
+         }
++        if (!m_candidate_panel_is_visible)
++            return category_list_cursor_move(keyval);
+         return false;
+     }
+ 
+ 
+     private bool key_press_escape() {
+-        if (m_backward_index >= 0 && m_backward != null) {
++        if (m_show_unicode) {
++            if (m_candidate_panel_is_visible) {
++                m_candidate_panel_is_visible = false;
++                show_unicode_blocks();
++                return true;
++            } else {
++                m_show_unicode = false;
++                m_category_active_index = -1;
++                hide_candidate_panel();
++                return true;
++            }
++        } else if (m_backward_index >= 0 && m_backward != null) {
+             show_emoji_for_category(m_backward);
+             return true;
+         } else if (m_candidate_panel_is_visible) {
+@@ -1287,10 +1674,13 @@ class IBusEmojier : Gtk.ApplicationWindow {
+         if (m_candidate_panel_is_visible) {
+             uint index = m_lookup_table.get_cursor_pos();
+             candidate_panel_select_index(index);
+-        } else if (m_category_active_index > 0) {
++        } else if (m_category_active_index >= 0) {
+             Gtk.ListBoxRow gtkrow = m_list_box.get_selected_row();
+             EBoxRow row = gtkrow as EBoxRow;
+-            show_emoji_for_category(row.text);
++            if (m_show_unicode)
++                show_unicode_for_block(row.text);
++            else
++                show_emoji_for_category(row.text);
+         }
+         return true;
+     }
+@@ -1380,6 +1770,7 @@ class IBusEmojier : Gtk.ApplicationWindow {
+         m_candidate_panel_is_visible = false;
+         m_result = null;
+         m_enter_notify_enable = true;
++        m_show_unicode = false;
+ 
+         /* Let gtk recalculate the window size. */
+         resize(1, 1);
+@@ -1399,8 +1790,9 @@ class IBusEmojier : Gtk.ApplicationWindow {
+          * prevention logic:
+          * https://mail.gnome.org/archives/gtk-devel-list/2017-May/msg00026.html
+          */
+-        uint32 timestamp = event.get_time();
+-        present_with_time(timestamp);
++        //uint32 timestamp = event.get_time();
++        //present_with_time(timestamp);
++        present_centralize(event);
+ 
+         Gdk.Device pointer;
+ #if VALA_0_34
+@@ -1646,18 +2038,24 @@ class IBusEmojier : Gtk.ApplicationWindow {
+         Gtk.Allocation allocation;
+         get_allocation(out allocation);
+         Gdk.Rectangle monitor_area;
++        Gdk.Rectangle work_area;
+ #if VALA_0_34
+         Gdk.Display display = Gdk.Display.get_default();
+         Gdk.Monitor monitor = display.get_monitor_at_window(this.get_window());
+         monitor_area = monitor.get_geometry();
++        work_area = monitor.get_workarea();
+ #else
+         Gdk.Screen screen = Gdk.Screen.get_default();
+         int monitor_num = screen.get_monitor_at_window(this.get_window());
+         screen.get_monitor_geometry(monitor_num, out monitor_area);
++        work_area = screen.get_monitor_workarea(monitor_num);
+ #endif
+         int x = (monitor_area.x + monitor_area.width - allocation.width)/2;
+         int y = (monitor_area.y + monitor_area.height
+                  - allocation.height)/2;
++        // Do not hide a bottom panel in XFCE4
++        if (work_area.y < y)
++            y = work_area.y;
+         move(x, y);
+ 
+         uint32 timestamp = event.get_time();
+@@ -1723,7 +2121,6 @@ class IBusEmojier : Gtk.ApplicationWindow {
+             string? favorite = unowned_favorites[i];
+             // Avoid gsetting value error by manual setting
+             GLib.return_if_fail(favorite != null);
+-            GLib.return_if_fail(favorite != "");
+             m_favorites += favorite;
+         }
+         for(int i = 0; i < unowned_favorite_annotations.length; i++) {
+@@ -1733,4 +2130,19 @@ class IBusEmojier : Gtk.ApplicationWindow {
+         }
+         update_favorite_emoji_dict();
+     }
++
++
++    private static GLib.Object get_load_progress_object() {
++            if (m_unicode_progress_object == null)
++                m_unicode_progress_object = new LoadProgressObject();
++            return m_unicode_progress_object as GLib.Object;
++    }
++
++
++    public static void load_unicode_dict() {
++        if (m_unicode_block_list.length() == 0)
++            make_unicode_block_dict();
++        if (m_name_to_unicodes_dict.size() == 0)
++            make_unicode_name_dict(IBusEmojier.get_load_progress_object());
++    }
+ }
+diff --git a/ui/gtk3/emojierapp.vala b/ui/gtk3/emojierapp.vala
+index 6615f22b..d816352e 100644
+--- a/ui/gtk3/emojierapp.vala
++++ b/ui/gtk3/emojierapp.vala
+@@ -176,6 +176,8 @@ public class EmojiApplication : Application {
+                 m_settings_emoji.get_strv("favorites"),
+                 m_settings_emoji.get_strv("favorite-annotations"));
+ 
++        IBusEmojier.load_unicode_dict();
++
+         activate_dialog(command_line);
+ 
+         return Posix.EXIT_SUCCESS;
+diff --git a/ui/gtk3/ibusemojidialog.h b/ui/gtk3/ibusemojidialog.h
+index ed8886a8..3b420b21 100644
+--- a/ui/gtk3/ibusemojidialog.h
++++ b/ui/gtk3/ibusemojidialog.h
+@@ -1,7 +1,7 @@
+ /* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
+ /* vim:set et sts=4: */
+ /* bus - The Input Bus
+- * Copyright (C) 2017 Takao Fujiwara <takao.fujiwara1@gmail.com>
++ * Copyright (C) 2017-2018 Takao Fujiwara <takao.fujiwara1@gmail.com>
+  * Copyright (C) 2017 Red Hat, Inc.
+  *
+  * This library is free software; you can redistribute it and/or
+@@ -196,5 +196,12 @@ void          ibus_emojier_set_partial_match_length
+  */
+ void          ibus_emojier_set_partial_match_condition
+                                                   (gint         condition);
++/**
++ * ibus_emojier_load_unicode_dict:
++ *
++ * Load the dictionary of #IBusUnicodeData.
++ */
++void          ibus_emojier_load_unicode_dict      (void);
++
+ G_END_DECLS
+ #endif
+diff --git a/ui/gtk3/panel.vala b/ui/gtk3/panel.vala
+index 4f032f6f..bcb3ed75 100644
+--- a/ui/gtk3/panel.vala
++++ b/ui/gtk3/panel.vala
+@@ -3,7 +3,7 @@
+  * ibus - The Input Bus
+  *
+  * Copyright(c) 2011-2014 Peng Huang <shawn.p.huang@gmail.com>
+- * Copyright(c) 2015-2017 Takao Fujwiara <takao.fujiwara1@gmail.com>
++ * Copyright(c) 2015-2018 Takao Fujwiara <takao.fujiwara1@gmail.com>
+  *
+  * This library is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU Lesser General Public
+@@ -871,6 +871,7 @@ class Panel : IBus.PanelService {
+             IBusEmojier.set_annotation_lang(
+                     m_settings_emoji.get_string("lang"));
+             m_emojier_set_emoji_lang_id = 0;
++            IBusEmojier.load_unicode_dict();
+             return false;
+         });
+     }
+-- 
+2.14.3
+
+From 4cfd5ad7c6d071cfef6c7d678cc027ea480b8fc9 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Tue, 6 Feb 2018 11:02:09 +0900
+Subject: [PATCH] Fix typo in ibusunicode.c
+
+Review URL: https://codereview.appspot.com/340740043
+---
+ src/ibusunicode.c    | 5 +++--
+ ui/gtk3/emojier.vala | 4 ----
+ 2 files changed, 3 insertions(+), 6 deletions(-)
+
+diff --git a/src/ibusunicode.c b/src/ibusunicode.c
+index 8559819d..aac9c135 100644
+--- a/src/ibusunicode.c
++++ b/src/ibusunicode.c
+@@ -412,7 +412,8 @@ ibus_unicode_data_list_deserialize (GVariant *variant,
+                 IBUS_UNICODE_DESERIALIZE_SIGNALL_STR,
+                 G_OBJECT_TYPE (source_object));
+         if (!has_signal) {
+-            const gchar type_name = g_type_name (source_object);
++            const gchar *type_name =
++                    g_type_name (G_OBJECT_TYPE (source_object));
+             g_warning ("GObject %s does not have the signal \"%s\"",
+                        type_name ? type_name : "(null)",
+                        IBUS_UNICODE_DESERIALIZE_SIGNALL_STR);
+@@ -677,7 +678,7 @@ ibus_unicode_block_class_init (IBusUnicodeBlockClass *class)
+     GObjectClass *gobject_class = G_OBJECT_CLASS (class);
+     IBusSerializableClass *serializable_class = IBUS_SERIALIZABLE_CLASS (class);
+ 
+-    object_class->destroy = (IBusObjectDestroyFunc) ibus_unicode_data_destroy;
++    object_class->destroy = (IBusObjectDestroyFunc) ibus_unicode_block_destroy;
+     gobject_class->set_property =
+             (GObjectSetPropertyFunc) ibus_unicode_block_set_property;
+     gobject_class->get_property =
+diff --git a/ui/gtk3/emojier.vala b/ui/gtk3/emojier.vala
+index 555ea68f..0bf34da8 100644
+--- a/ui/gtk3/emojier.vala
++++ b/ui/gtk3/emojier.vala
+@@ -1373,8 +1373,6 @@ public class IBusEmojier : Gtk.ApplicationWindow {
+                     return;
+                 }
+             }
+-            // TODO: Provide a custom description and annotation for
+-            // the favorite emojis.
+             EPaddedLabelBox widget = new EPaddedLabelBox(
+                         _("Description: %s").printf(_("None")),
+                         Gtk.Align.START);
+@@ -1790,8 +1788,6 @@ public class IBusEmojier : Gtk.ApplicationWindow {
+          * prevention logic:
+          * https://mail.gnome.org/archives/gtk-devel-list/2017-May/msg00026.html
+          */
+-        //uint32 timestamp = event.get_time();
+-        //present_with_time(timestamp);
+         present_centralize(event);
+ 
+         Gdk.Device pointer;
+-- 
+2.14.3
+

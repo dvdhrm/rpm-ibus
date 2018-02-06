@@ -30,7 +30,7 @@
 
 Name:           ibus
 Version:        1.5.17
-Release:        6%{?dist}
+Release:        7%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -78,6 +78,7 @@ BuildRequires:  qt5-qtbase-devel
 %endif
 BuildRequires:  cldr-emoji-annotation
 BuildRequires:  unicode-emoji
+BuildRequires:  unicode-ucd
 %if %with_emoji_harfbuzz
 BuildRequires:  cairo-devel
 BuildRequires:  fontconfig-devel
@@ -427,6 +428,9 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Tue Feb 06 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.17-7
+- Added Unicode typing on Emojier
+
 * Sat Feb 03 2018 Igor Gnatenko <ignatenkobrain@fedoraproject.org> - 1.5.17-6
 - Switch to %%ldconfig_scriptlets
 
