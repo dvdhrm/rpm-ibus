@@ -346,8 +346,8 @@ dconf update || :
 
 %ldconfig_scriptlets libs
 
-# FIXME: no version number
 %files -f %{name}10.lang
+# FIXME: no version number
 %doc AUTHORS COPYING README
 %dir %{_datadir}/ibus/
 %{_bindir}/ibus
