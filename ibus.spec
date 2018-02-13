@@ -30,7 +30,7 @@
 
 Name:           ibus
 Version:        1.5.17
-Release:        7%{?dist}
+Release:        8%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -128,14 +128,6 @@ Requires:       dbus >= 1.2.4
 Requires:       glib2 >= %{glib_ver}
 # Owner of %%{_libdir}/girepository-1.0
 Requires:       gobject-introspection
-# https://fedoraproject.org/wiki/Changes/Removing_ldconfig_scriptlets
-%if (0%{?fedora} >= 27 || 0%{?rhel} >= 8)
-Requires:       redhat-rpm-config >= 70-1
-%else
-%if (0%{?fedora} >= 26 || 0%{?rhel} >= 8)
-Requires:       redhat-rpm-config >= 64-1
-%endif
-%endif
 
 %description libs
 This package contains the libraries for IBus
@@ -428,6 +420,9 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Tue Feb 13 2018 Igor Gnatenko <ignatenkobrain@fedoraproject.org> - 1.5.17-8
+- Remove useless requires
+
 * Tue Feb 06 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.17-7
 - Added Unicode typing on Emojier
 
