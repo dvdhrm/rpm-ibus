@@ -1,6 +1,6 @@
-From c6c1e8ea01c8466dc97d7549e77538e2d7ec872a Mon Sep 17 00:00:00 2001
+From 158e06a10726a10393f1f6dd7237457b0b601f84 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Mon, 29 Jan 2018 18:27:09 +0900
+Date: Wed, 21 Feb 2018 15:39:49 +0900
 Subject: [PATCH] Integrate custom rendering to use HarfBuzz glyph info
 
 IBusFontSet offers FcFontSet, glyph info with HarfBuzz and rendering
@@ -20,11 +20,11 @@ Need configure --enable-harfbuzz-for-emoji option to enable this feature.
  bindings/vala/Makefile.am              |   83 +++
  bindings/vala/ibus-fontset-1.0.deps    |    1 +
  configure.ac                           |   29 +
- ui/gtk3/Makefile.am                    |   32 +
+ ui/gtk3/Makefile.am                    |   36 ++
  ui/gtk3/emojier.vala                   |  111 ++++
  ui/gtk3/ibusfontset.c                  | 1030 ++++++++++++++++++++++++++++++++
  ui/gtk3/ibusfontset.h                  |  302 ++++++++++
- 8 files changed, 1589 insertions(+)
+ 8 files changed, 1593 insertions(+)
  create mode 100644 bindings/vala/IBusFontSet-1.0.metadata
  create mode 100644 bindings/vala/ibus-fontset-1.0.deps
  create mode 100644 ui/gtk3/ibusfontset.c
@@ -202,19 +202,19 @@ index bd41069b..243396ff 100644
  ])
  
 diff --git a/ui/gtk3/Makefile.am b/ui/gtk3/Makefile.am
-index 786b80e6..cd1e9c2c 100644
+index 0a8f4200..8bb2345d 100644
 --- a/ui/gtk3/Makefile.am
 +++ b/ui/gtk3/Makefile.am
-@@ -156,6 +156,8 @@ EXTRA_DIST =                            \
-     $(man_seven_in_files)               \
-     emojierapp.vala                     \
+@@ -159,6 +159,8 @@ EXTRA_DIST =                            \
+     extension.vala                      \
+     gtkextension.xml.in                 \
      gtkpanel.xml.in                     \
 +    ibusfontset.c                       \
 +    ibusfontset.h                       \
      notification-item.xml               \
      notification-watcher.xml            \
-     $(NULL)
-@@ -198,6 +200,36 @@ emojierapp.o: $(srcdir)/emojierapp.c
+     panelbinding.vala                   \
+@@ -247,6 +249,40 @@ panelbinding.o: $(srcdir)/panelbinding.c
  	$(AM_V_CC_no)$(COMPILE) -c -o $@ $<
  	$(NULL)
  
@@ -224,6 +224,10 @@ index 786b80e6..cd1e9c2c 100644
 +    $(NULL)
 +
 +ibus_ui_emojier_SOURCES +=                      \
++    ibusfontset.c                               \
++    $(NULL)
++
++ibus_extension_gtk3_SOURCES +=                  \
 +    ibusfontset.c                               \
 +    $(NULL)
 +
@@ -252,7 +256,7 @@ index 786b80e6..cd1e9c2c 100644
  man_seven_DATA =$(man_seven_files:.7=.7.gz)
  man_sevendir = $(mandir)/man7
 diff --git a/ui/gtk3/emojier.vala b/ui/gtk3/emojier.vala
-index 555ea68f..0a703383 100644
+index c85dfa86..86482543 100644
 --- a/ui/gtk3/emojier.vala
 +++ b/ui/gtk3/emojier.vala
 @@ -99,16 +99,103 @@ public class IBusEmojier : Gtk.ApplicationWindow {
@@ -367,7 +371,7 @@ index 555ea68f..0a703383 100644
      }
      private class ESelectedLabel : EWhiteLabel {
          public ESelectedLabel(string text) {
-@@ -307,6 +395,9 @@ public class IBusEmojier : Gtk.ApplicationWindow {
+@@ -313,6 +401,9 @@ public class IBusEmojier : Gtk.ApplicationWindow {
      private static bool m_show_unicode = false;
      private static LoadProgressObject m_unicode_progress_object;
      private static bool m_loaded_unicode = false;
@@ -377,7 +381,7 @@ index 555ea68f..0a703383 100644
  
      private ThemedRGBA m_rgba;
      private Gtk.Box m_vbox;
-@@ -2064,6 +2155,22 @@ public class IBusEmojier : Gtk.ApplicationWindow {
+@@ -2070,6 +2161,22 @@ public class IBusEmojier : Gtk.ApplicationWindow {
      }
  
  
@@ -400,7 +404,7 @@ index 555ea68f..0a703383 100644
      public static bool has_loaded_emoji_dict() {
          if (m_emoji_to_data_dict == null)
              return false;
-@@ -2094,6 +2201,10 @@ public class IBusEmojier : Gtk.ApplicationWindow {
+@@ -2100,6 +2207,10 @@ public class IBusEmojier : Gtk.ApplicationWindow {
          int font_size = font_desc.get_size() / Pango.SCALE;
          if (font_size != 0)
              m_emoji_font_size = font_size;

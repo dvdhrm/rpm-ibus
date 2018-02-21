@@ -1,6 +1,6 @@
-From 8ea0d3f25078c612b4b16c955c1c0c17e764d8c5 Mon Sep 17 00:00:00 2001
+From 4ad2f160e2af0b71148b3f7726e71f26a107ff1c Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Thu, 27 Jul 2017 18:56:01 +0900
+Date: Wed, 21 Feb 2018 15:05:18 +0900
 Subject: [PATCH] bus: Fix SEGV in bus_panel_proxy_focus_in()
 
 BUG=rhbz#1349148
@@ -10,11 +10,11 @@ BUG=rhbz#1406699
 BUG=rhbz#1432252
 ---
  bus/dbusimpl.c | 38 ++++++++++++++++++++++++++++++++------
- bus/ibusimpl.c | 22 +++++++++++++++++++---
- 2 files changed, 51 insertions(+), 9 deletions(-)
+ bus/ibusimpl.c | 21 ++++++++++++++++++---
+ 2 files changed, 50 insertions(+), 9 deletions(-)
 
 diff --git a/bus/dbusimpl.c b/bus/dbusimpl.c
-index b54ef81..e4dd868 100644
+index b54ef817..e4dd8683 100644
 --- a/bus/dbusimpl.c
 +++ b/bus/dbusimpl.c
 @@ -2,7 +2,8 @@
@@ -124,41 +124,37 @@ index b54ef81..e4dd868 100644
      if (incoming) {
          /* is incoming message */
 diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
-index f99307a..2d43ff6 100644
+index 58d205cf..34f6c909 100644
 --- a/bus/ibusimpl.c
 +++ b/bus/ibusimpl.c
-@@ -2,7 +2,8 @@
- /* vim:set et sts=4: */
- /* ibus - The Input Bus
-  * Copyright (C) 2008-2013 Peng Huang <shawn.p.huang@gmail.com>
-- * Copyright (C) 2008-2013 Red Hat, Inc.
-+ * Copyright (C) 2015-2017 Takao Fujiwara <takao.fujiwara1@gmail.com>
-+ * Copyright (C) 2008-2017 Red Hat, Inc.
-  *
-  * This library is free software; you can redistribute it and/or
-  * modify it under the terms of the GNU Lesser General Public
-@@ -323,11 +324,14 @@ _dbus_name_owner_changed_cb (BusDBusImpl   *dbus,
-     g_assert (new_name != NULL);
-     g_assert (BUS_IS_IBUS_IMPL (ibus));
+@@ -357,13 +357,16 @@ _dbus_name_owner_changed_cb (BusDBusImpl   *dbus,
+     else if (!g_strcmp0 (name, IBUS_SERVICE_PANEL_EXTENSION))
+         panel_type = PANEL_TYPE_EXTENSION;
  
--    if (g_strcmp0 (name, IBUS_SERVICE_PANEL) == 0) {
+-    if (panel_type != PANEL_TYPE_NONE) {
 +    do {
-+        if (g_strcmp0 (name, IBUS_SERVICE_PANEL) != 0)
++        if (panel_type == PANEL_TYPE_NONE)
 +            break;
          if (g_strcmp0 (new_name, "") != 0) {
              /* a Panel process is started. */
              BusConnection *connection;
              BusInputContext *context = NULL;
+             BusPanelProxy   **panel = (panel_type == PANEL_TYPE_PANEL) ?
+                                        &ibus->panel : &ibus->extension;
 +            GDBusConnection *dbus_connection = NULL;
  
-             if (ibus->panel != NULL) {
-                 ibus_proxy_destroy ((IBusProxy *) ibus->panel);
-@@ -338,6 +342,18 @@ _dbus_name_owner_changed_cb (BusDBusImpl   *dbus,
-             connection = bus_dbus_impl_get_connection_by_name (BUS_DEFAULT_DBUS, new_name);
+             if (*panel != NULL) {
+                 ibus_proxy_destroy ((IBusProxy *)(*panel));
+@@ -372,9 +375,21 @@ _dbus_name_owner_changed_cb (BusDBusImpl   *dbus,
+                 g_assert (*panel == NULL);
+             }
+ 
+-            connection = bus_dbus_impl_get_connection_by_name (BUS_DEFAULT_DBUS, new_name);
++            connection = bus_dbus_impl_get_connection_by_name (BUS_DEFAULT_DBUS,
++                                                               new_name);
              g_return_if_fail (connection != NULL);
  
 +            dbus_connection = bus_connection_get_dbus_connection (connection);
-+
 +            /* rhbz#1349148 rhbz#1385349
 +             * Avoid SEGV of BUS_IS_PANEL_PROXY (ibus->panel)
 +             * This function is called during destroying the connection
@@ -169,10 +165,10 @@ index f99307a..2d43ff6 100644
 +                break;
 +            }
 +
-             ibus->panel = bus_panel_proxy_new (connection);
+             *panel = bus_panel_proxy_new (connection, panel_type);
  
-             g_signal_connect (ibus->panel,
-@@ -366,7 +382,7 @@ _dbus_name_owner_changed_cb (BusDBusImpl   *dbus,
+             g_signal_connect (*panel,
+@@ -406,7 +421,7 @@ _dbus_name_owner_changed_cb (BusDBusImpl   *dbus,
                  }
              }
          }
@@ -182,5 +178,5 @@ index f99307a..2d43ff6 100644
      bus_ibus_impl_component_name_owner_changed (ibus, name, old_name, new_name);
  }
 -- 
-2.9.3
+2.14.3
 

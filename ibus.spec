@@ -30,7 +30,7 @@
 
 Name:           ibus
 Version:        1.5.17
-Release:        8%{?dist}
+Release:        9%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -38,16 +38,17 @@ URL:            https://github.com/ibus/%name/wiki
 Source0:        https://github.com/ibus/%name/releases/download/%{version}/%{name}-%{version}.tar.gz
 Source1:        %{name}-xinput
 Source2:        %{name}.conf.5
+Source3:        https://fujiwara.fedorapeople.org/ibus/po/%{name}-po-1.5.17-20180221.tar.gz
 # Will remove the annotation tarball once the rpm is available on Fedora
 # Upstreamed patches.
 # Patch0:         %%{name}-HEAD.patch
 Patch0:         %{name}-HEAD.patch
-# Under testing #1349148 #1385349 #1350291 #1406699 #1432252
-Patch1:         %{name}-1385349-segv-bus-proxy.patch
 %if %with_emoji_harfbuzz
 # Under testing self rendering until Pango, Fontconfig, Cairo are stable
-Patch2:         %{name}-xx-emoji-harfbuzz.patch
+Patch1:         %{name}-xx-emoji-harfbuzz.patch
 %endif
+# Under testing #1349148 #1385349 #1350291 #1406699 #1432252
+Patch2:         %{name}-1385349-segv-bus-proxy.patch
 
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
@@ -243,10 +244,12 @@ The ibus-devel-docs package contains developer documentation for IBus
 # %%patch0 -p1
 %patch0 -p1
 # cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
-%patch1 -p1 -z .segv
 %if %with_emoji_harfbuzz
-%patch2 -p1 -z .hb
+%patch1 -p1 -z .hb
 %endif
+%patch2 -p1 -z .segv
+
+zcat %SOURCE3 | tar xfvp -
 
 # prep test
 diff client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
@@ -360,6 +363,7 @@ dconf update || :
 %{_libexecdir}/ibus-engine-simple
 %{_libexecdir}/ibus-dconf
 %{_libexecdir}/ibus-portal
+%{_libexecdir}/ibus-extension-gtk3
 %{_libexecdir}/ibus-ui-emojier
 %{_libexecdir}/ibus-ui-gtk3
 %{_libexecdir}/ibus-x11
@@ -420,6 +424,10 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Feb 21 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.17-9
+- Added panel extension for emoji keybinding not to depen on desktops
+- Showed Unicode code points on Unicode name list
+
 * Tue Feb 13 2018 Igor Gnatenko <ignatenkobrain@fedoraproject.org> - 1.5.17-8
 - Remove useless requires
 
