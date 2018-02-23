@@ -30,7 +30,7 @@
 
 Name:           ibus
 Version:        1.5.17
-Release:        10%{?dist}
+Release:        11%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -178,7 +178,11 @@ This is a setup utility for IBus.
 Summary:        IBus PyGTK2 library
 Group:          System Environment/Libraries
 Requires:       %{name} = %{version}-%{release}
+%if (0%{?fedora} && 0%{?fedora} <= 27) || (0%{?rhel} && 0%{?rhel} <= 7)
 Requires:       dbus-python >= %{dbus_python_version}
+%else
+Requires:       python2-dbus >= %{dbus_python_version}
+%endif
 Requires:       python2
 Requires:       pygtk2
 BuildArch:      noarch
@@ -193,7 +197,11 @@ Summary:        IBus Python2 override library
 Group:          System Environment/Libraries
 Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
 # Owner of %%python2_sitearch/gi/overrides
+%if (0%{?fedora} && 0%{?fedora} <= 27) || (0%{?rhel} && 0%{?rhel} <= 7)
 Requires:       pygobject3-base
+%else
+Requires:       python2-gobject-base
+%endif
 Requires:       python2
 
 %description py2override
@@ -424,6 +432,10 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Feb 28 2018 Iryna Shcherbina <ishcherb@redhat.com> - 1.5.17-11
+- Update Python 2 dependency declarations to new packaging standards
+  (See https://fedoraproject.org/wiki/FinalizingFedoraSwitchtoPython3)
+
 * Tue Feb 27 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.17-10
 - Disabled panel extension for gdm user
 - Enabled panel extension in Wayland
