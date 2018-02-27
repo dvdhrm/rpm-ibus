@@ -30,7 +30,7 @@
 
 Name:           ibus
 Version:        1.5.17
-Release:        9%{?dist}
+Release:        10%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -424,6 +424,10 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Tue Feb 27 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.17-10
+- Disabled panel extension for gdm user
+- Enabled panel extension in Wayland
+
 * Wed Feb 21 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.17-9
 - Added panel extension for emoji keybinding not to depen on desktops
 - Showed Unicode code points on Unicode name list
