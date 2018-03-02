@@ -1,6 +1,6 @@
-From 158e06a10726a10393f1f6dd7237457b0b601f84 Mon Sep 17 00:00:00 2001
+From 631ef573ebdd4f3fad8f036fcb33929e04372ab2 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 21 Feb 2018 15:39:49 +0900
+Date: Thu, 1 Mar 2018 16:05:04 +0900
 Subject: [PATCH] Integrate custom rendering to use HarfBuzz glyph info
 
 IBusFontSet offers FcFontSet, glyph info with HarfBuzz and rendering
@@ -202,7 +202,7 @@ index bd41069b..243396ff 100644
  ])
  
 diff --git a/ui/gtk3/Makefile.am b/ui/gtk3/Makefile.am
-index 0a8f4200..8bb2345d 100644
+index bf9f98d7..388f80f9 100644
 --- a/ui/gtk3/Makefile.am
 +++ b/ui/gtk3/Makefile.am
 @@ -159,6 +159,8 @@ EXTRA_DIST =                            \
@@ -213,8 +213,8 @@ index 0a8f4200..8bb2345d 100644
 +    ibusfontset.h                       \
      notification-item.xml               \
      notification-watcher.xml            \
-     panelbinding.vala                   \
-@@ -247,6 +249,40 @@ panelbinding.o: $(srcdir)/panelbinding.c
+     ibus-ui-emojier.desktop.in.in       \
+@@ -249,6 +251,40 @@ panelbinding.o: $(srcdir)/panelbinding.c
  	$(AM_V_CC_no)$(COMPILE) -c -o $@ $<
  	$(NULL)
  
@@ -256,7 +256,7 @@ index 0a8f4200..8bb2345d 100644
  man_seven_DATA =$(man_seven_files:.7=.7.gz)
  man_sevendir = $(mandir)/man7
 diff --git a/ui/gtk3/emojier.vala b/ui/gtk3/emojier.vala
-index c85dfa86..86482543 100644
+index 8707e432..49619d1c 100644
 --- a/ui/gtk3/emojier.vala
 +++ b/ui/gtk3/emojier.vala
 @@ -99,16 +99,103 @@ public class IBusEmojier : Gtk.ApplicationWindow {
@@ -381,7 +381,7 @@ index c85dfa86..86482543 100644
  
      private ThemedRGBA m_rgba;
      private Gtk.Box m_vbox;
-@@ -2070,6 +2161,22 @@ public class IBusEmojier : Gtk.ApplicationWindow {
+@@ -2116,6 +2207,22 @@ public class IBusEmojier : Gtk.ApplicationWindow {
      }
  
  
@@ -404,7 +404,7 @@ index c85dfa86..86482543 100644
      public static bool has_loaded_emoji_dict() {
          if (m_emoji_to_data_dict == null)
              return false;
-@@ -2100,6 +2207,10 @@ public class IBusEmojier : Gtk.ApplicationWindow {
+@@ -2146,6 +2253,10 @@ public class IBusEmojier : Gtk.ApplicationWindow {
          int font_size = font_desc.get_size() / Pango.SCALE;
          if (font_size != 0)
              m_emoji_font_size = font_size;

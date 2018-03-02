@@ -29,8 +29,8 @@
 %global dbus_python_version 0.83.0
 
 Name:           ibus
-Version:        1.5.17
-Release:        11%{?dist}
+Version:        1.5.18
+Release:        1%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -38,11 +38,9 @@ URL:            https://github.com/ibus/%name/wiki
 Source0:        https://github.com/ibus/%name/releases/download/%{version}/%{name}-%{version}.tar.gz
 Source1:        %{name}-xinput
 Source2:        %{name}.conf.5
-Source3:        https://fujiwara.fedorapeople.org/ibus/po/%{name}-po-1.5.17-20180221.tar.gz
 # Will remove the annotation tarball once the rpm is available on Fedora
 # Upstreamed patches.
 # Patch0:         %%{name}-HEAD.patch
-Patch0:         %{name}-HEAD.patch
 %if %with_emoji_harfbuzz
 # Under testing self rendering until Pango, Fontconfig, Cairo are stable
 Patch1:         %{name}-xx-emoji-harfbuzz.patch
@@ -250,14 +248,11 @@ The ibus-devel-docs package contains developer documentation for IBus
 %prep
 %setup -q
 # %%patch0 -p1
-%patch0 -p1
 # cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 %if %with_emoji_harfbuzz
 %patch1 -p1 -z .hb
 %endif
 %patch2 -p1 -z .segv
-
-zcat %SOURCE3 | tar xfvp -
 
 # prep test
 diff client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
@@ -355,6 +350,8 @@ dconf update || :
 %dir %{_datadir}/ibus/
 %{_bindir}/ibus
 %{_bindir}/ibus-daemon
+%{_datadir}/applications/org.freedesktop.IBus.Panel.Emojier.desktop
+%{_datadir}/applications/org.freedesktop.IBus.Panel.Extension.Gtk3.desktop
 %{_datadir}/bash-completion/completions/ibus.bash
 %{_datadir}/dbus-1/services/*.service
 %{_datadir}/GConf/gsettings/*
@@ -432,6 +429,9 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Mar 02 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-1
+- Bumped to 1.5.18
+
 * Wed Feb 28 2018 Iryna Shcherbina <ishcherb@redhat.com> - 1.5.17-11
 - Update Python 2 dependency declarations to new packaging standards
   (See https://fedoraproject.org/wiki/FinalizingFedoraSwitchtoPython3)
