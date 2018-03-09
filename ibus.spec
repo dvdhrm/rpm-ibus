@@ -30,7 +30,7 @@
 
 Name:           ibus
 Version:        1.5.18
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -429,6 +429,9 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Mar 09 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-2
+= Rebuilt for cldr-emoji-annotation-32.90.0_1 and unicode-emoji-10.90.20180207
+
 * Fri Mar 02 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-1
 - Bumped to 1.5.18
 
