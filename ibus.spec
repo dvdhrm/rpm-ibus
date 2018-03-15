@@ -30,7 +30,7 @@
 
 Name:           ibus
 Version:        1.5.18
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -41,6 +41,7 @@ Source2:        %{name}.conf.5
 # Will remove the annotation tarball once the rpm is available on Fedora
 # Upstreamed patches.
 # Patch0:         %%{name}-HEAD.patch
+Patch0:         %{name}-HEAD.patch
 %if %with_emoji_harfbuzz
 # Under testing self rendering until Pango, Fontconfig, Cairo are stable
 Patch1:         %{name}-xx-emoji-harfbuzz.patch
@@ -248,6 +249,7 @@ The ibus-devel-docs package contains developer documentation for IBus
 %prep
 %setup -q
 # %%patch0 -p1
+%patch0 -p1
 # cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 %if %with_emoji_harfbuzz
 %patch1 -p1 -z .hb
@@ -429,8 +431,11 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Mar 15 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-3
+- Fixed Bug 1554813 - Enter key on numpad in Emojier
+
 * Fri Mar 09 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-2
-= Rebuilt for cldr-emoji-annotation-32.90.0_1 and unicode-emoji-10.90.20180207
+- Rebuilt for cldr-emoji-annotation-32.90.0_1 and unicode-emoji-10.90.20180207
 
 * Fri Mar 02 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-1
 - Bumped to 1.5.18
