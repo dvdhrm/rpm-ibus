@@ -30,7 +30,7 @@
 
 Name:           ibus
 Version:        1.5.18
-Release:        3%{?dist}
+Release:        4%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -431,6 +431,9 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Mar 30 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-4
+- Fixed Bug 1554714 - improve order of unicode matches
+
 * Thu Mar 15 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-3
 - Fixed Bug 1554813 - Enter key on numpad in Emojier
 
