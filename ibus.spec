@@ -1,4 +1,15 @@
+%if (0%{?fedora} || 0%{?rhel} <= 7)
+%global with_python2 1
+%else
+%global with_python2 0
+%endif
+
+%if %with_python2
 %global with_pygobject2 1
+%else
+%global with_pygobject2 0
+%endif
+
 %global with_pygobject3 1
 
 %global with_pkg_config %(pkg-config --version >/dev/null 2>&1 && echo -n "1" || echo -n "0")
@@ -30,7 +41,7 @@
 
 Name:           ibus
 Version:        1.5.18
-Release:        4%{?dist}
+Release:        5%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -63,7 +74,9 @@ BuildRequires:  dconf-devel
 BuildRequires:  dbus-x11
 BuildRequires:  python3-devel
 BuildRequires:  python3-gobject
+%if %with_python2
 BuildRequires:  python2-devel
+%endif
 BuildRequires:  vala
 BuildRequires:  vala-devel
 BuildRequires:  vala-tools
@@ -276,6 +289,9 @@ autoreconf -f -i -v
     --enable-gtk-doc \
     --enable-surrounding-text \
     --with-python=python3 \
+%if ! %with_python2
+    --disable-python2 \
+%endif
 %if %with_pygobject2
     --enable-python-library \
 %endif
@@ -410,8 +426,10 @@ dconf update || :
 %{python2_sitelib}/ibus/*
 %endif
 
+%if %with_python2
 %files py2override
 %python2_sitearch/gi/overrides/IBus.py*
+%endif
 
 %files wayland
 %{_libexecdir}/ibus-wayland
@@ -431,6 +449,9 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Apr 13 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-5
+- Disabled python2 since RHEL8
+
 * Fri Mar 30 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-4
 - Fixed Bug 1554714 - improve order of unicode matches
 

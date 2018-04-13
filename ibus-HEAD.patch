@@ -154,3 +154,905 @@ index 24029703..0c0865f1 100644
 -- 
 2.14.3
 
+From 5788be80685f397c3db3bdf4e672d67cfb9b3433 Mon Sep 17 00:00:00 2001
+From: Jeremy Bicha <jbicha@ubuntu.com>
+Date: Fri, 30 Mar 2018 12:37:27 +0900
+Subject: [PATCH] Fix ucd directory override
+
+BUG=https://github.com/ibus/ibus/pull/1995
+R=Shawn.P.Huang@gmail.com
+
+Review URL: https://codereview.appspot.com/339450043
+
+Patch from Jeremy Bicha <jbicha@ubuntu.com>.
+---
+ configure.ac | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/configure.ac b/configure.ac
+index 6c00803f..d19aa874 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -666,7 +666,7 @@ AC_ARG_WITH(ucd-dir,
+     AS_HELP_STRING([--with-ucd-dir[=DIR]],
+         [Set the directory of UCD (Unicode Character Database) files.
+          (default: "/usr/share/unicode/ucd")]),
+-    UCD_DIR=$with_emoji_annotation_dir,
++    UCD_DIR=$with_ucd_dir,
+     UCD_DIR="/usr/share/unicode/ucd"
+ )
+ AC_SUBST(UCD_DIR)
+-- 
+2.14.3
+
+From 75a6667b6ad8c8cb801cb160b7b04625334f9094 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Thu, 5 Apr 2018 16:54:41 +0900
+Subject: [PATCH] src/tests: Fix ibus-compose for the latest GTK
+
+---
+ src/tests/ibus-compose.c | 17 +++++++++++++++--
+ 1 file changed, 15 insertions(+), 2 deletions(-)
+
+diff --git a/src/tests/ibus-compose.c b/src/tests/ibus-compose.c
+index eb7b9f19..aabb36ac 100644
+--- a/src/tests/ibus-compose.c
++++ b/src/tests/ibus-compose.c
+@@ -2,6 +2,10 @@
+ #include "ibus.h"
+ #include "ibuscomposetable.h"
+ 
++#define GREEN "\033[0;32m"
++#define RED   "\033[0;31m"
++#define NC    "\033[0m"
++
+ IBusBus *m_bus;
+ IBusComposeTable *m_compose_table;
+ IBusEngine *m_engine;
+@@ -172,7 +176,12 @@ window_inserted_text_cb (GtkEntryBuffer *buffer,
+                          guint           nchars,
+                          gpointer        data)
+ {
++/* https://gitlab.gnome.org/GNOME/gtk/commit/9981f46e0b
++ * The latest GTK does not emit "inserted-text" when the text is "".
++ */
++#if !GTK_CHECK_VERSION (3, 22, 16)
+     static int n_loop = 0;
++#endif
+     static guint stride = 0;
+     guint i;
+     int seq;
+@@ -182,16 +191,18 @@ window_inserted_text_cb (GtkEntryBuffer *buffer,
+ 
+     g_assert (m_compose_table != NULL);
+ 
++#if !GTK_CHECK_VERSION (3, 22, 16)
+     if (n_loop % 2 == 1) {
+         n_loop = 0;
+         return;
+     }
++#endif
+     i = stride + (m_compose_table->max_seq_len + 2) - 1;
+     seq = (i + 1) / (m_compose_table->max_seq_len + 2);
+     if (m_compose_table->data[i] == code) {
+-        test = "OK";
++        test = GREEN "PASS" NC;
+     } else {
+-        test = "NG";
++        test = RED "FAIL" NC;
+         m_retval = -1;
+     }
+     g_print ("%05d/%05d %s expected: %04X typed: %04X\n",
+@@ -207,7 +218,9 @@ window_inserted_text_cb (GtkEntryBuffer *buffer,
+     }
+ 
+     stride += m_compose_table->max_seq_len + 2;
++#if !GTK_CHECK_VERSION (3, 22, 16)
+     n_loop++;
++#endif
+     gtk_entry_set_text (entry, "");
+ }
+ 
+-- 
+2.14.3
+
+From 28d0c1d4bc47beb38995d84cc4bb1d539c08a070 Mon Sep 17 00:00:00 2001
+From: Olivier Tilloy <olivier.tilloy@canonical.com>
+Date: Fri, 6 Apr 2018 16:02:11 +0900
+Subject: [PATCH] src: Make the call to chmod in ibus_bus_init conditional
+
+BUG=https://github.com/ibus/ibus/issues/1996
+---
+ src/ibusbus.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/src/ibusbus.c b/src/ibusbus.c
+index 11659c41..98820e8a 100644
+--- a/src/ibusbus.c
++++ b/src/ibusbus.c
+@@ -557,7 +557,6 @@ ibus_bus_init (IBusBus *bus)
+     path = g_path_get_dirname (ibus_get_socket_path ());
+ 
+     g_mkdir_with_parents (path, 0700);
+-    g_chmod (path, 0700);
+ 
+     if (stat (path, &buf) == 0) {
+         if (buf.st_uid != getuid ()) {
+@@ -565,6 +564,9 @@ ibus_bus_init (IBusBus *bus)
+                        path, ibus_get_user_name ());
+             return;
+         }
++        if (buf.st_mode != (S_IFDIR | S_IRWXU)) {
++            g_chmod (path, 0700);
++        }
+     }
+ 
+     g_free (path);
+-- 
+2.14.3
+
+From 32f2f2bab149ad766674e7421f7044ebe98bb0b6 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Fri, 6 Apr 2018 20:24:08 +0900
+Subject: [PATCH] tests: Added an automation testing on console
+
+test-console.sh runs /usr/bin/ibus-daemon on console after install ibus.
+
+Login as root
+  --builddir /root/ibus/src/tests --srcdir /root/ibus/src/tests
+
+Also added DISABLE_GUI_TESTS parameters for make check.
+---
+ bus/Makefile.am       |   1 +
+ src/tests/Makefile.am |   5 +-
+ src/tests/runtest     | 151 +++++++++++++++++++------------
+ test/test-console.sh  | 242 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 343 insertions(+), 56 deletions(-)
+ create mode 100755 test/test-console.sh
+
+diff --git a/bus/Makefile.am b/bus/Makefile.am
+index 8bcc8e16..76166a0f 100644
+--- a/bus/Makefile.am
++++ b/bus/Makefile.am
+@@ -122,6 +122,7 @@ TESTS_ENVIRONMENT = \
+     top_builddir=$(top_builddir) \
+     top_srcdir=$(top_srcdir) \
+     builddir=$(builddir) \
++    srcdir=$(srcdir) \
+     $(NULL)
+ 
+ LOG_COMPILER = $(top_srcdir)/src/tests/runtest
+diff --git a/src/tests/Makefile.am b/src/tests/Makefile.am
+index 125be3fc..8bcac8f2 100644
+--- a/src/tests/Makefile.am
++++ b/src/tests/Makefile.am
+@@ -3,7 +3,8 @@
+ # ibus - The Input Bus
+ #
+ # Copyright (c) 2007-2015 Peng Huang <shawn.p.huang@gmail.com>
+-# Copyright (c) 2007-2015 Red Hat, Inc.
++# Copyright (c) 2015-2018 Takao Fujiwara <takao.fujiwara1@gmail.com>
++# Copyright (c) 2007-2018 Red Hat, Inc.
+ #
+ # This library is free software; you can redistribute it and/or
+ # modify it under the terms of the GNU Lesser General Public
+@@ -66,6 +67,8 @@ TESTS_ENVIRONMENT = \
+ 	top_builddir=$(top_builddir) \
+ 	top_srcdir=$(top_srcdir) \
+ 	builddir=$(builddir) \
++	srcdir=$(srcdir) \
++	DISABLE_GUI_TESTS=$(DISABLE_GUI_TESTS) \
+ 	$(NULL)
+ 
+ LOG_COMPILER = $(srcdir)/runtest
+diff --git a/src/tests/runtest b/src/tests/runtest
+index 0e43fee5..b3b2a1ce 100755
+--- a/src/tests/runtest
++++ b/src/tests/runtest
+@@ -1,5 +1,8 @@
+ #!/bin/sh
+ 
++# -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*-
++# vim:set et sts=4:
++
+ # Run a test case given by the first argument in a separate directory.
+ # This script may also launch $top_builddir/bus/ibus-daemon for testing.
+ 
+@@ -17,6 +20,8 @@
+ : ${top_builddir:=../..}
+ : ${top_srcdir:=../..}
+ : ${builddir:=.}
++: ${srcdir:=.}
++: ${DISABLE_GUI_TESTS:=''}
+ 
+ BUS_REQUIRED_TESTS="
+ ibus-bus
+@@ -29,50 +34,51 @@ ibus-engine-switch
+ ibus-compose
+ test-stress
+ "
++retval=0
+ 
+ # Portable replacement of basename.
+ func_basename () {
+-  case "$1" in
++    case "$1" in
+     */*)
+-      expr "$1" : '.*/\(.*\)'
+-      ;;
++        expr "$1" : '.*/\(.*\)'
++        ;;
+     *)
+-      echo "$1"
+-  esac
++        echo "$1"
++    esac
+ }
+ 
+ # Portable replacement of dirname.
+ func_dirname () {
+-  case "$1" in
++    case "$1" in
+     */*)
+-      expr "$1" : '\(.*\)/.*'
+-      ;;
++        expr "$1" : '\(.*\)/.*'
++        ;;
+     *)
+-      echo .
+-  esac
++        echo .
++    esac
+ }
+ 
+ # Kill ibus-daemon process and remove temporary files.
+ func_cleanup () {
+-  tstdir=$1
+-  if test -f $tstdir/ibus-daemon.pid; then
+-    . $tstdir/ibus-daemon.pid
+-    kill $IBUS_DAEMON_PID &> /dev/null
+-  fi
+-  rm -fr $tstdir
++    tstdir=$1
++    if test -f $tstdir/ibus-daemon.pid; then
++        . $tstdir/ibus-daemon.pid
++        kill $IBUS_DAEMON_PID &> /dev/null
++    fi
++    rm -fr $tstdir
+ }
+ 
+ # Prepare component files necessary for testing, under components/.
+ func_copy_component () {
+-  file=$1
+-  base=`func_basename $file`
+-  libexecdir=`func_dirname $file`
+-  # top_srcdir != top_builddir in make dist
+-  libexecdir=`echo "$libexecdir" | sed -e "s|$top_srcdir|$top_builddir|"`
+-  if test -f $file.in; then
+-    mkdir -p components
+-    sed "s|@libexecdir@|$libexecdir|g" < $file.in > components/$base
+-  fi
++    file=$1
++    base=`func_basename $file`
++    libexecdir=`func_dirname $file`
++    # top_srcdir != top_builddir in make dist
++    libexecdir=`echo "$libexecdir" | sed -e "s|$top_srcdir|$top_builddir|"`
++    if test -f $file.in; then
++        mkdir -p components
++        sed "s|@libexecdir@|$libexecdir|g" < $file.in > components/$base
++    fi
+ }
+ 
+ trap 'func_cleanup $tstdir' 1 2 3 15
+@@ -80,44 +86,79 @@ trap 'func_cleanup $tstdir' 1 2 3 15
+ tst=$1; shift
+ tstdir=tmp-`func_basename $tst`
+ 
+-test -d $tstdir || mkdir $tstdir
+-
+-( cd $tstdir
+-
+-  need_bus=no
+-  for t in $BUS_REQUIRED_TESTS; do
++for t in $DISABLE_GUI_TESTS; do
+     if test $t = `func_basename $tst`; then
+-      need_bus=yes
++        exit 77
+     fi
+-  done
+-
+-  if test $need_bus = yes; then
+-    func_copy_component "../$top_srcdir/engine/simple.xml"
+-    func_copy_component "../$top_srcdir/conf/memconf/memconf.xml"
++done
+ 
+-    IBUS_COMPONENT_PATH=$PWD/components
+-    export IBUS_COMPONENT_PATH
++test -d $tstdir || mkdir $tstdir
+ 
+-    IBUS_ADDRESS_FILE=$PWD/ibus-daemon.pid
+-    export IBUS_ADDRESS_FILE
++run_test_case()
++{
++    pushd $tstdir
++
++    need_bus=no
++    for t in $BUS_REQUIRED_TESTS; do
++        if test $t = `func_basename $tst`; then
++            need_bus=yes
++        fi
++    done
++
++    if test $need_bus = yes; then
++        func_copy_component "../$top_srcdir/engine/simple.xml"
++        func_copy_component "../$top_srcdir/conf/memconf/memconf.xml"
++
++        IBUS_COMPONENT_PATH=$PWD/components
++        export IBUS_COMPONENT_PATH
++
++        IBUS_ADDRESS_FILE=$PWD/ibus-daemon.pid
++        export IBUS_ADDRESS_FILE
++
++        # Start ibus-daemon.
++        ../$top_builddir/bus/ibus-daemon \
++        --daemonize \
++        --cache=none \
++        --panel=disable \
++        --panel-extension=disable \
++        --config=default \
++        --verbose;
++
++        # Wait until all necessary components are up.
++        sleep 1
++    fi
+ 
+-    # Start ibus-daemon.
+-    ../$top_builddir/bus/ibus-daemon \
+-    --daemonize \
+-    --cache=none \
+-    --panel=disable \
+-    --panel-extension=disable \
+-    --config=default \
+-    --verbose;
++    "../$tst" ${1+"$@"}
+ 
+-    # Wait until all necessary components are up.
+-    sleep 1
+-  fi
++    retval=`expr $retval \| $?`
+ 
+-  exec "../$tst" ${1+"$@"} )
++    $popd
+ 
+-retval=$?
++    func_cleanup $tstdir
++}
+ 
+-func_cleanup $tstdir
++envfile=$srcdir/`func_basename $tst`.env
++if test -f $envfile ; then
++    ENVS="`cat $envfile`"
++fi;
++if test x"$ENVS" = x ; then
++    run_test_case
++else
++    LANG_backup=$LANG
++    i=1
++    for e in $ENVS; do
++        first=`echo "$e" | cut -c1-1`
++        if test x"$first" = x"#" ; then
++            continue
++        fi
++        export $e
++        echo "Run `func_basename $tst` on $e"
++        echo "======================="
++        run_test_case
++        echo ""
++        i=`expr $i + 1`
++    done
++    export LANG=$LANG_backup
++fi
+ 
+ exit $retval
+diff --git a/test/test-console.sh b/test/test-console.sh
+new file mode 100755
+index 00000000..7199f7a7
+--- /dev/null
++++ b/test/test-console.sh
+@@ -0,0 +1,242 @@
++#!/bin/sh
++# -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*-
++# vim:set noet ts=4:
++#
++# ibus-anthy - The Anthy engine for IBus
++#
++# Copyright (c) 2018 Takao Fujiwara <takao.fujiwara1@gmail.com>
++# Copyright (c) 2018 Red Hat, Inc.
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License along
++# with this program; if not, write to the Free Software Foundation, Inc.,
++# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++
++# This test runs /usr/bin/ibus-daemon after install ibus
++#
++# # init 3
++# Login as root
++# # /root/ibus/tests/test-console.sh --tests ibus-compose \
++#   --builddir /root/ibus/src/tests --srcdir /root/ibus/src/tests
++
++PROGNAME=`basename $0`
++VERSION=0.1
++DISPLAY=:99.0
++BUILDDIR="."
++SRCDIR="."
++TEST_LOG=test-suite.log
++HAVE_GRAPHICS=1
++DESKTOP_COMMAND="gnome-session"
++PID_XORG=0
++PID_GNOME_SESSION=0
++TESTS=""
++GREEN='\033[0;32m'
++RED='\033[0;31m'
++NC='\033[0m'
++
++usage()
++{
++    echo -e \
++"This test runs /usr/bin/ibus-daemon after install ibus\n"                     \
++"$PROGNAME [OPTIONS…]\n"                                                       \
++"\n"                                                                           \
++"OPTIONS:\n"                                                                   \
++"-h, --help                       This help\n"                                 \
++"-v, --version                    Show version\n"                              \
++"-b, --builddir=BUILDDIR          Set the BUILDDIR\n"                          \
++"-s, --srcdir=SOURCEDIR           Set the SOURCEDIR\n"                         \
++"-c, --no-graphics                Use Xvfb instead of Xorg\n"                  \
++"-d, --desktop=DESKTOP            Run DESTKTOP. The default is gnome-session\n" \
++"-t, --tests=\"TESTS...\"           Run TESTS programs which is separated by space\n" \
++""
++}
++
++parse_args()
++{
++    # This is GNU getopt. "sudo port getopt" in BSD?
++    ARGS=`getopt -o hvb:s:cd:t: --long help,version,builddir:,srcdir:,no-graphics,desktop:,tests:\
++        -- "$@"`;
++    eval set -- "$ARGS"
++    while [ 1 ] ; do
++        case "$1" in
++        -h | --help )        usage; exit 0;;
++        -v | --version )     echo -e "$VERSION"; exit 0;;
++        -b | --builddir )    BUILDDIR="$2"; shift 2;;
++        -s | --srcdir )      SRCDIR="$2"; shift 2;;
++        -c | --no-graphics ) HAVE_GRAPHICS=0; shift;;
++        -d | --desktop )     DESKTOP_COMMAND="$2"; shift 2;;
++        -t | --tests )       TESTS="$2"; shift 2;;
++        -- )                 shift; break;;
++        * )                  usage; exit 1;;
++        esac
++    done
++}
++
++init_desktop()
++{
++    if test x$FORCE_TEST != x ; then
++        RUN_ARGS="$RUN_ARGS --force"
++    fi
++
++    if test ! -f $HOME/.config/gnome-initial-setup-done ; then
++        if test ! -f /var/lib/AccountsService/users/$USER ; then
++            mkdir -p /var/lib/AccountsService/users
++            cat >> /var/lib/AccountsService/users/$USER << _EOF
++[User]
++Language=ja_JP.UTF-8
++XSession=gnome
++SystemAccount=false
++_EOF
++        fi
++        mkdir -p $HOME/.config
++        touch $HOME/.config/gnome-initial-setup-done
++    fi
++}
++
++run_dbus_daemon()
++{
++    a=`ps -ef | grep dbus-daemon | grep "\-\-system" | grep -v session | grep -v grep`
++    if test x"$a" = x ; then
++        eval `dbus-launch --sh-syntax`
++    fi
++    SUSER=`echo "$USER" | cut -c 1-7`
++    a=`ps -ef | grep dbus-daemon | grep "$SUSER" | grep -v gdm | grep session | grep -v grep`
++    if test x"$a" = x ; then
++        systemctl --user start dbus
++        export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$UID/bus
++    fi
++    systemctl --user status dbus | col -b
++    ps -ef | grep dbus-daemon | grep "$SUSER" | grep -v gdm | egrep 'session|system' | grep -v grep
++    systemctl --user show-environment | col -b
++}
++
++run_desktop()
++{
++    if test $HAVE_GRAPHICS -eq 1 ; then
++        /usr/libexec/Xorg.wrap -noreset +extension GLX +extension RANDR +extension RENDER -logfile ./xorg.log -config ./xorg.conf -configdir . $DISPLAY &
++    else
++        /usr/bin/Xvfb $DISPLAY -noreset +extension GLX +extension RANDR +extension RENDER -screen 0 1280x1024x24 &
++    fi
++    PID_XORG=$!
++    sleep 1
++    export DISPLAY=$DISPLAY
++    $DESKTOP_COMMAND &
++    PID_GNOME_SESSION=$!
++    sleep 30
++    if test "$DESKTOP_COMMAND" != "gnome-session" ; then
++        ibus-daemon --daemonize --verbose
++        sleep 1
++    fi
++}
++
++count_case_result()
++{
++    retval=$1
++    pass=$2
++    fail=$3
++
++    if test $retval -eq  0 ; then
++        pass=`expr $pass + 1`
++    else
++        fail=`expr $fail + 1`
++    fi
++    echo $pass $fail
++}
++
++echo_case_result()
++{
++    retval=$1
++    tst=$2
++    log=$3
++    subtst=${4:-''}
++
++    if test $retval -eq  0 ; then
++        echo -e "${GREEN}PASS${NC}: $tst $subtst"
++    else
++        echo -e "${RED}FAIL${NC}: $tst $subtst"
++        echo "FAIL: $tst $subtst" >> $TEST_LOG
++        echo "======================" >> $TEST_LOG
++        echo "" >> $TEST_LOG
++        cat "$log" >> $TEST_LOG
++        echo "" >> $TEST_LOG
++    fi
++}
++
++run_test_suite()
++{
++    cd `dirname $0`
++    pass=0
++    fail=0
++
++    if test -f $TEST_LOG ; then
++        rm $TEST_LOG
++    fi
++    for tst in $TESTS; do
++        ENVS=
++        if test -f $SRCDIR/${tst}.env ; then
++            ENVS="`cat $SRCDIR/${tst}.env`"
++        fi
++        if test x"$ENVS" = x ; then
++            $BUILDDIR/$tst >&${tst}.log
++            retval=$?
++            read pass fail << EOF
++            `count_case_result $retval $pass $fail`
++EOF
++            echo_case_result $retval $tst ${tst}.log
++        else
++            LANG_backup=$LANG
++            i=1
++            for e in $ENVS; do
++                first=`echo "$e" | cut -c1-1`
++                if test x"$first" = x"#" ; then
++                    continue
++                fi
++                export $e
++                $BUILDDIR/$tst >&${tst}.${i}.log
++                retval=$?
++                read pass fail << EOF
++                `count_case_result $retval $pass $fail`
++EOF
++                echo_case_result $retval $tst ${tst}.${i}.log $e
++                i=`expr $i + 1`
++            done
++            export LANG=$LANG_backup
++        fi
++    done
++    echo ""
++    echo -e "# ${GREEN}PASS${NC}: $pass"
++    echo -e "# ${RED}FAIL${NC}: $fail"
++    if test -f ${TEST_LOG} ; then
++        echo ""
++        echo -e "${RED}See ${TEST_LOG}$NC"
++    fi
++}
++
++finit()
++{
++    if test "$DESKTOP_COMMAND" != "gnome-session" ; then
++        ibus exit
++    fi
++    kill $PID_GNOME_SESSION $PID_XORG
++}
++
++main()
++{
++    parse_args $@
++    init_desktop
++    run_dbus_daemon
++    run_desktop
++    run_test_suite
++    finit
++}
++
++main $@
+-- 
+2.14.3
+
+From 68e162a59c7943ee6207ff7d21f9a75d1e6f2f79 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Fri, 6 Apr 2018 20:35:50 +0900
+Subject: [PATCH] src/tests: Fix a typo in runtest
+
+---
+ src/tests/runtest | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/src/tests/runtest b/src/tests/runtest
+index b3b2a1ce..09026be0 100755
+--- a/src/tests/runtest
++++ b/src/tests/runtest
+@@ -92,10 +92,9 @@ for t in $DISABLE_GUI_TESTS; do
+     fi
+ done
+ 
+-test -d $tstdir || mkdir $tstdir
+-
+ run_test_case()
+ {
++    test -d $tstdir || mkdir $tstdir
+     pushd $tstdir
+ 
+     need_bus=no
+@@ -132,7 +131,7 @@ run_test_case()
+ 
+     retval=`expr $retval \| $?`
+ 
+-    $popd
++    popd
+ 
+     func_cleanup $tstdir
+ }
+-- 
+2.14.3
+
+From c360cbd830943a4bfb0ece9cc07b99a426dc2121 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Mon, 9 Apr 2018 11:57:09 +0900
+Subject: [PATCH] src/tests: Add ibus-compose.env
+
+---
+ src/tests/ibus-compose.env | 3 +++
+ 1 file changed, 3 insertions(+)
+ create mode 100644 src/tests/ibus-compose.env
+
+diff --git a/src/tests/ibus-compose.env b/src/tests/ibus-compose.env
+new file mode 100644
+index 00000000..734ab8fa
+--- /dev/null
++++ b/src/tests/ibus-compose.env
+@@ -0,0 +1,3 @@
++LANG=el_GR.UTF-8
++LANG=fi_FI.UTF-8
++LANG=pt_BR.UTF-8
+-- 
+2.14.3
+
+From 68bd2695c4cc6a06cb8a55a55fed2054d29f0995 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Fri, 13 Apr 2018 16:31:29 +0900
+Subject: [PATCH] src/tests: Fix a typo
+
+---
+ src/tests/Makefile.am | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/tests/Makefile.am b/src/tests/Makefile.am
+index 8bcac8f2..11ebb531 100644
+--- a/src/tests/Makefile.am
++++ b/src/tests/Makefile.am
+@@ -68,7 +68,7 @@ TESTS_ENVIRONMENT = \
+ 	top_srcdir=$(top_srcdir) \
+ 	builddir=$(builddir) \
+ 	srcdir=$(srcdir) \
+-	DISABLE_GUI_TESTS=$(DISABLE_GUI_TESTS) \
++	DISABLE_GUI_TESTS="$(DISABLE_GUI_TESTS)" \
+ 	$(NULL)
+ 
+ LOG_COMPILER = $(srcdir)/runtest
+-- 
+2.14.3
+
+From 8d4c4738d07b6850e56ae74d46b7b13b7382f865 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Fri, 13 Apr 2018 17:33:50 +0900
+Subject: [PATCH] configure: Add --disable-python2 option
+
+---
+ bindings/pygobject/Makefile.am |  6 ++++++
+ configure.ac                   | 37 ++++++++++++++++++++++++++++---------
+ 2 files changed, 34 insertions(+), 9 deletions(-)
+
+diff --git a/bindings/pygobject/Makefile.am b/bindings/pygobject/Makefile.am
+index 238a537a..fb2e2a7a 100644
+--- a/bindings/pygobject/Makefile.am
++++ b/bindings/pygobject/Makefile.am
+@@ -4,6 +4,8 @@
+ #
+ # Copyright (c) 2012 Daiki Ueno <ueno@unixuser.org>
+ # Copyright (c) 2014-2016 Peng Huang <shawn.p.huang@gmail.com>
++# Copyright (c) 2018 Takao Fujiwara <takao.fujiwara1@gmail.com>
++# Copyright (c) 2012-2018 Red Hat, Inc.
+ #
+ # This library is free software; you can redistribute it and/or
+ # modify it under the terms of the GNU Lesser General Public
+@@ -22,11 +24,13 @@
+ 
+ NULL =
+ 
++if ENABLE_PYTHON2
+ py2_compile = PYTHON=$(PYTHON2) $(SHELL) $(py_compile)
+ overrides2dir = $(py2overridesdir)
+ overrides2_DATA =				\
+ 	gi/overrides/IBus.py			\
+ 	$(NULL)
++endif
+ 
+ overridesdir = $(pyoverridesdir)
+ overrides_PYTHON =				\
+@@ -56,6 +60,7 @@ EXTRA_DIST =					\
+ 	$(NULL)
+ 
+ install-data-hook:
++if ENABLE_PYTHON2
+ 	@for data in $(overrides2_DATA); do \
+ 	    file=`echo $$data | sed -e 's|^.*/||'`; \
+ 	    dlist="$$dlist $$file"; \
+@@ -63,6 +68,7 @@ install-data-hook:
+ 	$(py2_compile) --destdir "$(DESTDIR)" \
+ 	               --basedir "$(overrides2dir)" \
+ 	               $$dlist
++endif
+ 	$(NULL)
+ 
+ -include $(top_srcdir)/git.mk
+diff --git a/configure.ac b/configure.ac
+index d19aa874..085cecb8 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -391,6 +391,14 @@ fi
+ AC_PATH_PROG(ENV_IBUS_TEST, env)
+ AC_SUBST(ENV_IBUS_TEST)
+ 
++AC_ARG_ENABLE(python2,
++    AS_HELP_STRING([--disable-python2],
++                   [Do not install bindings/pygobject/gi and ibus for python2.
++                    '--disable-python2' bring '--disable-python-library'.]),
++    [enable_python2=$enableval],
++    [enable_python2=yes]
++)
++
+ AC_ARG_ENABLE(python-library,
+     AS_HELP_STRING([--enable-python-library],
+                    [Use ibus python library]),
+@@ -405,10 +413,6 @@ AC_ARG_ENABLE(setup,
+     [enable_setup=yes]
+ )
+ 
+-AM_CONDITIONAL([ENABLE_PYTHON_LIBRARY], [test x"$enable_python_library" = x"yes"])
+-AM_CONDITIONAL([ENABLE_SETUP], [test x"$enable_setup" = x"yes"])
+-AM_CONDITIONAL([ENABLE_DAEMON], [true])
+-
+ # Define python version
+ AC_ARG_WITH(python,
+     AS_HELP_STRING([--with-python[=PATH]],
+@@ -417,12 +421,24 @@ AC_ARG_WITH(python,
+ )
+ 
+ AM_PATH_PYTHON([2.5])
+-AC_PATH_PROG(PYTHON2, python2)
+ 
+-if test x"$PYTHON2" = x""; then
+-    PYTHON2=$PYTHON
++if test x"$enable_python2" != x"yes"; then
++    enable_python_library=no
++    PYTHON2=
++    enable_python2="no (disabled, use --enable-python2 to enable)"
++else
++    AC_PATH_PROG(PYTHON2, python2)
++
++    if test x"$PYTHON2" = x""; then
++        PYTHON2=$PYTHON
++    fi
+ fi
+ 
++AM_CONDITIONAL([ENABLE_PYTHON2], [test x"$enable_python2" = x"yes"])
++AM_CONDITIONAL([ENABLE_PYTHON_LIBRARY], [test x"$enable_python_library" = x"yes"])
++AM_CONDITIONAL([ENABLE_SETUP], [test x"$enable_setup" = x"yes"])
++AM_CONDITIONAL([ENABLE_DAEMON], [true])
++
+ PYGOBJECT_REQUIRED=3.0.0
+ 
+ PKG_CHECK_EXISTS([pygobject-3.0 >= $PYGOBJECT_REQUIRED],
+@@ -434,8 +450,10 @@ if test "x$enable_pygobject" = "xyes"; then
+     pyoverridesdir=`$PYTHON -c "import gi; print(gi._overridesdir)"`
+     AC_SUBST(pyoverridesdir)
+ 
+-    py2overridesdir=`$PYTHON2 -c "import gi; print(gi._overridesdir)"`
+-    AC_SUBST(py2overridesdir)
++    if test x"$enable_python2" = x"yes"; then
++        py2overridesdir=`$PYTHON2 -c "import gi; print(gi._overridesdir)"`
++        AC_SUBST(py2overridesdir)
++    fi
+ fi
+ 
+ AM_CONDITIONAL(ENABLE_PYGOBJECT, test x"$enable_pygobject" = "xyes")
+@@ -752,6 +770,7 @@ Build options:
+   CFLAGS                        $CFLAGS
+   PYTHON                        $PYTHON
+   PYTHON2                       $PYTHON2
++  Enable python2                $enable_python2
+   Gtk2 immodule dir             $GTK2_IM_MODULEDIR
+   Gtk3 immodule dir             $GTK3_IM_MODULEDIR
+   Build gtk2 immodule           $enable_gtk2
+-- 
+2.14.3
+
+From 7bc160f2139799b853678264c6b01277f0721336 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Fri, 13 Apr 2018 19:39:09 +0900
+Subject: [PATCH] bus: Add DISABLE_GUI_TESTS for test-stress
+
+---
+ bus/Makefile.am | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/bus/Makefile.am b/bus/Makefile.am
+index 76166a0f..dda79eac 100644
+--- a/bus/Makefile.am
++++ b/bus/Makefile.am
+@@ -110,7 +110,6 @@ if ENABLE_EMOJI_DICT
+ AM_CFLAGS += -DEMOJI_DICT
+ endif
+ 
+-
+ if ENABLE_TESTS
+ TESTS = \
+ 	test-matchrule \
+@@ -123,6 +122,7 @@ TESTS_ENVIRONMENT = \
+     top_srcdir=$(top_srcdir) \
+     builddir=$(builddir) \
+     srcdir=$(srcdir) \
++    DISABLE_GUI_TESTS="$(DISABLE_GUI_TESTS)" \
+     $(NULL)
+ 
+ LOG_COMPILER = $(top_srcdir)/src/tests/runtest
+-- 
+2.14.3
+
