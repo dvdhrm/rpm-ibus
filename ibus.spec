@@ -74,9 +74,9 @@ BuildRequires:  dconf-devel
 BuildRequires:  dbus-x11
 BuildRequires:  python3-devel
 BuildRequires:  python3-gobject
-%if %with_python2
+# https://bugzilla.gnome.org/show_bug.cgi?id=759334
+# Need python2 for gsettings-schema-convert
 BuildRequires:  python2-devel
-%endif
 BuildRequires:  vala
 BuildRequires:  vala-devel
 BuildRequires:  vala-tools
@@ -337,6 +337,9 @@ desktop-file-install --delete-original          \
 # FIXME: no version number
 %find_lang %{name}10
 
+%check
+make check DISABLE_GUI_TESTS="ibus-compose test-stress"
+
 %post
 %{_sbindir}/alternatives --install %{_sysconfdir}/X11/xinit/xinputrc xinputrc %{_xinputconf} 83 || :
 
@@ -381,8 +384,8 @@ dconf update || :
 %{_datadir}/icons/hicolor/*/apps/*
 %{_datadir}/man/man1/ibus.1.gz
 %{_datadir}/man/man1/ibus-daemon.1.gz
-%{_datadir}/man/man5/ibus.conf.5.gz
 %{_datadir}/man/man7/ibus-emoji.7.gz
+%{_datadir}/man/man5/ibus.conf.5.gz
 %{_libexecdir}/ibus-engine-simple
 %{_libexecdir}/ibus-dconf
 %{_libexecdir}/ibus-portal
@@ -451,6 +454,7 @@ dconf update || :
 %changelog
 * Fri Apr 13 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-5
 - Disabled python2 since RHEL8
+- Run make check in %%check except for GUI testings
 
 * Fri Mar 30 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-4
 - Fixed Bug 1554714 - improve order of unicode matches

@@ -1056,3 +1056,126 @@ index 76166a0f..dda79eac 100644
 -- 
 2.14.3
 
+From 10cc30eac200d10b581d9d2122d5a732f4880943 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Tue, 17 Apr 2018 14:00:20 +0900
+Subject: [PATCH] src/tests: Enable GSettings in runtest
+
+---
+ src/tests/runtest | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+
+diff --git a/src/tests/runtest b/src/tests/runtest
+index 09026be0..35825b1b 100755
+--- a/src/tests/runtest
++++ b/src/tests/runtest
+@@ -34,6 +34,8 @@ ibus-engine-switch
+ ibus-compose
+ test-stress
+ "
++IBUS_SCHEMA_FILE='org.freedesktop.ibus.gschema.xml'
++
+ retval=0
+ 
+ # Portable replacement of basename.
+@@ -92,6 +94,12 @@ for t in $DISABLE_GUI_TESTS; do
+     fi
+ done
+ 
++# IBusEngine has GSettings
++if test ! -f "$top_builddir/data/dconf/$IBUS_SCHEMA_FILE" ; then
++    echo "NOT FOUND $top_builddir/data/dconf/$IBUS_SCHEMA_FILE"
++    exit -1
++fi
++
+ run_test_case()
+ {
+     test -d $tstdir || mkdir $tstdir
+@@ -114,6 +122,20 @@ run_test_case()
+         IBUS_ADDRESS_FILE=$PWD/ibus-daemon.pid
+         export IBUS_ADDRESS_FILE
+ 
++        cp "../$top_builddir/data/dconf/$IBUS_SCHEMA_FILE" $PWD
++        glib-compile-schemas $PWD
++        if test $? -ne 0 ; then
++            echo "FAILED glib-compile-schemas"
++            retval=1
++            return
++        fi
++        if test ! -f $PWD/gschemas.compiled ; then
++            echo "NOT FOUND $PWD/gschemas.compiled"
++            retval=1
++            return
++        fi
++        export GSETTINGS_SCHEMA_DIR=$PWD
++
+         # Start ibus-daemon.
+         ../$top_builddir/bus/ibus-daemon \
+         --daemonize \
+-- 
+2.14.3
+
+From 3280848b42b07afbac3d59066474c5f429de9182 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Tue, 17 Apr 2018 14:43:02 +0900
+Subject: [PATCH] bus: Enable sub package of gtkextension.xml and
+ ibus-extension-gtk3
+
+GNOME destkop asked not to install ibus-extension-gtk3 by default
+since the UI is not called by gnome-shell.
+
+BUG=rhbz#1567689
+---
+ bus/main.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/bus/main.c b/bus/main.c
+index 7aa89fc4..e1cc423b 100644
+--- a/bus/main.c
++++ b/bus/main.c
+@@ -293,7 +293,7 @@ main (gint argc, gchar **argv)
+         if (component) {
+             bus_component_set_restart (component, restart);
+         }
+-        if (component == NULL ||
++        if (component != NULL &&
+             !bus_component_start (component, g_verbose)) {
+             g_printerr ("Can not execute default panel program\n");
+             exit (-1);
+-- 
+2.14.3
+
+From d8f901f856ddd75baba5826038d1346c5a43d048 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Fri, 20 Apr 2018 15:58:06 +0900
+Subject: [PATCH] Replace OnlyShowIn= with NoDisplay=true
+
+BUG=rhbz#1567689
+---
+ ui/gtk3/ibus-extension-gtk3.desktop.in.in | 2 +-
+ ui/gtk3/ibus-ui-emojier.desktop.in.in     | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/ui/gtk3/ibus-extension-gtk3.desktop.in.in b/ui/gtk3/ibus-extension-gtk3.desktop.in.in
+index 6ec5585f..a119ec8e 100644
+--- a/ui/gtk3/ibus-extension-gtk3.desktop.in.in
++++ b/ui/gtk3/ibus-extension-gtk3.desktop.in.in
+@@ -3,4 +3,4 @@ _Name=Emoji Choice
+ Icon=ibus
+ Exec=@libexecdir@/ibus-extension-gtk3
+ Type=Application
+-OnlyShowIn=
++NoDisplay=true
+diff --git a/ui/gtk3/ibus-ui-emojier.desktop.in.in b/ui/gtk3/ibus-ui-emojier.desktop.in.in
+index f4b750a8..6d9422d5 100644
+--- a/ui/gtk3/ibus-ui-emojier.desktop.in.in
++++ b/ui/gtk3/ibus-ui-emojier.desktop.in.in
+@@ -3,4 +3,4 @@ _Name=Emoji Choice
+ Icon=ibus
+ Exec=ibus emoji
+ Type=Application
+-OnlyShowIn=
++NoDisplay=true
+-- 
+2.14.3
+
