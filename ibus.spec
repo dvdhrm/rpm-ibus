@@ -452,9 +452,10 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Fri Apr 13 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-5
+* Mon May 07 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-5
 - Disabled python2 since RHEL8
 - Run make check in %%check except for GUI testings
+- Fixed Bug 1574855 - [abrt] ibus: ibus_engine_filter_key_event()
 
 * Fri Mar 30 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-4
 - Fixed Bug 1554714 - improve order of unicode matches
