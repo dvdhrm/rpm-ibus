@@ -41,7 +41,7 @@
 
 Name:           ibus
 Version:        1.5.18
-Release:        5%{?dist}
+Release:        6%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -452,6 +452,9 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Tue Jun 19 2018 Miro Hrončok <mhroncok@redhat.com> - 1.5.18-6
+- Rebuilt for Python 3.7
+
 * Mon May 07 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-5
 - Disabled python2 since RHEL8
 - Run make check in %%check except for GUI testings
