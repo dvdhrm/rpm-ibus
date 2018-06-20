@@ -1,6 +1,6 @@
-From 4ad2f160e2af0b71148b3f7726e71f26a107ff1c Mon Sep 17 00:00:00 2001
+From 8c5ccd2c990080e581f6cf5c71d8f5603a87bf15 Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 21 Feb 2018 15:05:18 +0900
+Date: Wed, 20 Jun 2018 17:40:15 +0900
 Subject: [PATCH] bus: Fix SEGV in bus_panel_proxy_focus_in()
 
 BUG=rhbz#1349148
@@ -124,12 +124,12 @@ index b54ef817..e4dd8683 100644
      if (incoming) {
          /* is incoming message */
 diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
-index 58d205cf..34f6c909 100644
+index ec1caea8..9ae3751b 100644
 --- a/bus/ibusimpl.c
 +++ b/bus/ibusimpl.c
-@@ -357,13 +357,16 @@ _dbus_name_owner_changed_cb (BusDBusImpl   *dbus,
-     else if (!g_strcmp0 (name, IBUS_SERVICE_PANEL_EXTENSION))
-         panel_type = PANEL_TYPE_EXTENSION;
+@@ -484,13 +484,16 @@ _dbus_name_owner_changed_cb (BusDBusImpl   *dbus,
+     else if (!g_strcmp0 (name, IBUS_SERVICE_PANEL_EXTENSION_EMOJI))
+         panel_type = PANEL_TYPE_EXTENSION_EMOJI;
  
 -    if (panel_type != PANEL_TYPE_NONE) {
 +    do {
@@ -140,12 +140,12 @@ index 58d205cf..34f6c909 100644
              BusConnection *connection;
              BusInputContext *context = NULL;
              BusPanelProxy   **panel = (panel_type == PANEL_TYPE_PANEL) ?
-                                        &ibus->panel : &ibus->extension;
+                                       &ibus->panel : &ibus->emoji_extension;
 +            GDBusConnection *dbus_connection = NULL;
  
              if (*panel != NULL) {
                  ibus_proxy_destroy ((IBusProxy *)(*panel));
-@@ -372,9 +375,21 @@ _dbus_name_owner_changed_cb (BusDBusImpl   *dbus,
+@@ -499,9 +502,21 @@ _dbus_name_owner_changed_cb (BusDBusImpl   *dbus,
                  g_assert (*panel == NULL);
              }
  
@@ -166,9 +166,9 @@ index 58d205cf..34f6c909 100644
 +            }
 +
              *panel = bus_panel_proxy_new (connection, panel_type);
- 
-             g_signal_connect (*panel,
-@@ -406,7 +421,7 @@ _dbus_name_owner_changed_cb (BusDBusImpl   *dbus,
+             if (panel_type == PANEL_TYPE_EXTENSION_EMOJI)
+                 ibus->enable_emoji_extension = FALSE;
+@@ -555,7 +570,7 @@ _dbus_name_owner_changed_cb (BusDBusImpl   *dbus,
                  }
              }
          }

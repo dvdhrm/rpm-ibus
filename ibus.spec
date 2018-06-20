@@ -20,8 +20,6 @@
 %global with_kde5 0
 %endif
 
-%global with_emoji_harfbuzz 1
-
 %global ibus_api_version 1.0
 
 # for bytecompile in %%{_datadir}/ibus/setup
@@ -41,7 +39,7 @@
 
 Name:           ibus
 Version:        1.5.18
-Release:        6%{?dist}
+Release:        7%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -53,12 +51,8 @@ Source2:        %{name}.conf.5
 # Upstreamed patches.
 # Patch0:         %%{name}-HEAD.patch
 Patch0:         %{name}-HEAD.patch
-%if %with_emoji_harfbuzz
-# Under testing self rendering until Pango, Fontconfig, Cairo are stable
-Patch1:         %{name}-xx-emoji-harfbuzz.patch
-%endif
 # Under testing #1349148 #1385349 #1350291 #1406699 #1432252
-Patch2:         %{name}-1385349-segv-bus-proxy.patch
+Patch1:         %{name}-1385349-segv-bus-proxy.patch
 
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
@@ -82,6 +76,7 @@ BuildRequires:  vala-devel
 BuildRequires:  vala-tools
 # for AM_GCONF_SOURCE_2 in configure.ac
 BuildRequires:  GConf2-devel
+BuildRequires:  git
 BuildRequires:  intltool
 BuildRequires:  iso-codes-devel
 BuildRequires:  libnotify-devel
@@ -92,11 +87,6 @@ BuildRequires:  qt5-qtbase-devel
 BuildRequires:  cldr-emoji-annotation
 BuildRequires:  unicode-emoji
 BuildRequires:  unicode-ucd
-%if %with_emoji_harfbuzz
-BuildRequires:  cairo-devel
-BuildRequires:  fontconfig-devel
-BuildRequires:  harfbuzz-devel
-%endif
 
 Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
 Requires:       %{name}-gtk2%{?_isa}   = %{version}-%{release}
@@ -260,14 +250,8 @@ The ibus-devel-docs package contains developer documentation for IBus
 
 
 %prep
-%setup -q
-# %%patch0 -p1
-%patch0 -p1
+%autosetup -S git
 # cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
-%if %with_emoji_harfbuzz
-%patch1 -p1 -z .hb
-%endif
-%patch2 -p1 -z .segv
 
 # prep test
 diff client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
@@ -298,9 +282,6 @@ autoreconf -f -i -v
     --enable-wayland \
 %if ! %with_kde5
     --disable-appindicator \
-%endif
-%if %with_emoji_harfbuzz
-    --enable-harfbuzz-for-emoji \
 %endif
     --enable-introspection \
     %{nil}
@@ -452,6 +433,10 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Jun 20 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-7
+- Moved input focus on Emojier to engines' preedit
+- Removed ibus-xx-emoji-harfbuzz.patch not to change session emoji font
+
 * Tue Jun 19 2018 Miro Hrončok <mhroncok@redhat.com> - 1.5.18-6
 - Rebuilt for Python 3.7
 
