@@ -39,7 +39,7 @@
 
 Name:           ibus
 Version:        1.5.18
-Release:        7%{?dist}
+Release:        8%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -47,6 +47,7 @@ URL:            https://github.com/ibus/%name/wiki
 Source0:        https://github.com/ibus/%name/releases/download/%{version}/%{name}-%{version}.tar.gz
 Source1:        %{name}-xinput
 Source2:        %{name}.conf.5
+Source3:        %{name}-po-1.5.18-20180627.tar.gz
 # Will remove the annotation tarball once the rpm is available on Fedora
 # Upstreamed patches.
 # Patch0:         %%{name}-HEAD.patch
@@ -251,6 +252,7 @@ The ibus-devel-docs package contains developer documentation for IBus
 
 %prep
 %autosetup -S git
+zcat %SOURCE3 | tar xfv -
 # cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
 
 # prep test
@@ -433,6 +435,10 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Jun 27 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-8
+- Enable preedit for compose keys
+- Fix SEGV in panel_binding_parse_accelerator
+
 * Wed Jun 20 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-7
 - Moved input focus on Emojier to engines' preedit
 - Removed ibus-xx-emoji-harfbuzz.patch not to change session emoji font
