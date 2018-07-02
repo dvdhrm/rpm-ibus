@@ -39,7 +39,7 @@
 
 Name:           ibus
 Version:        1.5.18
-Release:        9%{?dist}
+Release:        10%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -435,6 +435,9 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon Jul 02 2018 Miro Hrončok <mhroncok@redhat.com> - 1.5.18-10
+- Rebuilt for Python 3.7
+
 * Fri Jun 29 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-9
 - Do not use combined characters on preedit for compose keys
 - Fixed an infinite loop of extension preedit with xterm
