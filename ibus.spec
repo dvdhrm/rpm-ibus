@@ -39,7 +39,7 @@
 
 Name:           ibus
 Version:        1.5.18
-Release:        10%{?dist}
+Release:        11%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -435,6 +435,9 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Jul 13 2018 Fedora Release Engineering <releng@fedoraproject.org> - 1.5.18-11
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_29_Mass_Rebuild
+
 * Mon Jul 02 2018 Miro Hrončok <mhroncok@redhat.com> - 1.5.18-10
 - Rebuilt for Python 3.7
 
