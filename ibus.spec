@@ -39,7 +39,7 @@
 
 Name:           ibus
 Version:        1.5.18
-Release:        11%{?dist}
+Release:        12%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -52,8 +52,9 @@ Source3:        %{name}-po-1.5.18-20180627.tar.gz
 # Upstreamed patches.
 # Patch0:         %%{name}-HEAD.patch
 Patch0:         %{name}-HEAD.patch
-# Under testing #1349148 #1385349 #1350291 #1406699 #1432252
-Patch1:         %{name}-1385349-segv-bus-proxy.patch
+Patch1:         %{name}-1602549-covscan.patch
+# Under testing #1349148 #1385349 #1350291 #1406699 #1432252 #1601577
+Patch2:         %{name}-1385349-segv-bus-proxy.patch
 
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
@@ -435,6 +436,9 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon Jul 23 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-12
+- Rebuilt with RHEL code reviews
+
 * Fri Jul 13 2018 Fedora Release Engineering <releng@fedoraproject.org> - 1.5.18-11
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_29_Mass_Rebuild
 

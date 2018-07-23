@@ -1,6 +1,6 @@
-From 8c5ccd2c990080e581f6cf5c71d8f5603a87bf15 Mon Sep 17 00:00:00 2001
+From 865b204f1c06b782cf7b4a479b358e76f4b3dfee Mon Sep 17 00:00:00 2001
 From: fujiwarat <takao.fujiwara1@gmail.com>
-Date: Wed, 20 Jun 2018 17:40:15 +0900
+Date: Tue, 17 Jul 2018 13:39:30 +0900
 Subject: [PATCH] bus: Fix SEGV in bus_panel_proxy_focus_in()
 
 BUG=rhbz#1349148
@@ -8,10 +8,12 @@ BUG=rhbz#1385349
 BUG=rhbz#1350291
 BUG=rhbz#1406699
 BUG=rhbz#1432252
+BUG=rhbz#1601577
 ---
- bus/dbusimpl.c | 38 ++++++++++++++++++++++++++++++++------
- bus/ibusimpl.c | 21 ++++++++++++++++++---
- 2 files changed, 50 insertions(+), 9 deletions(-)
+ bus/dbusimpl.c    | 38 ++++++++++++++++++++++++++++++++------
+ bus/engineproxy.c |  5 ++++-
+ bus/ibusimpl.c    | 21 ++++++++++++++++++---
+ 3 files changed, 54 insertions(+), 10 deletions(-)
 
 diff --git a/bus/dbusimpl.c b/bus/dbusimpl.c
 index b54ef817..e4dd8683 100644
@@ -123,6 +125,36 @@ index b54ef817..e4dd8683 100644
  
      if (incoming) {
          /* is incoming message */
+diff --git a/bus/engineproxy.c b/bus/engineproxy.c
+index 2d98995c..d661673a 100644
+--- a/bus/engineproxy.c
++++ b/bus/engineproxy.c
+@@ -665,6 +665,7 @@ bus_engine_proxy_new_internal (const gchar     *path,
+                                IBusEngineDesc  *desc,
+                                GDBusConnection *connection)
+ {
++    GError *error = NULL;
+     g_assert (path);
+     g_assert (IBUS_IS_ENGINE_DESC (desc));
+     g_assert (G_IS_DBUS_CONNECTION (connection));
+@@ -673,7 +674,7 @@ bus_engine_proxy_new_internal (const gchar     *path,
+     BusEngineProxy *engine =
+         (BusEngineProxy *) g_initable_new (BUS_TYPE_ENGINE_PROXY,
+                                            NULL,
+-                                           NULL,
++                                           &error,
+                                            "desc",              desc,
+                                            "g-connection",      connection,
+                                            "g-interface-name",  IBUS_INTERFACE_ENGINE,
+@@ -681,6 +682,8 @@ bus_engine_proxy_new_internal (const gchar     *path,
+                                            "g-default-timeout", g_gdbus_timeout,
+                                            "g-flags",           flags,
+                                            NULL);
++    /* FIXME: rhbz#1601577 */
++    g_assert_no_error (error);
+     const gchar *layout = ibus_engine_desc_get_layout (desc);
+     if (layout != NULL && layout[0] != '\0') {
+         engine->keymap = ibus_keymap_get (layout);
 diff --git a/bus/ibusimpl.c b/bus/ibusimpl.c
 index ec1caea8..9ae3751b 100644
 --- a/bus/ibusimpl.c
@@ -178,5 +210,5 @@ index ec1caea8..9ae3751b 100644
      bus_ibus_impl_component_name_owner_changed (ibus, name, old_name, new_name);
  }
 -- 
-2.14.3
+2.17.1
 
