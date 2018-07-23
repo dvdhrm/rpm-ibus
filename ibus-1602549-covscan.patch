@@ -1,0 +1,979 @@
+From bdedaa4eec316f1d4527d70ac8d8b14e163226df Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Mon, 23 Jul 2018 18:51:55 +0900
+Subject: [PATCH] RHEL code reviews
+
+---
+ client/x11/main.c             |  4 ++--
+ setup/enginetreeview.py       | 10 ++--------
+ setup/ibus-setup.in           |  5 ++---
+ src/emoji-parser.c            |  8 +++++---
+ src/ibusbus.c                 |  9 ++++++---
+ src/ibuscomposetable.c        |  4 ++--
+ src/ibusenginesimple.c        | 22 +++++++++++++++++-----
+ src/ibushotkey.c              |  5 +++--
+ src/ibuskeymap.c              | 10 ++++++----
+ src/ibuskeynames.c            |  3 +--
+ src/ibusregistry.c            |  4 ++--
+ src/ibusservice.c             | 13 +++++++++----
+ src/ibusxml.c                 |  9 ++++++---
+ src/unicode-parser.c          |  3 ++-
+ util/IMdkit/FrameMgr.c        |  7 +++++++
+ util/IMdkit/IMConn.c          |  6 ++++--
+ util/IMdkit/i18nClbk.c        | 10 ++++++++++
+ util/IMdkit/i18nIc.c          | 11 +++++++++--
+ util/IMdkit/i18nMethod.c      |  4 ++++
+ util/IMdkit/i18nOffsetCache.c | 21 +++++++++++++++++----
+ util/IMdkit/i18nPtHdr.c       | 28 +++++++++++++++++++++++-----
+ util/IMdkit/i18nUtil.c        | 12 +++++++++---
+ util/IMdkit/i18nX.c           | 10 ++++++++--
+ 23 files changed, 156 insertions(+), 62 deletions(-)
+
+diff --git a/client/x11/main.c b/client/x11/main.c
+index 159f4303..3bea94b7 100644
+--- a/client/x11/main.c
++++ b/client/x11/main.c
+@@ -2,7 +2,7 @@
+ /* vim:set et sts=4: */
+ /* ibus
+  * Copyright (C) 2007-2015 Peng Huang <shawn.p.huang@gmail.com>
+- * Copyright (C) 2015-2017 Takao Fujiwara <takao.fujiwara1@gmail.com>
++ * Copyright (C) 2015-2018 Takao Fujiwara <takao.fujiwara1@gmail.com>
+  * Copyright (C) 2007-2015 Red Hat, Inc.
+  *
+  * main.c:
+@@ -196,7 +196,7 @@ _xim_preedit_callback_draw (XIMS xims, X11IC *x11ic, const gchar *preedit_string
+         }
+     }
+ 
+-    for (i = 0; i < len; i++) {
++    for (i = 0; feedback && i < len; i++) {
+         feedback[i] = 0;
+     }
+ 
+diff --git a/setup/enginetreeview.py b/setup/enginetreeview.py
+index 4de4a516..aea84593 100644
+--- a/setup/enginetreeview.py
++++ b/setup/enginetreeview.py
+@@ -3,7 +3,8 @@
+ # ibus - The Input Bus
+ #
+ # Copyright (c) 2007-2015 Peng Huang <shawn.p.huang@gmail.com>
+-# Copyright (c) 2007-2015 Red Hat, Inc.
++# Copyright (c) 2014-2018 Takao Fujiwara <takao.fujiwara1@gmail.com>
++# Copyright (c) 2007-2018 Red Hat, Inc.
+ #
+ # This library is free software; you can redistribute it and/or
+ # modify it under the terms of the GNU Lesser General Public
+@@ -91,7 +92,6 @@ class EngineTreeView(Gtk.TreeView):
+         renderer.set_property("text-column", 0)
+         renderer.set_property("has-entry", False)
+         renderer.set_property("editable", True)
+-        renderer.connect("changed", self.__engine_layout_changed_cb)
+ 
+         column = Gtk.TreeViewColumn(_("Kbd"))
+         column.set_expand(False)
+@@ -167,12 +167,6 @@ class EngineTreeView(Gtk.TreeView):
+         renderer.set_property("text", layout)
+         renderer.set_property("weight", Pango.Weight.NORMAL)
+ 
+-    def __engine_layout_changed_cb(self, combo, path, it):
+-        return
+-        i = self.__model.get_iter(path)
+-        layout = combo.get_property("model").get_value(it, 0)
+-        self.__model.set_value(i, 1, layout)
+-
+     def do_get_property(self, prop):
+         if prop.name == "active-engine":
+             it = self.get_selected_iter()
+diff --git a/setup/ibus-setup.in b/setup/ibus-setup.in
+index e0ed9ff5..bb5c85cf 100644
+--- a/setup/ibus-setup.in
++++ b/setup/ibus-setup.in
+@@ -3,7 +3,8 @@
+ # ibus - The Input Bus
+ #
+ # Copyright (c) 2007-2010 Peng Huang <shawn.p.huang@gmail.com>
+-# Copyright (c) 2007-2010 Red Hat, Inc.
++# Copyright (c) 2018 Takao Fujiwara <takao.fujiwara1@gmail.com>
++# Copyright (c) 2007-2018 Red Hat, Inc.
+ #
+ # This library is free software; you can redistribute it and/or
+ # modify it under the terms of the GNU Lesser General Public
+@@ -21,8 +22,6 @@
+ # USA
+ 
+ prefix=@prefix@
+-exec_prefix=@exec_prefix@
+-datarootdir=@datarootdir@
+ libexecdir=@libexecdir@
+ export IBUS_PREFIX=@prefix@
+ export IBUS_DATAROOTDIR=@datarootdir@
+diff --git a/src/emoji-parser.c b/src/emoji-parser.c
+index 0f7c8cfb..b8f4dcf1 100644
+--- a/src/emoji-parser.c
++++ b/src/emoji-parser.c
+@@ -466,7 +466,8 @@ unicode_annotations_parse_xml_file (const gchar  *filename,
+     g_return_val_if_fail (list != NULL, FALSE);
+ 
+     if (!g_file_get_contents (filename, &content, &length, &error)) {
+-        g_warning ("Failed to load %s: %s", filename, error->message);
++        g_warning ("Failed to load %s: %s", filename,
++                   error ? error->message : "");
+         goto failed_to_parse_unicode_annotations;
+     }
+ 
+@@ -611,7 +612,7 @@ unicode_emoji_test_parse_line (const gchar *line,
+             int i;
+             gchar *amp;
+             segments = g_strsplit(data->subcategory, "-", -1);
+-            for (i = 0; segments[i]; i++) {
++            for (i = 0; segments && segments[i]; i++) {
+                 if ((amp = strchr (segments[i], '&')) != NULL) {
+                     if (amp - segments[i] <= 1) {
+                         g_warning ("Wrong ampersand");
+@@ -665,7 +666,8 @@ unicode_emoji_test_parse_file (const gchar *filename,
+     g_return_val_if_fail (list != NULL, FALSE);
+ 
+     if (!g_file_get_contents (filename, &content, &length, &error)) {
+-        g_warning ("Failed to load %s: %s", filename, error->message);
++        g_warning ("Failed to load %s: %s",
++                   filename, error ? error->message : "");
+         goto failed_to_parse_unicode_emoji_test;
+     }
+     head = end = content;
+diff --git a/src/ibusbus.c b/src/ibusbus.c
+index 98820e8a..30c2e321 100644
+--- a/src/ibusbus.c
++++ b/src/ibusbus.c
+@@ -2,7 +2,7 @@
+ /* vim:set et sts=4: */
+ /* ibus - The Input Bus
+  * Copyright (C) 2008-2015 Peng Huang <shawn.p.huang@gmail.com>
+- * Copyright (C) 2015-2016 Takao Fujiwara <takao.fujiwara1@gmail.com>
++ * Copyright (C) 2015-2018 Takao Fujiwara <takao.fujiwara1@gmail.com>
+  * Copyright (C) 2008-2016 Red Hat, Inc.
+  *
+  * This library is free software; you can redistribute it and/or
+@@ -22,6 +22,7 @@
+  */
+ 
+ #include "ibusbus.h"
++#include <errno.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <unistd.h>
+@@ -565,7 +566,9 @@ ibus_bus_init (IBusBus *bus)
+             return;
+         }
+         if (buf.st_mode != (S_IFDIR | S_IRWXU)) {
+-            g_chmod (path, 0700);
++            errno = 0;
++            if (g_chmod (path, 0700))
++                g_warning ("chmod failed: %s", errno ? g_strerror (errno) : "");
+         }
+     }
+ 
+@@ -673,7 +676,7 @@ ibus_bus_constructor (GType                  type,
+             ibus_bus_connect (_bus);
+     }
+     else {
+-        object = g_object_ref (_bus);
++        object = g_object_ref (G_OBJECT (_bus));
+     }
+ 
+     return object;
+diff --git a/src/ibuscomposetable.c b/src/ibuscomposetable.c
+index d473f581..b843e7e1 100644
+--- a/src/ibuscomposetable.c
++++ b/src/ibuscomposetable.c
+@@ -1,7 +1,7 @@
+ /* -*- mode: C; c-basic-offset: 4; indent-tabs-mode: nil; -*- */
+ /* ibus - The Input Bus
+  * Copyright (C) 2013-2014 Peng Huang <shawn.p.huang@gmail.com>
+- * Copyright (C) 2013-2017 Takao Fujiwara <takao.fujiwara1@gmail.com>
++ * Copyright (C) 2013-2018 Takao Fujiwara <takao.fujiwara1@gmail.com>
+  *
+  * This library is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU Lesser General Public
+@@ -532,7 +532,7 @@ ibus_compose_table_serialize (IBusComposeTable *compose_table)
+ 
+     variant_data = g_variant_new_fixed_array (G_VARIANT_TYPE_UINT16,
+                                               compose_table->data,
+-                                              index_stride * n_seqs,
++                                              (gsize)index_stride * n_seqs,
+                                               sizeof (guint16));
+     if (variant_data == NULL) {
+         g_warning ("Could not change compose data to GVariant.");
+diff --git a/src/ibusenginesimple.c b/src/ibusenginesimple.c
+index 68d6fb1e..aae6b8df 100644
+--- a/src/ibusenginesimple.c
++++ b/src/ibusenginesimple.c
+@@ -2,7 +2,7 @@
+ /* vim:set et sts=4: */
+ /* ibus - The Input Bus
+  * Copyright (C) 2014 Peng Huang <shawn.p.huang@gmail.com>
+- * Copyright (C) 2015-2017 Takao Fujiwara <takao.fujiwara1@gmail.com>
++ * Copyright (C) 2015-2018 Takao Fujiwara <takao.fujiwara1@gmail.com>
+  * Copyright (C) 2014-2017 Red Hat, Inc.
+  *
+  * This library is free software; you can redistribute it and/or
+@@ -814,9 +814,21 @@ check_normalize_nfc (gunichar* combination_buffer, gint n_compose)
+         g_free (nfc_temp);
+ 
+         if (n_compose > 2) {
+-            temp_swap = combination_buffer_temp[i % (n_compose - 1) + 1];
+-            combination_buffer_temp[i % (n_compose - 1) + 1] = combination_buffer_temp[(i+1) % (n_compose - 1) + 1];
+-            combination_buffer_temp[(i+1) % (n_compose - 1) + 1] = temp_swap;
++            gint j = i % (n_compose - 1) + 1;
++            gint k = (i+1) % (n_compose - 1) + 1;
++            if (j >= IBUS_MAX_COMPOSE_LEN) {
++                g_warning ("j >= IBUS_MAX_COMPOSE_LEN for " \
++                           "combination_buffer_temp");
++                break;
++            }
++            if (k >= IBUS_MAX_COMPOSE_LEN) {
++                g_warning ("k >= IBUS_MAX_COMPOSE_LEN for " \
++                           "combination_buffer_temp");
++                break;
++            }
++            temp_swap = combination_buffer_temp[j];
++            combination_buffer_temp[j] = combination_buffer_temp[k];
++            combination_buffer_temp[k] = temp_swap;
+         }
+         else
+             break;
+@@ -1067,7 +1079,7 @@ ibus_engine_simple_process_key_event (IBusEngine *engine,
+     gboolean compose_finish;
+     gunichar output_char;
+ 
+-    while (priv->compose_buffer[n_compose] != 0 && n_compose < EMOJI_SOURCE_LEN)
++    while (n_compose < EMOJI_SOURCE_LEN && priv->compose_buffer[n_compose] != 0)
+         n_compose++;
+     if (n_compose >= EMOJI_SOURCE_LEN) {
+         g_warning ("copmose table buffer is full.");
+diff --git a/src/ibushotkey.c b/src/ibushotkey.c
+index 0cdfa78b..00d502fc 100644
+--- a/src/ibushotkey.c
++++ b/src/ibushotkey.c
+@@ -2,7 +2,8 @@
+ /* vim:set et sts=4: */
+ /* IBus - The Input Bus
+  * Copyright (C) 2008-2010 Peng Huang <shawn.p.huang@gmail.com>
+- * Copyright (C) 2008-2010 Red Hat, Inc.
++ * Copyright (C) 2018 Takao Fujiwara <takao.fujiwara1@gmail.com>
++ * Copyright (C) 2008-2018 Red Hat, Inc.
+  *
+  * This library is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU Lesser General Public
+@@ -453,7 +454,7 @@ ibus_hotkey_profile_remove_hotkey (IBusHotkeyProfile *profile,
+             break;
+     }
+ 
+-    g_assert (p2->event == event);
++    g_assert (p2 && p2->event == event);
+ 
+     p2->hotkeys = g_list_remove (p2->hotkeys, p1);
+     if (p2->hotkeys == NULL) {
+diff --git a/src/ibuskeymap.c b/src/ibuskeymap.c
+index d7428c5d..27a56754 100644
+--- a/src/ibuskeymap.c
++++ b/src/ibuskeymap.c
+@@ -2,7 +2,8 @@
+ /* vim:set et sts=4: */
+ /* IBus - The Input Bus
+  * Copyright (C) 2008-2010 Peng Huang <shawn.p.huang@gmail.com>
+- * Copyright (C) 2008-2010 Red Hat, Inc.
++ * Copyright (C) 2018 Takao Fujiwara <takao.fujiwara1@gmail.com>
++ * Copyright (C) 2008-2018 Red Hat, Inc.
+  *
+  * This library is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU Lesser General Public
+@@ -72,7 +73,7 @@ static gboolean
+ ibus_keymap_parse_line (gchar  *str,
+                         KEYMAP  keymap)
+ {
+-    gchar *p1, *p2;
++    gchar *p1, *p2, ch;
+     gint i;
+     guint keycode;
+     guint keysym;
+@@ -139,11 +140,12 @@ ibus_keymap_parse_line (gchar  *str,
+     if (keysym == IBUS_KEY_VoidSymbol)
+         return FALSE;
+ 
++    /* Do not assign *p1 to g_ascii_isalpha() directly for the syntax check */
+     if (i == 0 &&
+         strncmp (p2, "addupper", sizeof ("addupper") - 1) == 0 &&
+-        g_ascii_isalpha (*p1)) {
++        (ch = *p1) && g_ascii_isalpha (ch)) {
+         gchar buf[] = "a";
+-        buf[0] = g_ascii_toupper(*p1);
++        buf[0] = g_ascii_toupper(ch);
+         keymap[keycode][0] = keymap[keycode][3] = keysym;
+         keymap[keycode][1] = keymap[keycode][2] = ibus_keyval_from_name (buf);
+ 
+diff --git a/src/ibuskeynames.c b/src/ibuskeynames.c
+index c3665127..08505598 100644
+--- a/src/ibuskeynames.c
++++ b/src/ibuskeynames.c
+@@ -192,8 +192,7 @@ ibus_key_event_from_string (const gchar *string,
+     if (*keyval != IBUS_KEY_VoidSymbol)
+         retval = TRUE;
+ _out:
+-    if (tokens)
+-        g_strfreev (tokens);
++    g_strfreev (tokens);
+     return retval;
+ }
+ 
+diff --git a/src/ibusregistry.c b/src/ibusregistry.c
+index dfda2af3..b0483998 100644
+--- a/src/ibusregistry.c
++++ b/src/ibusregistry.c
+@@ -2,7 +2,7 @@
+ /* vim:set et sts=4: */
+ /* bus - The Input Bus
+  * Copyright (C) 2015 Peng Huang <shawn.p.huang@gmail.com>
+- * Copyright (C) 2015 Takao Fujiwara <takao.fujiwara1@gmail.com>
++ * Copyright (C) 2015-2018 Takao Fujiwara <takao.fujiwara1@gmail.com>
+  * Copyright (C) 2015 Red Hat, Inc.
+  *
+  * This library is free software; you can redistribute it and/or
+@@ -472,7 +472,7 @@ ibus_registry_save_cache_file (IBusRegistry *registry,
+     }
+ 
+     if (g_str_has_prefix (filename, g_get_user_cache_dir ())) {
+-        g_chmod (filename, 0644);
++        g_warn_if_fail (!g_chmod (filename, 0644));
+     }
+ 
+     return TRUE;
+diff --git a/src/ibusservice.c b/src/ibusservice.c
+index 2199d61d..8023527b 100644
+--- a/src/ibusservice.c
++++ b/src/ibusservice.c
+@@ -2,7 +2,8 @@
+ /* vim:set et sts=4: */
+ /* ibus - The Input Bus
+  * Copyright (C) 2008-2015 Peng Huang <shawn.p.huang@gmail.com>
+- * Copyright (C) 2008-2015 Red Hat, Inc.
++ * Copyright (C) 2015-2018 Takao Fujiwara <takao.fujiwara1@gmail.com>
++ * Copyright (C) 2008-2018 Red Hat, Inc.
+  *
+  * This library is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU Lesser General Public
+@@ -500,12 +501,14 @@ ibus_service_register (IBusService     *service,
+                        GDBusConnection *connection,
+                        GError         **error)
+ {
++    GArray *array = NULL;
++    GArray *interfaces;
++    GDBusInterfaceInfo **p;
++
+     g_return_val_if_fail (IBUS_IS_SERVICE (service), FALSE);
+     g_return_val_if_fail (G_IS_DBUS_CONNECTION (connection), FALSE);
+     g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
+ 
+-    GArray *array = NULL;
+-
+     if (g_hash_table_lookup (service->priv->table, connection)) {
+         if (error) {
+             *error = g_error_new (G_DBUS_ERROR, G_DBUS_ERROR_OBJECT_PATH_IN_USE,
+@@ -515,7 +518,9 @@ ibus_service_register (IBusService     *service,
+         goto error_out;
+     }
+ 
+-    GDBusInterfaceInfo **p = (GDBusInterfaceInfo **)IBUS_SERVICE_GET_CLASS (service)->interfaces->data;
++    interfaces = IBUS_SERVICE_GET_CLASS (service)->interfaces;
++    g_assert (interfaces);
++    p = (GDBusInterfaceInfo **)interfaces->data;
+     if (*p == NULL) {
+         if (error) {
+             *error = g_error_new (G_DBUS_ERROR, G_DBUS_ERROR_FAILED,
+diff --git a/src/ibusxml.c b/src/ibusxml.c
+index 5cacc5af..266a8207 100644
+--- a/src/ibusxml.c
++++ b/src/ibusxml.c
+@@ -2,7 +2,8 @@
+ /* vim:set et sts=4: */
+ /* bus - The Input Bus
+  * Copyright (C) 2008-2015 Peng Huang <shawn.p.huang@gmail.com>
+- * Copyright (C) 2008-2015 Red Hat, Inc.
++ * Copyright (C) 2018 Takao Fujiwara <takao.fujiwara1@gmail.com>
++ * Copyright (C) 2008-2018 Red Hat, Inc.
+  *
+  * This library is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU Lesser General Public
+@@ -240,8 +241,10 @@ ibus_xml_parse_file (const gchar *filename)
+         return node;
+     } while (0);
+ 
+-    g_warning ("Parse %s failed: %s", filename, error->message);
+-    g_error_free (error);
++    if (error) {
++        g_warning ("Parse %s failed: %s", filename, error->message);
++        g_error_free (error);
++    }
+     g_markup_parse_context_free (context);
+     return NULL;
+ }
+diff --git a/src/unicode-parser.c b/src/unicode-parser.c
+index e98c6d5f..0e4fe8b7 100644
+--- a/src/unicode-parser.c
++++ b/src/unicode-parser.c
+@@ -281,7 +281,8 @@ ucd_parse_file (const gchar *filename,
+     g_return_val_if_fail (list != NULL, FALSE);
+ 
+     if (!g_file_get_contents (filename, &content, &length, &error)) {
+-        g_warning ("Failed to load %s: %s", filename, error->message);
++        g_warning ("Failed to load %s: %s",
++                   filename, error ? error->message : "");
+         goto failed_to_parse_ucd_names_list;
+     }
+     head = end = content;
+diff --git a/util/IMdkit/FrameMgr.c b/util/IMdkit/FrameMgr.c
+index 9b497948..084b8810 100644
+--- a/util/IMdkit/FrameMgr.c
++++ b/util/IMdkit/FrameMgr.c
+@@ -27,6 +27,7 @@ SOFTWARE.
+ ******************************************************************/
+ 
+ #include <X11/Xlibint.h>
++#include <assert.h>
+ #include <stdlib.h>
+ #include "FrameMgr.h"
+ 
+@@ -989,6 +990,7 @@ static XimFrameType FrameInstGetNextType(FrameInst fi, XimFrameTypeInfo info)
+             while (number > 0)
+             {
+                 i = _FrameInstDecrement (fi->template, i);
++                assert (i >= 0);
+                 size += _FrameInstGetItemSize (fi, i);
+                 number--;
+             }
+@@ -1138,6 +1140,7 @@ static XimFrameType FrameInstPeekNextType (FrameInst fi, XimFrameTypeInfo info)
+             while (number > 0)
+             {
+                 i = _FrameInstDecrement (fi->template, i);
++                assert (i >= 0);
+                 size += _FrameInstGetItemSize (fi, i);
+                 number--;
+             }
+@@ -1356,6 +1359,7 @@ static FmStatus FrameInstSetSize (FrameInst fi, int num)
+ 	    break;
+         }
+         /*endswitch*/
++        assert (i >= 0);
+         i = _FrameInstIncrement(fi->template, i);
+     }
+     /*endwhile*/
+@@ -1457,6 +1461,7 @@ static FmStatus FrameInstSetIterCount (FrameInst fi, int num)
+ 	    break;
+         }
+         /*endswitch*/
++        assert (i >= 0);
+         i = _FrameInstIncrement (fi->template, i);
+     }
+     /*endwhile*/
+@@ -1474,6 +1479,7 @@ static int FrameInstGetTotalSize (FrameInst fi)
+     while (fi->template[i].type != EOL)
+     {
+         size += _FrameInstGetItemSize (fi, i);
++        assert (i >= 0);
+         i = _FrameInstIncrement (fi->template, i);
+     }
+     /*endwhile*/
+@@ -2419,6 +2425,7 @@ static int _FrameInstGetItemSize (FrameInst fi, int cur_no)
+             size = 0;
+             while (number > 0)
+             {
++                assert (i >= 0);
+                 i = _FrameInstDecrement (fi->template, i);
+                 size += _FrameInstGetItemSize (fi, i);
+                 number--;
+diff --git a/util/IMdkit/IMConn.c b/util/IMdkit/IMConn.c
+index 6d365893..8e8b8ece 100644
+--- a/util/IMdkit/IMConn.c
++++ b/util/IMdkit/IMConn.c
+@@ -83,7 +83,7 @@ static char *_FindModifiers (XIMArg *args)
+ {
+     char *modifiers;
+ 
+-    while (args->name)
++    while (args && args->name)
+     {
+ 	if (strcmp (args->name, IMModifiers) == 0)
+ 	{
+@@ -144,8 +144,10 @@ XIMS IMOpenIM (Display *display, ...)
+     modifiers = _FindModifiers (args);
+ 
+     ims = _GetIMS (modifiers);
+-    if (ims == (XIMS) NULL)
++    if (ims == (XIMS) NULL) {
++        XFree (args);
+         return (XIMS) NULL;
++    }
+     /*endif*/
+     
+     ims->core.display = display;
+diff --git a/util/IMdkit/i18nClbk.c b/util/IMdkit/i18nClbk.c
+index b3edf3ad..f55f970f 100644
+--- a/util/IMdkit/i18nClbk.c
++++ b/util/IMdkit/i18nClbk.c
+@@ -55,6 +55,7 @@ int _Xi18nGeometryCallback (XIMS ims, IMProtocol *call_data)
+     if (!reply)
+     {
+         _Xi18nSendMessage (ims, connect_id, XIM_ERROR, 0, 0, 0);
++        FrameMgrFree (fm);
+         return False;
+     }
+     /*endif*/
+@@ -97,6 +98,7 @@ int _Xi18nPreeditStartCallback (XIMS ims, IMProtocol *call_data)
+     if (!reply)
+     {
+         _Xi18nSendMessage(ims, connect_id, XIM_ERROR, 0, 0, 0);
++        FrameMgrFree (fm);
+         return False;
+     }
+     /*endif*/
+@@ -159,6 +161,7 @@ int _Xi18nPreeditDrawCallback (XIMS ims, IMProtocol *call_data)
+     if (!reply)
+     {
+         _Xi18nSendMessage (ims, connect_id, XIM_ERROR, 0, 0, 0);
++        FrameMgrFree (fm);
+         return False;
+     }
+     /*endif*/
+@@ -212,6 +215,7 @@ int _Xi18nPreeditCaretCallback (XIMS ims, IMProtocol *call_data)
+     if (!reply)
+     {
+         _Xi18nSendMessage (ims, connect_id, XIM_ERROR, 0, 0, 0);
++        FrameMgrFree (fm);
+         return False;
+     }
+     /*endif*/
+@@ -256,6 +260,7 @@ int _Xi18nPreeditDoneCallback (XIMS ims, IMProtocol *call_data)
+     if (!reply)
+     {
+         _Xi18nSendMessage (ims, connect_id, XIM_ERROR, 0, 0, 0);
++        FrameMgrFree (fm);
+         return False;
+     }
+     /*endif*/
+@@ -297,6 +302,7 @@ int _Xi18nStatusStartCallback (XIMS ims, IMProtocol *call_data)
+     if (!reply)
+     {
+         _Xi18nSendMessage (ims, connect_id, XIM_ERROR, 0, 0, 0);
++        FrameMgrFree (fm);
+         return False;
+     }
+     /*endif*/
+@@ -363,6 +369,7 @@ int _Xi18nStatusDrawCallback (XIMS ims, IMProtocol *call_data)
+         if (!reply)
+         {
+             _Xi18nSendMessage (ims, connect_id, XIM_ERROR, 0, 0, 0);
++            FrameMgrFree (fm);
+             return False;
+         }
+         /*endif*/
+@@ -390,6 +397,7 @@ int _Xi18nStatusDrawCallback (XIMS ims, IMProtocol *call_data)
+         if (!reply)
+         {
+             _Xi18nSendMessage (ims, connect_id, XIM_ERROR, 0, 0, 0);
++            FrameMgrFree (fm);
+             return False;
+         }
+         /*endif*/
+@@ -435,6 +443,7 @@ int _Xi18nStatusDoneCallback (XIMS ims, IMProtocol *call_data)
+     if (!reply)
+     {
+         _Xi18nSendMessage (ims, connect_id, XIM_ERROR, 0, 0, 0);
++        FrameMgrFree (fm);
+         return False;
+     }
+     /*endif*/
+@@ -479,6 +488,7 @@ int _Xi18nStringConversionCallback (XIMS ims, IMProtocol *call_data)
+     if (!reply)
+     {
+         _Xi18nSendMessage (ims, connect_id, XIM_ERROR, 0, 0, 0);
++        FrameMgrFree (fm);
+         return False;
+     }
+     /*endif*/
+diff --git a/util/IMdkit/i18nIc.c b/util/IMdkit/i18nIc.c
+index 87445986..289837a6 100644
+--- a/util/IMdkit/i18nIc.c
++++ b/util/IMdkit/i18nIc.c
+@@ -475,8 +475,10 @@ static XICAttribute *CreateNestedList (CARD16 attr_id,
+     /*endif*/
+     memset (nest_list, 0, sizeof (XICAttribute));
+     nest_list->value = (void *) malloc (value_length);
+-    if (nest_list->value == NULL)
++    if (nest_list->value == NULL) {
++        XFree (nest_list);
+         return NULL;
++    }
+     /*endif*/
+     memset (nest_list->value, 0, value_length);
+ 
+@@ -816,6 +818,7 @@ void _Xi18nChangeIC (XIMS ims,
+     if (!reply)
+     {
+         _Xi18nSendMessage (ims, connect_id, XIM_ERROR, 0, 0, 0);
++        FrameMgrFree (fm);
+         return;
+     }
+     /*endif*/
+@@ -973,8 +976,10 @@ void _Xi18nGetIC (XIMS ims, IMProtocol *call_data, unsigned char *p)
+     getic->ic_attr = ic_attr;
+     if (i18n_core->address.improto)
+     {
+-        if (!(i18n_core->address.improto (ims, call_data)))
++        if (!(i18n_core->address.improto (ims, call_data))) {
++            XFree (attrID_list);
+             return;
++        }
+         /*endif*/
+ 	if (_Xi18nNeedSwap (i18n_core, connect_id))
+ 	  SwapAttributes(getic->ic_attr, getic->ic_attr_num);
+@@ -1020,6 +1025,8 @@ void _Xi18nGetIC (XIMS ims, IMProtocol *call_data, unsigned char *p)
+     if (reply == NULL)
+     {
+         _Xi18nSendMessage (ims, connect_id, XIM_ERROR, 0, 0, 0);
++        XFree (attrID_list);
++        FrameMgrFree (fm);
+         return;
+     }
+     /*endif*/
+diff --git a/util/IMdkit/i18nMethod.c b/util/IMdkit/i18nMethod.c
+index 203f8315..36dd28ac 100644
+--- a/util/IMdkit/i18nMethod.c
++++ b/util/IMdkit/i18nMethod.c
+@@ -895,6 +895,7 @@ static Status xi18n_forwardEvent (XIMS ims, XPointer xp)
+                            0,
+                            0,
+                            0);
++        FrameMgrFree (fm);
+         return False;
+     }
+     /*endif*/
+@@ -964,6 +965,7 @@ static Status xi18n_commit (XIMS ims, XPointer xp)
+                                0,
+                                0,
+                                0);
++            FrameMgrFree (fm);
+             return False;
+         }
+         /*endif*/
+@@ -997,6 +999,7 @@ static Status xi18n_commit (XIMS ims, XPointer xp)
+                                0,
+                                0,
+                                0);
++            FrameMgrFree (fm);
+             return False;
+         }
+         /*endif*/
+@@ -1132,6 +1135,7 @@ static int xi18n_syncXlib (XIMS ims, XPointer xp)
+     reply = (unsigned char *) malloc (total_size);
+     if (!reply) {
+         _Xi18nSendMessage (ims, connect_id, XIM_ERROR, 0, 0, 0);
++        FrameMgrFree (fm);
+         return False;
+     }
+     memset (reply, 0, total_size);
+diff --git a/util/IMdkit/i18nOffsetCache.c b/util/IMdkit/i18nOffsetCache.c
+index c952d5b4..d5379051 100644
+--- a/util/IMdkit/i18nOffsetCache.c
++++ b/util/IMdkit/i18nOffsetCache.c
+@@ -27,9 +27,11 @@
+  */
+ 
+ #include <X11/Xlib.h>
++#include <assert.h>
+ #include <stddef.h>
+ #include "IMdkit.h"
+ #include "Xi18n.h"
++#include "Xi18n.h"
+ 
+ /*
+  * The XIM specification does not limit the number of window properties
+@@ -52,9 +54,11 @@ void _Xi18nInitOffsetCache (Xi18nOffsetCache *offset_cache)
+ unsigned long _Xi18nLookupPropertyOffset (Xi18nOffsetCache *offset_cache,
+                                           Atom key)
+ {
+-    Xi18nAtomOffsetPair *data = offset_cache->data;
++    Xi18nAtomOffsetPair *data;
+     size_t i;
+ 
++    assert (offset_cache);
++    data = offset_cache->data;
+     for (i = 0; i < offset_cache->size; ++i) {
+         if (data[i].key == key) {
+             return data[i].offset;
+@@ -70,6 +74,7 @@ void _Xi18nSetPropertyOffset (Xi18nOffsetCache *offset_cache, Atom key,
+     Xi18nAtomOffsetPair *data = offset_cache->data;
+     size_t i;
+ 
++    assert (data != NULL);
+     for (i = 0; i < offset_cache->size; ++i) {
+         if (data[i].key == key) {
+             data[i].offset = offset;
+@@ -79,11 +84,19 @@ void _Xi18nSetPropertyOffset (Xi18nOffsetCache *offset_cache, Atom key,
+ 
+     if (++offset_cache->size > offset_cache->capacity) {
+         offset_cache->capacity *= OFFSET_CACHE_GROWTH_FACTOR;
+-        offset_cache->data = data = (Xi18nAtomOffsetPair *) realloc (data,
++        offset_cache->data = (Xi18nAtomOffsetPair *) realloc (data,
+                 offset_cache->capacity * sizeof (Xi18nAtomOffsetPair));
++        if (offset_cache->data == NULL) {
++            offset_cache->data = data;
++            --offset_cache->size;
++        }
++        data = offset_cache->data;
+     }
+ 
+-    data[i].key = key;
+-    data[i].offset = offset;
++    assert (data != NULL);
++    if (offset_cache->size > 0) {
++        data[i].key = key;
++        data[i].offset = offset;
++    }
+ }
+ 
+diff --git a/util/IMdkit/i18nPtHdr.c b/util/IMdkit/i18nPtHdr.c
+index 2e673541..eaeeee1c 100644
+--- a/util/IMdkit/i18nPtHdr.c
++++ b/util/IMdkit/i18nPtHdr.c
+@@ -110,6 +110,7 @@ static void ConnectMessageProc (XIMS ims,
+     if (!reply)
+     {
+         _Xi18nSendMessage (ims, connect_id, XIM_ERROR, 0, 0, 0);
++        FrameMgrFree (fm);
+         return;
+     }
+     /*endif*/
+@@ -230,6 +231,7 @@ static void OpenMessageProc(XIMS ims, IMProtocol *call_data, unsigned char *p)
+     if (!reply)
+     {
+         _Xi18nSendMessage (ims, connect_id, XIM_ERROR, 0, 0, 0);
++        FrameMgrFree (fm);
+         return;
+     }
+     /*endif*/
+@@ -312,6 +314,7 @@ static void CloseMessageProc (XIMS ims,
+                            0,
+                            0,
+                            0);
++        FrameMgrFree (fm);
+         return;
+     }
+     /*endif*/
+@@ -513,6 +516,10 @@ static void QueryExtensionMessageProc (XIMS ims,
+                            0,
+                            0,
+                            0);
++        FrameMgrFree (fm);
++        for (i = 0;  i < reply_number;  i++)
++            XFree (ext_list[i].name);
++        XFree ((char *) ext_list);
+         return;
+     }
+     /*endif*/
+@@ -610,8 +617,10 @@ static void GetIMValueFromName (Xi18n i18n_core,
+ 
+             total_size = FrameMgrGetTotalSize (fm);
+             data = (unsigned char *) malloc (total_size);
+-            if (!data)
++            if (!data) {
++                FrameMgrFree (fm);
+                 return;
++            }
+             /*endif*/
+             memset (data, 0, total_size);
+             FrameMgrSetBuffer (fm, data);
+@@ -666,11 +675,12 @@ static XIMAttribute *MakeIMAttributeList (Xi18n i18n_core,
+         /*endfor*/
+     }
+     /*endfor*/
+-    attrib_list = (XIMAttribute *) malloc (sizeof (XIMAttribute)*list_num);
++    attrib_list =
++            (XIMAttribute *) malloc (sizeof (XIMAttribute)*(list_num + 1));
+     if (!attrib_list)
+         return NULL;
+     /*endif*/
+-    memset (attrib_list, 0, sizeof (XIMAttribute)*list_num);
++    memset (attrib_list, 0, sizeof (XIMAttribute)*(list_num + 1));
+     number_ret = list_num;
+     list_num = 0;
+     for (i = 0;  i < *number;  i++)
+@@ -805,6 +815,10 @@ static void GetIMValuesMessageProc (XIMS ims,
+     if (!reply)
+     {
+         _Xi18nSendMessage (ims, connect_id, XIM_ERROR, 0, 0, 0);
++        FrameMgrFree (fm);
++        for (i = 0; i < iter_count; i++)
++            XFree(im_attribute_list[i].value);
++        XFree (im_attribute_list);
+         return;
+     }
+     /*endif*/
+@@ -961,6 +975,7 @@ static void DestroyICMessageProc (XIMS ims,
+     if (!reply)
+     {
+         _Xi18nSendMessage (ims, connect_id, XIM_ERROR, 0, 0, 0);
++        FrameMgrFree (fm);
+         return;
+     }
+     /*endif*/
+@@ -1026,6 +1041,7 @@ static void ResetICMessageProc (XIMS ims,
+     if (!reply)
+     {
+         _Xi18nSendMessage (ims, connect_id, XIM_ERROR, 0, 0, 0);
++        FrameMgrFree (fm);
+         return;
+     }
+     /*endif*/
+@@ -1072,7 +1088,7 @@ static int WireEventToEvent (Xi18n i18n_core,
+     /* get & set serial */
+     FrameMgrGetToken(fm, c16);
+     ev->xany.serial = (unsigned long)c16;
+-    ev->xany.serial |= serial << 16;
++    ev->xany.serial |= ((unsigned long)serial) << 16;
+     ev->xany.send_event = False;
+     ev->xany.display = i18n_core->address.dpy;
+ 
+@@ -1308,6 +1324,7 @@ static void TriggerNotifyMessageProc (XIMS ims,
+     if (!reply)
+     {
+         _Xi18nSendMessage (ims, connect_id, XIM_ERROR, 0, 0, 0);
++        FrameMgrFree (fm);
+         return;
+     }
+     /*endif*/
+@@ -1443,7 +1460,7 @@ static void EncodingNegotiatonMessageProc (XIMS ims,
+     if (byte_length > 0)
+     {
+         enc_nego->encodinginfo = (XIMStr *) malloc (sizeof (XIMStr)*10);
+-        memset (enc_nego->encoding, 0, sizeof (XIMStr)*10);
++        memset (enc_nego->encodinginfo, 0, sizeof (XIMStr)*10);
+         i = 0;
+         while (FrameMgrIsIterLoopEnd (fm, &status) == False)
+         {
+@@ -1488,6 +1505,7 @@ static void EncodingNegotiatonMessageProc (XIMS ims,
+     if (!reply)
+     {
+         _Xi18nSendMessage (ims, connect_id, XIM_ERROR, 0, 0, 0);
++        FrameMgrFree (fm);
+         return;
+     }
+     /*endif*/
+diff --git a/util/IMdkit/i18nUtil.c b/util/IMdkit/i18nUtil.c
+index 6557bd1a..109dcdf9 100644
+--- a/util/IMdkit/i18nUtil.c
++++ b/util/IMdkit/i18nUtil.c
+@@ -148,6 +148,7 @@ void _Xi18nSendMessage (XIMS ims,
+     if (reply_hdr == NULL)
+     {
+         _Xi18nSendMessage (ims, connect_id, XIM_ERROR, 0, 0, 0);
++        FrameMgrFree (fm);
+         return;
+     }
+     /*endif*/
+@@ -163,7 +164,8 @@ void _Xi18nSendMessage (XIMS ims,
+     replyp = reply;
+     memmove (reply, reply_hdr, header_size);
+     replyp += header_size;
+-    memmove (replyp, data, length);
++    if (length > 0 && data != NULL)
++        memmove (replyp, data, length);
+ 
+     i18n_core->methods.send (ims, connect_id, reply, reply_length);
+ 
+@@ -202,8 +204,10 @@ void _Xi18nSendTriggerKey (XIMS ims, CARD16 connect_id)
+     total_size = FrameMgrGetTotalSize (fm);
+ 
+     reply = (unsigned char *) malloc (total_size);
+-    if (!reply)
++    if (!reply) {
++        FrameMgrFree (fm);
+         return;
++    }
+     /*endif*/
+     memset (reply, 0, total_size);
+     FrameMgrSetBuffer (fm, reply);
+@@ -257,8 +261,10 @@ void _Xi18nSetEventMask (XIMS ims,
+ 
+     total_size = FrameMgrGetTotalSize (fm);
+     reply = (unsigned char *) malloc (total_size);
+-    if (!reply)
++    if (!reply) {
++        FrameMgrFree (fm);
+         return;
++    }
+     /*endif*/
+     memset (reply, 0, total_size);
+     FrameMgrSetBuffer (fm, reply);
+diff --git a/util/IMdkit/i18nX.c b/util/IMdkit/i18nX.c
+index 8385aba9..5e5c15fa 100644
+--- a/util/IMdkit/i18nX.c
++++ b/util/IMdkit/i18nX.c
+@@ -31,6 +31,7 @@ IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  
+ ******************************************************************/
+ 
++#include <assert.h>
+ #include <stddef.h>
+ #include <limits.h>
+ #include <X11/Xlib.h>
+@@ -92,6 +93,7 @@ static unsigned char *ReadXIMMessage (XIMS ims,
+         client = client->next;
+     }
+ 
++    assert (client);
+     if (ev->format == 8) {
+         /* ClientMessage only */
+         XimProtoHdr *hdr = (XimProtoHdr *) ev->data.b;
+@@ -158,6 +160,7 @@ static unsigned char *ReadXIMMessage (XIMS ims,
+         /* The property data is retrieved in 32-bit chunks */
+         long_begin = offset / 4;
+         long_end = (end + 3) / 4;
++        assert (x_client);
+         return_code = XGetWindowProperty (i18n_core->address.dpy,
+                                           x_client->accept_win,
+                                           atom,
+@@ -276,11 +279,11 @@ static Bool Xi18nXEnd(XIMS ims)
+ static char *MakeNewAtom (CARD16 connect_id, char *atomName)
+ {
+     static int sequence = 0;
+-    
+     sprintf (atomName,
+              "_server%d_%d",
+              connect_id,
+-             ((sequence > 20)  ?  (sequence = 0)  :  sequence++));
++             ((sequence > 20)  ?  (sequence = 0)  :  (0x1f & sequence)));
++    sequence++;
+     return atomName;
+ }
+ 
+@@ -418,13 +421,16 @@ static Bool Xi18nXWait (XIMS ims,
+                 &&
+                 (hdr->minor_opcode == minor_opcode))
+             {
++                XFree (packet);
+                 return True;
+             }
+             else if (hdr->major_opcode == XIM_ERROR)
+             {
++                XFree (packet);
+                 return False;
+             }
+             /*endif*/
++            XFree (packet);
+         }
+         /*endif*/
+     }
+-- 
+2.17.1
+
