@@ -39,7 +39,7 @@
 
 Name:           ibus
 Version:        1.5.18
-Release:        12%{?dist}
+Release:        13%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -52,7 +52,6 @@ Source3:        %{name}-po-1.5.18-20180627.tar.gz
 # Upstreamed patches.
 # Patch0:         %%{name}-HEAD.patch
 Patch0:         %{name}-HEAD.patch
-Patch1:         %{name}-1602549-covscan.patch
 # Under testing #1349148 #1385349 #1350291 #1406699 #1432252 #1601577
 Patch2:         %{name}-1385349-segv-bus-proxy.patch
 
@@ -436,6 +435,9 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Tue Jul 24 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-13
+- Deleted deprecated g_mem_* APIs
+
 * Mon Jul 23 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-12
 - Rebuilt with RHEL code reviews
 
