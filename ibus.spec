@@ -39,7 +39,7 @@
 
 Name:           ibus
 Version:        1.5.18
-Release:        13%{?dist}
+Release:        14%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -252,8 +252,9 @@ The ibus-devel-docs package contains developer documentation for IBus
 
 %prep
 %autosetup -S git
-zcat %SOURCE3 | tar xfv -
 # cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
+cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
+zcat %SOURCE3 | tar xfv -
 
 # prep test
 diff client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
@@ -368,6 +369,8 @@ dconf update || :
 %{_datadir}/man/man1/ibus.1.gz
 %{_datadir}/man/man1/ibus-daemon.1.gz
 %{_datadir}/man/man7/ibus-emoji.7.gz
+%{_datadir}/man/man5/00-upstream-settings.5.gz
+%{_datadir}/man/man5/ibus.5.gz
 %{_datadir}/man/man5/ibus.conf.5.gz
 %{_libexecdir}/ibus-engine-simple
 %{_libexecdir}/ibus-dconf
@@ -435,6 +438,11 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Mon Aug 06 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-14
+- Fixed Man page scan results for ibus
+- Added IBUS_DISCARD_PASSWORD env variable for password dialog in firefox
+- Added history annotation for previous emojis
+
 * Tue Jul 24 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-13
 - Deleted deprecated g_mem_* APIs
 

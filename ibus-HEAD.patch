@@ -10742,3 +10742,500 @@ index 8385aba9..5e5c15fa 100644
 -- 
 2.17.1
 
+From be7554cea294aa13a65895b66b26e5f1fa4a1897 Mon Sep 17 00:00:00 2001
+From: Ryutaroh Matsumoto
+ <36657667+ryutaroh-matsumoto@users.noreply.github.com>
+Date: Thu, 2 Aug 2018 08:10:04 +0900
+Subject: [PATCH] option --monitor-timeout should be removed
+
+ibus-daemon(1) has explanation of --monitor-timeout, but main.c does not accept it and make an error.
+---
+ bus/ibus-daemon.1.in | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/bus/ibus-daemon.1.in b/bus/ibus-daemon.1.in
+index 2dc982b2..a3d0d03a 100644
+--- a/bus/ibus-daemon.1.in
++++ b/bus/ibus-daemon.1.in
+@@ -62,9 +62,6 @@ auto, refresh, none is available.
+ \fB\-o\fR, \fB\-\-timeout\fR=\fItimeout\fR [default is 2000]
+ dbus reply timeout in milliseconds.
+ .TP
+-\fB\-j\fR, \fB\-\-monitor\-timeout\fR=\fItimeout\fR [default is 0]
+-timeout of poll changes of engines in seconds. 0 to disable it.
+-.TP
+ \fB\-m\fR, \fB\-\-mem\-profile\fR
+ enable memory profile, send SIGUSR2 to print out the memory profile.
+ .TP
+-- 
+2.17.1
+
+From 5f44e7307771685c70202f996e39e9aa68d48d2e Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Fri, 3 Aug 2018 14:58:10 +0900
+Subject: [PATCH] data/dconf: Add man pages of 00-upstream-settings(5) and
+ ibus(5)
+
+Also delete --mem-profile option in ibus-daemon(1)
+---
+ bus/ibus-daemon.1.in                 |  3 --
+ data/dconf/00-upstream-settings.5.in | 40 ++++++++++++++++++++++
+ data/dconf/Makefile.am               | 50 ++++++++++++++++++----------
+ data/dconf/ibus.5.in                 | 39 ++++++++++++++++++++++
+ ui/gtk3/ibus-emoji.7.in              |  6 ++--
+ 5 files changed, 114 insertions(+), 24 deletions(-)
+ create mode 100644 data/dconf/00-upstream-settings.5.in
+ create mode 100644 data/dconf/ibus.5.in
+
+diff --git a/bus/ibus-daemon.1.in b/bus/ibus-daemon.1.in
+index a3d0d03a..ed975aed 100644
+--- a/bus/ibus-daemon.1.in
++++ b/bus/ibus-daemon.1.in
+@@ -62,9 +62,6 @@ auto, refresh, none is available.
+ \fB\-o\fR, \fB\-\-timeout\fR=\fItimeout\fR [default is 2000]
+ dbus reply timeout in milliseconds.
+ .TP
+-\fB\-m\fR, \fB\-\-mem\-profile\fR
+-enable memory profile, send SIGUSR2 to print out the memory profile.
+-.TP
+ \fB\-v\fR, \fB\-\-verbose\fR
+ verbose.
+ 
+diff --git a/data/dconf/00-upstream-settings.5.in b/data/dconf/00-upstream-settings.5.in
+new file mode 100644
+index 00000000..b7a56fda
+--- /dev/null
++++ b/data/dconf/00-upstream-settings.5.in
+@@ -0,0 +1,40 @@
++.\" This file is distributed under the same license as the ibus
++.\" package.
++.\" Copyright (C) Takao Fujiwara <takao.fujiwara1@gmail.com>, 2018.
++.\"
++.TH 00\-UPSTREAM\-SETTINGS "5" "August 2018" "@VERSION@" "User Commands"
++.SH NAME
++.B 00\-upstream\-settings
++\- dconf configuration file
++
++.SH SYNOPSIS
++.B /etc/dconf/db/ibus.d/00\-upstream\-settings
++
++.SH DESCRIPTION
++
++.PP
++IBus is an Intelligent Input Bus. It is a new input framework for Linux
++OS. It provides full featured and user friendly input method user
++interface.  It also may help developers to develop input method easily.
++
++.PP
++.B 00\-upstream\-settings
++is a text configuration file of dconf and can be converted to
++/etc/dconf/db/ibus by
++.B dconf update
++command with a write privilege in /etc/dconf/db. /etc/dconf/db/ibus is a
++database file of dconf and saves the IBus default settings. The saved keys
++and values can be readed by dconf command.
++
++.PP
++.RS 4
++.nf
++env DCONF_PROFILE=ibus dconf list /desktop/ibus/
++.RE
++
++.SH BUGS
++If you find a bug, please report it at https://github.com/ibus/ibus/issues
++
++.SH "SEE ALSO"
++.BR dconf (1)
++.BR ibus (5)
+diff --git a/data/dconf/Makefile.am b/data/dconf/Makefile.am
+index 7f0d0fd8..433d9937 100644
+--- a/data/dconf/Makefile.am
++++ b/data/dconf/Makefile.am
+@@ -4,7 +4,7 @@
+ #
+ # Copyright (c) 2007-2010 Peng Huang <shawn.p.huang@gmail.com>
+ # Copyright (c) 2011 Daiki Ueno <ueno@unixuser.org>
+-# Copyright (c) 2007-2011 Red Hat, Inc.
++# Copyright (c) 2007-2018 Red Hat, Inc.
+ #
+ # This library is free software; you can redistribute it and/or
+ # modify it under the terms of the GNU Lesser General Public
+@@ -28,22 +28,6 @@ dist_gsettingsconvert_DATA = ibus.convert
+ @GSETTINGS_RULES@
+ @INTLTOOL_XML_NOMERGE_RULE@
+ 
+-EXTRA_DIST = \
+-	$(gsettings_schemas_in_files) \
+-	make-dconf-override-db.sh \
+-	profile/ibus \
+-	00-upstream-settings \
+-	$(NULL)
+-
+-CLEANFILES = \
+-	$(gsettings_SCHEMAS) \
+-	$(NULL)
+-
+-MAINTAINERCLEANFILES = \
+-	$(gsettings_schemas_in_files) \
+-	00-upstream-settings \
+-	$(NULL)
+-
+ dconfprofiledir = $(sysconfdir)/dconf/profile
+ dconfprofile_DATA = profile/ibus
+ 
+@@ -60,9 +44,39 @@ org.freedesktop.ibus.gschema.xml.in: $(top_srcdir)/data/ibus.schemas.in
+ 	$(AM_V_GEN) $(srcdir)/make-dconf-override-db.sh > $@ || \
+ 		{ rc=$$?; $(RM) -rf $@; exit $$rc; }
+ 
++man_5_in_files = 00-upstream-settings.5.in ibus.5.in
++man_5_files = $(man_5_in_files:.5.in=.5)
++man_5_DATA =$(man_5_files:.5=.5.gz)
++man_5dir = $(mandir)/man5
++%.5: %.5.in
++	$(AM_V_GEN) sed \
++	    -e 's|@VERSION[@]|$(VERSION)|g' $< > $@.tmp && \
++	    mv $@.tmp $@
++%.5.gz: %.5
++	$(AM_V_GEN) gzip -c $< > $@.tmp && mv $@.tmp $@
++
+ install-data-hook:
+ 	if test -z "$(DESTDIR)"; then \
+-		dconf update; \
++	    dconf update; \
+ 	fi
+ 
++EXTRA_DIST = \
++    $(gsettings_schemas_in_files) \
++    $(man_5_in_files) \
++    make-dconf-override-db.sh \
++    profile/ibus \
++    00-upstream-settings \
++    $(NULL)
++
++CLEANFILES = \
++    $(gsettings_SCHEMAS) \
++    $(man_5_DATA) \
++    $(man_5_files) \
++    $(NULL)
++
++MAINTAINERCLEANFILES = \
++    $(gsettings_schemas_in_files) \
++    00-upstream-settings \
++    $(NULL)
++
+ -include $(top_srcdir)/git.mk
+diff --git a/data/dconf/ibus.5.in b/data/dconf/ibus.5.in
+new file mode 100644
+index 00000000..d959c7e3
+--- /dev/null
++++ b/data/dconf/ibus.5.in
+@@ -0,0 +1,39 @@
++.\" This file is distributed under the same license as the ibus
++.\" package.
++.\" Copyright (C) Takao Fujiwara <takao.fujiwara1@gmail.com>, 2018.
++.\"
++.TH IBUS "5" "August 2018" "@VERSION@" "User Commands"
++.SH NAME
++.B IBUS
++\- dconf database file for IBus
++
++.SH SYNOPSIS
++.B /etc/dconf/db/ibus
++
++.SH DESCRIPTION
++
++.PP
++IBus is an Intelligent Input Bus. It is a new input framework for Linux
++OS. It provides full featured and user friendly input method user
++interface.  It also may help developers to develop input method easily.
++
++.PP
++.B /etc/dconf/db/ibus
++is a database file dconf and saves the IBus default settings. It can be
++generated from /etc/dconf/db/ibus.d/00\-upstream\-settings by
++.B dconf update
++command with a write privilege in /etc/dconf/db. The saved keys
++and values can be readed by dconf command.
++
++.PP
++.RS 4
++.nf
++env DCONF_PROFILE=ibus dconf list /desktop/ibus/
++.RE
++
++.SH BUGS
++If you find a bug, please report it at https://github.com/ibus/ibus/issues
++
++.SH "SEE ALSO"
++.BR dconf (1)
++.BR 00\-upstream\-settings (5)
+diff --git a/ui/gtk3/ibus-emoji.7.in b/ui/gtk3/ibus-emoji.7.in
+index 3a2db2c0..b8b43574 100644
+--- a/ui/gtk3/ibus-emoji.7.in
++++ b/ui/gtk3/ibus-emoji.7.in
+@@ -1,10 +1,10 @@
+ .\" This file is distributed under the same license as the ibus
+ .\" package.
+-.\" Copyright (C) Takao Fujiwara <takao.fujiwara1@gmail.com>, 2017.
++.\" Copyright (C) Takao Fujiwara <takao.fujiwara1@gmail.com>, 2017-2018.
+ .\"
+-.TH "IBUS EMOJI" 1 "May 2017" "@VERSION@" "User Commands"
++.TH "IBUS EMOJI" 1 "August 2018" "@VERSION@" "User Commands"
+ .SH NAME
+-.B ibus emoji utility
++.B ibus-emoji
+ \- Call the IBus emoji utility by
+ .B IBus Emojier
+ 
+-- 
+2.17.1
+
+From f328fd67f479faa46ca87bf3c85eed7080ec5ec0 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Mon, 6 Aug 2018 12:33:44 +0900
+Subject: [PATCH] client/gtk2: Add IBUS_DISCARD_PASSWORD for firefox and
+ chrome
+
+popup window in firefox is closed in Xorg GNOME when password entry
+is focus on. It's caused by gnome-shell [1].
+Now IBUS_DISCARD_PASSWORD and IBUS_DISCARD_PASSWORD_APPS enviroment
+variables are implemented in IBus GTK clients as a workaround.
+
+env IBUS_DISCARD_PASSWORD=1 firefox
+or
+export IBUS_DISCARD_PASSWORD_APPS='firefox,.*chrome.*'
+
+can discard typing characters on the password entries.
+
+[1] https://gitlab.gnome.org/GNOME/gnome-shell/issues/391
+
+BUG=https://github.com/ibus/ibus/issues/2002
+---
+ client/gtk2/ibusimcontext.c | 77 ++++++++++++++++++++++++++++---------
+ 1 file changed, 58 insertions(+), 19 deletions(-)
+
+diff --git a/client/gtk2/ibusimcontext.c b/client/gtk2/ibusimcontext.c
+index a806382d..e4de52d9 100644
+--- a/client/gtk2/ibusimcontext.c
++++ b/client/gtk2/ibusimcontext.c
+@@ -91,6 +91,9 @@ static guint    _key_snooper_id = 0;
+ 
+ static gboolean _use_sync_mode = FALSE;
+ 
++static const gchar *_discard_password_apps  = "";
++static gboolean _use_discard_password = FALSE;
++
+ static GtkIMContext *_focus_im_context = NULL;
+ static IBusInputContext *_fake_context = NULL;
+ static GdkWindow *_input_window = NULL;
+@@ -157,7 +160,7 @@ static gboolean _slave_delete_surrounding_cb
+                                              IBusIMContext      *context);
+ static void     _request_surrounding_text   (IBusIMContext      *context);
+ static void     _create_fake_input_context  (void);
+-static void     _set_content_type           (IBusIMContext      *context);
++static gboolean _set_content_type           (IBusIMContext      *context);
+ 
+ 
+ 
+@@ -383,7 +386,7 @@ _request_surrounding_text (IBusIMContext *context)
+     }
+ }
+ 
+-static void
++static gboolean
+ _set_content_type (IBusIMContext *context)
+ {
+ #if GTK_CHECK_VERSION (3, 6, 0)
+@@ -396,11 +399,18 @@ _set_content_type (IBusIMContext *context)
+                       "input-hints", &hints,
+                       NULL);
+ 
++        if (_use_discard_password) {
++            if (purpose == GTK_INPUT_PURPOSE_PASSWORD ||
++                purpose == GTK_INPUT_PURPOSE_PIN) {
++                return FALSE;
++            }
++        }
+         ibus_input_context_set_content_type (context->ibuscontext,
+                                              purpose,
+                                              hints);
+     }
+ #endif
++    return TRUE;
+ }
+ 
+ 
+@@ -608,24 +618,45 @@ ibus_im_context_class_init (IBusIMContextClass *class)
+     _use_key_snooper = !_get_boolean_env ("IBUS_DISABLE_SNOOPER",
+                                           !(ENABLE_SNOOPER));
+     _use_sync_mode = _get_boolean_env ("IBUS_ENABLE_SYNC_MODE", FALSE);
++    _use_discard_password = _get_boolean_env ("IBUS_DISCARD_PASSWORD", FALSE);
++
++#define CHECK_APP_IN_CSV_ENV_VARIABLES(retval,                          \
++                                       env_apps,                        \
++                                       fallback_apps,                   \
++                                       value_if_found)                  \
++{                                                                       \
++    const gchar * prgname = g_get_prgname ();                           \
++    gchar **p;                                                          \
++    gchar ** apps;                                                      \
++    if (g_getenv ((#env_apps))) {                                       \
++        fallback_apps = g_getenv (#env_apps);                           \
++    }                                                                   \
++    apps = g_strsplit ((fallback_apps), ",", 0);                        \
++    for (p = apps; *p != NULL; p++) {                                   \
++        if (g_regex_match_simple (*p, prgname, 0, 0)) {                 \
++            retval = (value_if_found);                                  \
++            break;                                                      \
++        }                                                               \
++    }                                                                   \
++    g_strfreev (apps);                                                  \
++}
+ 
+     /* env IBUS_DISABLE_SNOOPER does not exist */
+     if (_use_key_snooper) {
+         /* disable snooper if app is in _no_snooper_apps */
+-        const gchar * prgname = g_get_prgname ();
+-        if (g_getenv ("IBUS_NO_SNOOPER_APPS")) {
+-            _no_snooper_apps = g_getenv ("IBUS_NO_SNOOPER_APPS");
+-        }
+-        gchar **p;
+-        gchar ** apps = g_strsplit (_no_snooper_apps, ",", 0);
+-        for (p = apps; *p != NULL; p++) {
+-            if (g_regex_match_simple (*p, prgname, 0, 0)) {
+-                _use_key_snooper = FALSE;
+-                break;
+-            }
+-        }
+-        g_strfreev (apps);
++        CHECK_APP_IN_CSV_ENV_VARIABLES (_use_key_snooper,
++                                        IBUS_NO_SNOOPER_APPS,
++                                        _no_snooper_apps,
++                                        FALSE);
+     }
++    if (!_use_discard_password) {
++        CHECK_APP_IN_CSV_ENV_VARIABLES (_use_discard_password,
++                                        IBUS_DISCARD_PASSWORD_APPS,
++                                        _discard_password_apps,
++                                        TRUE);
++    }
++
++#undef CHECK_APP_IN_CSV_ENV_VARIABLES
+ 
+     /* init bus object */
+     if (_bus == NULL) {
+@@ -926,7 +957,10 @@ ibus_im_context_focus_in (GtkIMContext *context)
+ 
+     ibusimcontext->has_focus = TRUE;
+     if (ibusimcontext->ibuscontext) {
+-        _set_content_type (ibusimcontext);
++        if (!_set_content_type (ibusimcontext)) {
++            ibusimcontext->has_focus = FALSE;
++            return;
++        }
+         ibus_input_context_focus_in (ibusimcontext->ibuscontext);
+     }
+ 
+@@ -958,9 +992,14 @@ ibus_im_context_focus_out (GtkIMContext *context)
+         return;
+     }
+ 
+-    g_object_remove_weak_pointer ((GObject *) context,
+-                                  (gpointer *) &_focus_im_context);
+-    _focus_im_context = NULL;
++    /* If _use_discard_password is TRUE or GtkEntry has no visibility,
++     * _focus_im_context is NULL.
++     */
++    if (_focus_im_context) {
++        g_object_remove_weak_pointer ((GObject *) context,
++                                      (gpointer *) &_focus_im_context);
++        _focus_im_context = NULL;
++    }
+ 
+     ibusimcontext->has_focus = FALSE;
+     if (ibusimcontext->ibuscontext) {
+-- 
+2.17.1
+
+From dc5e7eeba30d0bc2327ffa562cdf6ca0ae23aecc Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Mon, 6 Aug 2018 15:26:42 +0900
+Subject: [PATCH] ui/gtk3: Show previous emojis with "history" annotation
+
+---
+ ui/gtk3/emojier.vala | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/ui/gtk3/emojier.vala b/ui/gtk3/emojier.vala
+index 7beb6f0a..85dcdceb 100644
+--- a/ui/gtk3/emojier.vala
++++ b/ui/gtk3/emojier.vala
+@@ -1294,8 +1294,14 @@ public class IBusEmojier : Gtk.ApplicationWindow {
+             return;
+         }
+         string? unicode_point = check_unicode_point(annotation);
+-        GLib.SList<string>? total_emojis =
+-            lookup_emojis_from_annotation(annotation);
++        GLib.SList<string>? total_emojis = null;
++        if (annotation.ascii_casecmp("history") == 0) {
++            for (int i = 0; i < m_favorites.length; i++) {
++                total_emojis.append(m_favorites[i].dup());
++            }
++        }
++        if (total_emojis == null)
++            total_emojis = lookup_emojis_from_annotation(annotation);
+         if (total_emojis == null) {
+             /* Users can type title strings against lower case.
+              * E.g. "Smile" against "smile"
+-- 
+2.17.1
+
+From 428e64eac8f7dc3ff60234435fe5f34d50126432 Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Mon, 6 Aug 2018 15:59:06 +0900
+Subject: [PATCH] src: Describe "default" layout in ibus_engine_desc_new()
+
+BUG=https://github.com/ibus/ibus/issues/2011
+---
+ src/ibusenginedesc.h | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/src/ibusenginedesc.h b/src/ibusenginedesc.h
+index 45ec06bf..00a98e41 100644
+--- a/src/ibusenginedesc.h
++++ b/src/ibusenginedesc.h
+@@ -2,7 +2,8 @@
+ /* vim:set et sts=4: */
+ /* bus - The Input Bus
+  * Copyright (C) 2008-2015 Peng Huang <shawn.p.huang@gmail.com>
+- * Copyright (C) 2008-2015 Red Hat, Inc.
++ * Copyright (C) 2011-2018 Takao Fujiwara <takao.fujiwara1@gmail.com>
++ * Copyright (C) 2008-2018 Red Hat, Inc.
+  *
+  * This library is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU Lesser General Public
+@@ -107,6 +108,10 @@ GType            ibus_engine_desc_get_type      (void);
+  * @layout: Keyboard layout
+  *
+  * Creates a new #IBusEngineDesc.
++ * If layout is "default", the engine inherits the current layout and
++ * does not change the layout. The layouts "default" and "" are same.
++ * E.g. If you switch JP XKB engine and an input method engine (IME),
++ * the IME inherits the JP layout.
+  *
+  * Returns: A newly allocated IBusEngineDesc.
+  */
+@@ -128,6 +133,10 @@ IBusEngineDesc  *ibus_engine_desc_new           (const gchar    *name,
+  * ibus_engine_desc_new_varargs() supports the va_list format.
+  * name property is required. e.g.
+  * ibus_engine_desc_new_varargs("name", "ibus-foo", "language", "us", NULL)
++ * If layout is "default", the engine inherits the current layout and
++ * does not change the layout. The layouts "default" and "" are same.
++ * E.g. If you switch JP XKB engine and an input method engine (IME),
++ * the IME inherits the JP layout.
+  *
+  * Returns: A newly allocated IBusEngineDesc.
+  */
+-- 
+2.17.1
+
