@@ -4,14 +4,6 @@
 %global with_python2 0
 %endif
 
-%if %with_python2
-%global with_pygobject2 1
-%else
-%global with_pygobject2 0
-%endif
-
-%global with_pygobject3 1
-
 %global with_pkg_config %(pkg-config --version >/dev/null 2>&1 && echo -n "1" || echo -n "0")
 
 %if (0%{?fedora} > 21 || 0%{?rhel} > 7)
@@ -38,8 +30,8 @@
 %global dbus_python_version 0.83.0
 
 Name:           ibus
-Version:        1.5.18
-Release:        14%{?dist}
+Version:        1.5.19
+Release:        1%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -47,13 +39,11 @@ URL:            https://github.com/ibus/%name/wiki
 Source0:        https://github.com/ibus/%name/releases/download/%{version}/%{name}-%{version}.tar.gz
 Source1:        %{name}-xinput
 Source2:        %{name}.conf.5
-Source3:        %{name}-po-1.5.18-20180627.tar.gz
 # Will remove the annotation tarball once the rpm is available on Fedora
 # Upstreamed patches.
 # Patch0:         %%{name}-HEAD.patch
-Patch0:         %{name}-HEAD.patch
 # Under testing #1349148 #1385349 #1350291 #1406699 #1432252 #1601577
-Patch2:         %{name}-1385349-segv-bus-proxy.patch
+Patch1:         %{name}-1385349-segv-bus-proxy.patch
 
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
@@ -161,7 +151,6 @@ Requires(post): glib2 >= %{glib_ver}
 %description gtk3
 This package contains IBus IM module for GTK3
 
-%if %with_pygobject3
 %package setup
 Summary:        IBus setup utility
 Group:          System Environment/Libraries
@@ -174,9 +163,8 @@ BuildArch:      noarch
 
 %description setup
 This is a setup utility for IBus.
-%endif
 
-%if %with_pygobject2
+%if %with_python2
 %package pygtk2
 Summary:        IBus PyGTK2 library
 Group:          System Environment/Libraries
@@ -252,9 +240,7 @@ The ibus-devel-docs package contains developer documentation for IBus
 
 %prep
 %autosetup -S git
-# cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
-cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c ||
-zcat %SOURCE3 | tar xfv -
+# cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c || :
 
 # prep test
 diff client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
@@ -278,8 +264,7 @@ autoreconf -f -i -v
     --with-python=python3 \
 %if ! %with_python2
     --disable-python2 \
-%endif
-%if %with_pygobject2
+%else
     --enable-python-library \
 %endif
     --enable-wayland \
@@ -322,7 +307,10 @@ desktop-file-install --delete-original          \
 %find_lang %{name}10
 
 %check
-make check DISABLE_GUI_TESTS="ibus-compose test-stress"
+make check \
+    DISABLE_GUI_TESTS="ibus-compose ibus-keypress test-stress" \
+    VERBOSE=1 \
+    %{nil}
 
 %post
 %{_sbindir}/alternatives --install %{_sysconfdir}/X11/xinit/xinputrc xinputrc %{_xinputconf} 83 || :
@@ -399,7 +387,6 @@ dconf update || :
 %files gtk3
 %{_libdir}/gtk-3.0/%{gtk3_binary_version}/immodules/im-ibus.so
 
-%if %with_pygobject3
 # The setup package won't include icon files so that
 # gtk-update-icon-cache is executed in the main package only one time.
 %files setup
@@ -407,9 +394,8 @@ dconf update || :
 %{_datadir}/applications/ibus-setup.desktop
 %{_datadir}/ibus/setup
 %{_datadir}/man/man1/ibus-setup.1.gz
-%endif
 
-%if %with_pygobject2
+%if %with_python2
 %files pygtk2
 %dir %{python2_sitelib}/ibus
 %{python2_sitelib}/ibus/*
@@ -438,6 +424,9 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Aug 08 2019 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.19-1
+- Bumped to 1.5.19
+
 * Mon Aug 06 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-14
 - Fixed Man page scan results for ibus
 - Added IBUS_DISCARD_PASSWORD env variable for password dialog in firefox
