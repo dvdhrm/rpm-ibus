@@ -424,7 +424,7 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
-* Wed Aug 08 2019 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.19-1
+* Wed Aug 08 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.19-1
 - Bumped to 1.5.19
 
 * Mon Aug 06 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.18-14
