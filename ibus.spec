@@ -31,7 +31,7 @@
 
 Name:           ibus
 Version:        1.5.19
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -39,9 +39,9 @@ URL:            https://github.com/ibus/%name/wiki
 Source0:        https://github.com/ibus/%name/releases/download/%{version}/%{name}-%{version}.tar.gz
 Source1:        %{name}-xinput
 Source2:        %{name}.conf.5
-# Will remove the annotation tarball once the rpm is available on Fedora
-# Upstreamed patches.
+Source3:        https://fujiwara.fedorapeople.org/ibus/po/%{name}-po-1.5.19-20180822.tar.gz
 # Patch0:         %%{name}-HEAD.patch
+Patch0:         %{name}-HEAD.patch
 # Under testing #1349148 #1385349 #1350291 #1406699 #1432252 #1601577
 Patch1:         %{name}-1385349-segv-bus-proxy.patch
 
@@ -242,6 +242,8 @@ The ibus-devel-docs package contains developer documentation for IBus
 %autosetup -S git
 # cp client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c || :
 
+zcat %SOURCE3 | tar xfv -
+
 # prep test
 diff client/gtk2/ibusimcontext.c client/gtk3/ibusimcontext.c
 if test $? -ne 0 ; then
@@ -424,6 +426,9 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Wed Aug 22 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.19-2
+- Do not clear Unicode data when emoji annotation lang is changed
+
 * Wed Aug 08 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.19-1
 - Bumped to 1.5.19
 
