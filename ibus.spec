@@ -31,7 +31,7 @@
 
 Name:           ibus
 Version:        1.5.19
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -78,6 +78,8 @@ BuildRequires:  qt5-qtbase-devel
 BuildRequires:  cldr-emoji-annotation
 BuildRequires:  unicode-emoji
 BuildRequires:  unicode-ucd
+# for ibus-keypress
+BuildRequires:  libXtst-devel
 
 Requires:       %{name}-libs%{?_isa}   = %{version}-%{release}
 Requires:       %{name}-gtk2%{?_isa}   = %{version}-%{release}
@@ -426,6 +428,11 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Aug 30 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.19-3
+- Fix Bug 1618682 - SEGV with ASCII on emojier in Wayland
+- Support Shift-Space on emojier preedit
+- Do not move Emojier popup with the active candidate in Xorg
+
 * Wed Aug 22 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.19-2
 - Do not clear Unicode data when emoji annotation lang is changed
 
