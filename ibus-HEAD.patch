@@ -392,3 +392,321 @@ index 0f455800..9811fde5 100644
 -- 
 2.17.1
 
+From 1c6565e205528a45e88a84ba2a328f9035875c8d Mon Sep 17 00:00:00 2001
+From: fujiwarat <takao.fujiwara1@gmail.com>
+Date: Fri, 14 Sep 2018 16:15:41 +0900
+Subject: [PATCH] ui/gtk3: Fix SEGV when commit an emoji on Emojier in Wayland
+
+Just pressing Space key without emoji annotations can launch Emojier
+popup and the popup takes a focus in Wayland and the chosen emoji is
+output when the original text application gets the focus after Emojier
+popup release the focus. Emojier disabled Ctrl-Shift-e after got the focus.
+But currently GNOME Wayland has a bug not to send focus-in until a
+key press or mouse click happens [1] and Emojier causes a SEGV.
+Now Emojier disables Ctrl-Shift-e immediately when an emoji is chosen
+whether focus-in comes or not and fixes the SEGV.
+
+[1] https://gitlab.gnome.org/GNOME/gnome-shell/issues/573
+
+BUG=rhbz#1625187
+---
+ ui/gtk3/emojier.vala      | 63 +++++++-------------------------------
+ ui/gtk3/emojierapp.vala   |  2 +-
+ ui/gtk3/panelbinding.vala | 64 ++++++++++++++++++++++++++-------------
+ 3 files changed, 55 insertions(+), 74 deletions(-)
+
+diff --git a/ui/gtk3/emojier.vala b/ui/gtk3/emojier.vala
+index 9811fde5..e23ef889 100644
+--- a/ui/gtk3/emojier.vala
++++ b/ui/gtk3/emojier.vala
+@@ -21,17 +21,6 @@
+  */
+ 
+ public class IBusEmojier : Gtk.ApplicationWindow {
+-    private class EEntry : Gtk.SearchEntry {
+-        public EEntry() {
+-            GLib.Object(
+-                name : "IBusEmojierEntry",
+-                margin_start : 6,
+-                margin_end : 6,
+-                margin_top : 6,
+-                margin_bottom : 6
+-            );
+-        }
+-    }
+     private class EListBox : Gtk.ListBox {
+         public EListBox() {
+             GLib.Object(
+@@ -330,6 +319,7 @@ public class IBusEmojier : Gtk.ApplicationWindow {
+     private uint m_redraw_window_id;
+ 
+     public signal void candidate_clicked(uint index, uint button, uint state);
++    public signal void commit_text(string text);
+ 
+     public IBusEmojier() {
+         GLib.Object(
+@@ -380,12 +370,6 @@ public class IBusEmojier : Gtk.ApplicationWindow {
+             adjust_window_position();
+         });
+ 
+-        candidate_clicked.connect((i, b, s) => {
+-            if (m_input_context_path != "")
+-                candidate_panel_select_index(i, b);
+-        });
+-
+-
+         if (m_annotation_to_emojis_dict == null) {
+             reload_emoji_dict();
+         }
+@@ -1641,34 +1625,6 @@ public class IBusEmojier : Gtk.ApplicationWindow {
+     }
+ 
+ 
+-    private void candidate_panel_select_index(uint index,
+-                                              uint button) {
+-        if (button == BUTTON_CLOSE_BUTTON) {
+-            hide();
+-            if (m_candidate_panel_mode &&
+-                m_lookup_table.get_number_of_candidates() > 0) {
+-                // Call remove_all_children() instead of show_category_list()
+-                // so that show_category_list do not remove children with
+-                // PageUp/PageDown.
+-                remove_all_children();
+-            }
+-            m_result = "";
+-            return;
+-        }
+-        string text = m_lookup_table.get_candidate(index).text;
+-        unowned GLib.SList<string>? emojis =
+-                m_emoji_to_emoji_variants_dict.lookup(text);
+-        if (m_show_emoji_variant && emojis != null &&
+-            m_backward_index < 0) {
+-            show_emoji_variants(emojis);
+-            show_all();
+-        } else {
+-            m_result = text;
+-            hide();
+-        }
+-    }
+-
+-
+     private void candidate_panel_cursor_down() {
+         enter_notify_disable_with_timer();
+         uint ncandidates = m_lookup_table.get_number_of_candidates();
+@@ -1762,7 +1718,8 @@ public class IBusEmojier : Gtk.ApplicationWindow {
+     }
+ 
+ 
+-    public bool has_variants(uint index) {
++    public bool has_variants(uint index,
++                             bool need_commit_signal) {
+         if (index >= m_lookup_table.get_number_of_candidates())
+             return false;
+         string text = m_lookup_table.get_candidate(index).text;
+@@ -1773,6 +1730,10 @@ public class IBusEmojier : Gtk.ApplicationWindow {
+             show_emoji_variants(emojis);
+             return true;
+         }
++        if (m_input_context_path != "")
++            m_result = text;
++        if (need_commit_signal)
++            commit_text(text);
+         return false;
+     }
+ 
+@@ -1881,10 +1842,10 @@ public class IBusEmojier : Gtk.ApplicationWindow {
+     }
+ 
+ 
+-    public bool key_press_enter() {
++    public bool key_press_enter(bool need_commit_signal) {
+         if (m_candidate_panel_is_visible) {
+             uint index = m_lookup_table.get_cursor_pos();
+-            return has_variants(index);
++            return has_variants(index, need_commit_signal);
+         } else if (m_category_active_index >= 0) {
+             Gtk.ListBoxRow gtkrow = m_list_box.get_selected_row();
+             EBoxRow row = gtkrow as EBoxRow;
+@@ -2282,12 +2243,10 @@ public class IBusEmojier : Gtk.ApplicationWindow {
+             return true;
+         case Gdk.Key.Return:
+         case Gdk.Key.KP_Enter:
+-            if (key_press_enter()) {
++            if (key_press_enter(true))
+                 show_all();
+-            } else {
+-                m_result = get_current_candidate();
++            else
+                 hide();
+-            }
+             return true;
+         case Gdk.Key.space:
+         case Gdk.Key.KP_Space:
+diff --git a/ui/gtk3/emojierapp.vala b/ui/gtk3/emojierapp.vala
+index 787d448f..fab99d9e 100644
+--- a/ui/gtk3/emojierapp.vala
++++ b/ui/gtk3/emojierapp.vala
+@@ -65,7 +65,7 @@ public class EmojiApplication : Gtk.Application {
+         uint ncandidates = m_emojier.get_number_of_candidates();
+         if (ncandidates > 0 && ncandidates >= index) {
+             m_emojier.set_cursor_pos(index);
+-            show_candidate = m_emojier.has_variants(index);
++            show_candidate = m_emojier.has_variants(index, false);
+         } else {
+             return;
+         }
+diff --git a/ui/gtk3/panelbinding.vala b/ui/gtk3/panelbinding.vala
+index 4ebff8da..01c43b0d 100644
+--- a/ui/gtk3/panelbinding.vala
++++ b/ui/gtk3/panelbinding.vala
+@@ -447,13 +447,19 @@ class PanelBinding : IBus.PanelService {
+     }
+ 
+ 
+-    private void commit_text_update_favorites(IBus.Text text) {
++    private void commit_text_update_favorites(IBus.Text text,
++                                              bool      disable_extension) {
+         commit_text(text);
+-        IBus.ExtensionEvent event = new IBus.ExtensionEvent(
++
++        // If disable_extension is false, the extension event is already
++        // sent before the focus-in is received.
++        if (disable_extension) {
++            IBus.ExtensionEvent event = new IBus.ExtensionEvent(
+                     "name", m_extension_name,
+                     "is-enabled", false,
+                     "is-extension", true);
+-        panel_extension(event);
++            panel_extension(event);
++        }
+         string committed_string = text.text;
+         string preedit_string = m_preedit.get_text();
+         m_preedit.hide();
+@@ -482,7 +488,7 @@ class PanelBinding : IBus.PanelService {
+             prev_context_path != "" &&
+             prev_context_path == m_current_context_path) {
+             IBus.Text text = new IBus.Text.from_string(selected_string);
+-            commit_text_update_favorites(text);
++            commit_text_update_favorites(text, false);
+             m_emojier.reset();
+             return true;
+         }
+@@ -564,13 +570,13 @@ class PanelBinding : IBus.PanelService {
+     private bool key_press_enter() {
+         if (m_extension_name != "unicode" && is_emoji_lookup_table()) {
+             // Check if variats exist
+-            if (m_emojier.key_press_enter()) {
++            if (m_emojier.key_press_enter(false)) {
+                 convert_preedit_text();
+                 return true;
+             }
+         }
+         IBus.Text text = m_preedit.get_commit_text();
+-        commit_text_update_favorites(text);
++        commit_text_update_favorites(text, true);
+         return false;
+     }
+ 
+@@ -712,15 +718,10 @@ class PanelBinding : IBus.PanelService {
+     }
+ 
+ 
+-    private bool is_visible_wayland_lookup_table() {
+-        return m_wayland_lookup_table_is_visible;
+-    }
+-
+-
+     private void hide_emoji_lookup_table() {
+         if (m_emojier == null)
+             return;
+-        if (m_is_wayland)
++        if (m_wayland_lookup_table_is_visible)
+             hide_wayland_lookup_table();
+         else
+             m_emojier.hide();
+@@ -747,7 +748,7 @@ class PanelBinding : IBus.PanelService {
+ 
+     private bool is_emoji_lookup_table() {
+         if (m_is_wayland)
+-            return is_visible_wayland_lookup_table();
++            return m_wayland_lookup_table_is_visible;
+         else
+             return m_emojier.get_visible();
+     }
+@@ -788,7 +789,8 @@ class PanelBinding : IBus.PanelService {
+          */
+         if (!input_context_path.has_suffix("InputContext_1")) {
+             m_real_current_context_path = m_current_context_path;
+-            this.emojier_focus_commit();
++            if (m_is_wayland)
++                this.emojier_focus_commit();
+         }
+     }
+ 
+@@ -822,8 +824,18 @@ class PanelBinding : IBus.PanelService {
+             // For title handling in gnome-shell
+             m_application.add_window(m_emojier);
+             m_emojier.candidate_clicked.connect((i, b, s) => {
++                candidate_clicked_lookup_table_real(i, b, s, true);
++            });
++            m_emojier.commit_text.connect((s) => {
+                 if (!m_is_wayland)
+-                    candidate_clicked_lookup_table(i, b, s);
++                    return;
++                // Currently emojier has a focus but the text input focus
++                // does not and commit the text later.
++                IBus.ExtensionEvent close_event = new IBus.ExtensionEvent(
++                        "name", m_extension_name,
++                        "is-enabled", false,
++                        "is-extension", true);
++                panel_extension(close_event);
+             });
+         }
+         m_emojier.reset();
+@@ -1041,9 +1053,10 @@ class PanelBinding : IBus.PanelService {
+         show_preedit_and_candidate(show_candidate);
+     }
+ 
+-    public override void candidate_clicked_lookup_table(uint index,
+-                                                        uint button,
+-                                                        uint state) {
++    private void candidate_clicked_lookup_table_real(uint index,
++                                                     uint button,
++                                                     uint state,
++                                                     bool is_emojier) {
+         if (button == IBusEmojier.BUTTON_CLOSE_BUTTON) {
+             m_enable_extension = false;
+             hide_emoji_lookup_table();
+@@ -1061,17 +1074,26 @@ class PanelBinding : IBus.PanelService {
+         uint ncandidates = m_emojier.get_number_of_candidates();
+         if (ncandidates > 0 && ncandidates >= index) {
+             m_emojier.set_cursor_pos(index);
+-            show_candidate = m_emojier.has_variants(index);
+-            m_preedit.set_emoji(m_emojier.get_current_candidate());
++            bool need_commit_signal = m_is_wayland && is_emojier;
++            show_candidate = m_emojier.has_variants(index, need_commit_signal);
++            if (!m_is_wayland)
++                m_preedit.set_emoji(m_emojier.get_current_candidate());
+         } else {
+             return;
+         }
+         if (!show_candidate) {
+             IBus.Text text = m_preedit.get_commit_text();
+-            commit_text_update_favorites(text);
+             hide_emoji_lookup_table();
++            if (!is_emojier || !m_is_wayland)
++                commit_text_update_favorites(text, true);
+             return;
+         }
+         show_preedit_and_candidate(show_candidate);
+     }
++
++    public override void candidate_clicked_lookup_table(uint index,
++                                                        uint button,
++                                                        uint state) {
++        candidate_clicked_lookup_table_real(index, button, state, false);
++    }
+ }
+-- 
+2.17.1
+

@@ -31,7 +31,7 @@
 
 Name:           ibus
 Version:        1.5.19
-Release:        3%{?dist}
+Release:        4%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -428,6 +428,9 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Fri Sep 14 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.19-4
+- Fix Bug SEGV Choose an emoji by mouse from the emoji category list
+
 * Thu Aug 30 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.19-3
 - Fix Bug 1618682 - SEGV with ASCII on emojier in Wayland
 - Support Shift-Space on emojier preedit
