@@ -31,7 +31,7 @@
 
 Name:           ibus
 Version:        1.5.19
-Release:        4%{?dist}
+Release:        5%{?dist}
 Summary:        Intelligent Input Bus for Linux OS
 License:        LGPLv2+
 Group:          System Environment/Libraries
@@ -87,7 +87,6 @@ Requires:       %{name}-gtk3%{?_isa}   = %{version}-%{release}
 Requires:       %{name}-setup          = %{version}-%{release}
 
 Requires:       iso-codes
-Requires:       dbus-x11
 Requires:       dconf
 # rpmlint asks to delete librsvg2
 #Requires:       librsvg2
@@ -428,6 +427,11 @@ dconf update || :
 %{_datadir}/gtk-doc/html/*
 
 %changelog
+* Thu Oct 11 2018 David Herrmann <dh.herrmann@gmail.com> - 1.5.19-5
+- Reduce 'dbus-x11' dependency to 'dbus'. The xinit scripts are no longer the
+  canonical way to start dbus, but the 'dbus' package is nowadays required to
+  provide a user and system bus to its dependents.
+
 * Fri Sep 14 2018 Takao Fujiwara <tfujiwar@redhat.com> - 1.5.19-4
 - Fix Bug SEGV Choose an emoji by mouse from the emoji category list
 
